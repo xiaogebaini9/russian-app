@@ -1,0 +1,22 @@
+{
+  "name": "russian-app",
+  "version": "1.0.0",
+  "description": "俄语翻译学习 - 走遍俄罗斯",
+  "scripts": {
+    "build": "npm run sync",
+    "sync": "npx cap sync",
+    "copy": "npx cap copy",
+    "open:android": "npx cap open android",
+    "build:apk": "cd android && ./gradlew assembleDebug",
+    "build:aab": "cd android && ./gradlew bundleDebug"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1"
+  }
+}

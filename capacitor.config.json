@@ -1,0 +1,15 @@
+{
+  "appId": "com.russian.learn",
+  "appName": "俄语学习",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1000,
+      "backgroundColor": "#1a1a2e"
+    }
+  }
+}
