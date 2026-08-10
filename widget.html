@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>DeepSeek 余额</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#1a1a1a;--card:#252525;--border:#333;
+  --text:#eee;--text2:#999;--text3:#555;
+  --accent:#f0c27f;--bar-bg:#333;
+}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+  display:flex;justify-content:center;align-items:center;min-height:100vh;
+  -webkit-app-region:drag;-webkit-user-select:none;user-select:none;
+}
+.widget{
+  text-align:center;padding:24px 20px;border-radius:20px;
+  background:var(--card);border:1px solid var(--border);
+  width:220px;box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.widget .title{
+  font-size:11px;color:var(--text3);font-weight:500;letter-spacing:.05em;
+  margin-bottom:12px;text-transform:uppercase;
+}
+.widget .balance{
+  font-size:22px;font-weight:600;color:var(--accent);margin-bottom:4px;
+  letter-spacing:.02em;
+}
+.widget .currency{font-size:11px;color:var(--text2);margin-bottom:14px}
+.widget .meter{
+  height:4px;border-radius:2px;background:var(--bar-bg);
+  margin-bottom:14px;overflow:hidden;
+}
+.widget .meter .fill{
+  height:100%;border-radius:2px;background:var(--accent);
+  transition:width .6s ease;
+}
+.widget .info{font-size:10px;color:var(--text3);line-height:1.8}
+.widget .info span{color:var(--text2)}
+.widget .status{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  margin-top:10px;font-size:10px;color:var(--text3);
+}
+.widget .status .dot{width:5px;height:5px;border-radius:50%;background:#55efc4}
+.widget .status .dot.error{background:#ff6b6b}
+.widget .refresh{
+  margin-top:12px;font-size:10px;color:var(--text3);cursor:pointer;
+  padding:4px 12px;border-radius:10px;border:1px solid var(--border);
+  background:none;transition:all .15s;-webkit-app-region:no-drag;
+}
+.widget .refresh:hover{color:var(--text);border-color:var(--text2)}
+.widget .refresh:active{background:var(--border)}
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="title">DeepSeek API</div>
+  <div class="balance" id="balance">---</div>
+  <div class="currency" id="currency"></div>
+  <div class="meter">
+    <div class="fill" id="fill" style="width:0%"></div>
+  </div>
+  <div class="info">
+    <div>充值 <span id="toppedUp">---</span></div>
+    <div>赠送 <span id="granted">---</span></div>
+  </div>
+  <div class="status" id="status">
+    <span class="dot" id="dot"></span>
+    <span id="statusText">加载中</span>
+  </div>
+  <button class="refresh" id="refreshBtn">刷新</button>
+</div>
+
+<script>
+const KEY = 'sk-ce11d037357b463697124e730bdb77a4';
+const API = 'http://localhost:8765/api/balance';
+
+async function fetchBalance(){
+  const dot=document.getElementById('dot');
+  const st=document.getElementById('statusText');
+  st.textContent='查询中...';dot.className='dot';
+
+  try{
+    const r=await fetch(API,{headers:{'x-api-key':KEY},signal:AbortSignal.timeout(8000)});
+    const d=await r.json();
+    if(d.error){throw new Error(d.error)}
+    if(!d.balance_infos||!d.balance_infos.length){throw new Error('无余额数据')}
+
+    const b=d.balance_infos[0];
+    const total=parseFloat(b.total_balance);
+    const granted=parseFloat(b.granted_balance);
+    const topped=parseFloat(b.topped_up_balance);
+    const used=Math.max(0,granted+topped-total);
+
+    document.getElementById('balance').textContent=total.toFixed(2);
+    document.getElementById('currency').textContent=b.currency||'CNY';
+    document.getElementById('toppedUp').textContent=topped.toFixed(2);
+    document.getElementById('granted').textContent=granted.toFixed(2);
+
+    // Meter: show remaining %
+    const orig=Math.max(granted+topped,0.01);
+    const pct=Math.max(0,Math.min(100,(total/orig)*100));
+    document.getElementById('fill').style.width=pct+'%';
+
+    if(pct<15)document.getElementById('fill').style.background='#ff6b6b';
+    else if(pct<40)document.getElementById('fill').style.background='#ffeaa7';
+    else document.getElementById('fill').style.background='var(--accent)';
+
+    dot.className='dot';st.textContent=d.is_available?'可用':'已用尽';
+    if(!d.is_available){dot.className='dot error'}
+  }catch(e){
+    document.getElementById('balance').textContent='---';
+    dot.className='dot error';st.textContent=e.message.slice(0,30);
+  }
+}
+
+document.getElementById('refreshBtn').addEventListener('click',fetchBalance);
+fetchBalance();
+setInterval(fetchBalance,120000); // 2分钟自动刷新
+</script>
+</body>
+</html>

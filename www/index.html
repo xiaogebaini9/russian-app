@@ -3,1019 +3,615 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<meta name="theme-color" content="#1a1a2e">
+<meta name="theme-color" content="#f5f6fa">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
-<title>俄语翻译学习</title>
+<title>俄语学习</title>
 <style>
-/* ─── Reset & Variables ─── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0e0e1a;--surface:#1a1a30;--surface2:#222244;--surface3:#2e2e52;
-  --text:#eeeef4;--text2:#8899bb;--text3:#5a6a8a;--text4:#3a4a6a;
-  --accent:#fc5c7d;--accent2:#f0c27f;--accent3:#6c5ce7;
-  --success:#55efc4;--warning:#ffeaa7;--danger:#ff6b6b;
-  --radius:14px;--shadow:0 8px 32px rgba(0,0,0,0.5);
-  --fs:16px;--fs-sm:13px;--fs-xs:11px;
-  --nav-h:62px;--safe-b:env(safe-area-inset-bottom,0px);
-  --header-h:50px;
+  --bg:#f5f6fa;--surface:#fff;--card:#fff;--input:#f0f1f5;
+  --border:#e4e6ed;--border2:#dcdee5;
+  --blue:#2563eb;--blue2:#3b82f6;--blue-bg:rgba(37,99,235,.06);--blue-bg2:rgba(37,99,235,.12);
+  --text:#1a1d26;--text2:#6b7080;--text3:#adb1c0;
+  --green:#22c55e;--yellow:#f59e0b;--red:#ef4444;
+  --radius:12px;--radius-sm:8px;
+  --fs:15px;--fs-sm:13px;--fs-xs:11px;
 }
-body.light{
-  --bg:#eef0f6;--surface:#ffffff;--surface2:#f4f6fc;--surface3:#dce0ec;
-  --text:#2d3436;--text2:#636e72;--text3:#a0a8b8;--text4:#c0c8d8;
-  --shadow:0 8px 32px rgba(0,0,0,0.06);
-}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-size:var(--fs);font-family:-apple-system,'Segoe UI',system-ui,sans-serif;transition:background .3s,color .3s;-webkit-tap-highlight-color:transparent}
-input,textarea{font-family:inherit;font-size:inherit;outline:none;background:var(--surface2);border:1.5px solid var(--surface3);color:var(--text);border-radius:12px;padding:12px 16px;width:100%;transition:border-color .25s}
-input:focus,textarea:focus{border-color:var(--accent)}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-size:var(--fs);font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+input,textarea{font-family:inherit;font-size:inherit;outline:none;background:var(--input);border:1.5px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:10px 14px;width:100%;transition:border-color .2s}
+input:focus,textarea:focus{border-color:var(--blue)}
 textarea{resize:none}
 ::placeholder{color:var(--text3)}
 button{cursor:pointer;border:none;outline:none;font-family:inherit;font-size:inherit;background:none;color:inherit;-webkit-tap-highlight-color:transparent}
-*{ -webkit-tap-highlight-color:transparent; outline:none;}
-::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar{width:2px}
 ::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:1px}
 
-/* ─── App Shell ─── */
-.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:480px;margin:0 auto;position:relative;overflow:hidden}
-.header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:8px 16px;height:var(--header-h);flex-shrink:0;
-  background:var(--surface);border-bottom:1px solid var(--surface3);
-  position:relative;z-index:10;
-}
-.header h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;-webkit-text-fill-color:transparent}
-.header .status{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px}
-.header .status .dot{width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block}
-.header .status .dot.offline{background:var(--text4)}
-.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px 4px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:480px;margin:0 auto;overflow:hidden}
+.header{display:flex;align-items:center;justify-content:center;padding:12px 16px;flex-shrink:0}
+.header h1{font-size:17px;font-weight:600;letter-spacing:.03em;color:var(--blue)}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px 8px;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 
-/* ─── Bottom Nav ─── */
-.nav{
-  display:flex;flex-shrink:0;background:var(--surface);border-top:1px solid var(--surface3);
-  padding:4px 0 calc(4px + var(--safe-b));box-shadow:0 -4px 20px rgba(0,0,0,0.15);
-}
-.nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;
-  padding:5px 0 3px;font-size:10px;color:var(--text3);font-weight:500;transition:color .2s;
-  border-radius:8px;margin:0 2px;position:relative;
-}
-.nav-btn .icon{font-size:22px;transition:transform .2s}
-.nav-btn .badge{
-  position:absolute;top:2px;right:50%;margin-right:-24px;
-  min-width:16px;height:16px;border-radius:8px;background:var(--accent);
-  color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;
-  padding:0 4px;box-shadow:0 2px 6px rgba(252,92,125,0.4);display:none;
-}
-.nav-btn .badge.show{display:flex}
-.nav-btn.active{color:var(--accent)}
-.nav-btn.active .icon{transform:scale(1.1)}
-.nav-btn:active .icon{transform:scale(0.9)}
-
-/* ─── Screen ─── */
+/* Nav */
+.nav{display:flex;flex-shrink:0;background:var(--surface);border-top:1px solid var(--border);padding:4px 0 calc(4px+env(safe-area-inset-bottom,0px))}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0 4px;font-size:10px;color:var(--text3);font-weight:500;transition:color .2s}
+.nav-btn .icon{font-size:20px}
+.nav-btn.active{color:var(--blue)}
+.nav-btn:active .icon{transform:scale(.9)}
 .screen{display:none;height:100%;flex-direction:column;padding-top:6px}
 .screen.active{display:flex}
-.screen-title{font-size:var(--fs-sm);color:var(--text2);font-weight:600;padding:10px 4px 6px}
 
-/* ════════════════════════ TRANSLATE ════════════════════════ */
-.tr-lang-bar{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;flex-shrink:0}
-.lang-btn{padding:5px 12px;border-radius:8px;background:var(--surface2);color:var(--text2);font-size:var(--fs-sm);font-weight:500;transition:all .2s}
-.lang-btn.active{background:rgba(252,92,125,0.15);color:var(--accent)}
-.swap-btn{font-size:18px;color:var(--text3);padding:4px 8px;border-radius:50%;transition:all .3s}
-.swap-btn:active{transform:rotate(180deg);background:var(--surface2)}
-.tr-input-wrap{position:relative;flex-shrink:0}
-.tr-input-wrap textarea{padding-right:44px;min-height:76px;font-size:calc(var(--fs) + 2px);padding-top:14px}
-.clear-btn{
-  position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;
-  background:var(--surface3);color:var(--text3);font-size:12px;display:flex;
-  align-items:center;justify-content:center;transition:all .2s
-}
-.clear-btn:active{background:var(--accent);color:#fff;transform:scale(0.9)}
-.tr-options{display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px;flex-shrink:0}
+/* ═══ TRANSLATE (keep existing) ═══ */
+.lang-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;flex-shrink:0}
+.lang-sel{position:relative}
+.lang-sel-btn{padding:7px 16px;border-radius:20px;font-size:var(--fs-sm);font-weight:500;background:var(--surface);border:1.5px solid var(--border);color:var(--text2);transition:all .2s;min-width:72px;text-align:center}
+.lang-popup{position:absolute;top:110%;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;display:none;z-index:10;min-width:100px;box-shadow:0 8px 24px rgba(0,0,0,.1)}
+.lang-popup.show{display:block;animation:fadeIn .15s ease}
+.lang-popup button{display:block;width:100%;padding:9px 14px;border-radius:7px;font-size:var(--fs-sm);color:var(--text2);text-align:center;transition:all .15s}
+.lang-popup button:hover{background:var(--blue-bg);color:var(--blue)}
+.lang-popup button.active{color:var(--blue)}
+.swap-btn{font-size:18px;color:var(--text3);padding:6px 10px;border-radius:50%;transition:all .3s}
+.swap-btn:active{transform:rotate(180deg);background:var(--blue-bg)}
+.tr-input-wrap{position:relative;flex-shrink:0;margin-bottom:6px}
+.tr-input-wrap textarea{padding:16px 44px 16px 16px;min-height:100px;font-size:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);line-height:1.5}
+.tr-input-wrap textarea:focus{border-color:var(--blue)}
+.clear-btn{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;color:var(--text3);font-size:11px;display:flex;align-items:center;justify-content:center}
+.clear-btn:active{background:var(--blue);color:#fff}
+.tr-mode-wrap{position:absolute;right:6px;bottom:6px;z-index:5}
+.tr-mode-trigger{font-size:10px;padding:4px 8px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text3);display:flex;align-items:center;gap:3px}
+.tr-mode-trigger.deep{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
+.tr-mode-popup{position:absolute;right:0;bottom:100%;margin-bottom:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;display:none;min-width:140px;box-shadow:0 8px 24px rgba(0,0,0,.1)}
+.tr-mode-popup.show{display:block;animation:fadeIn .15s ease}
+.tr-mode-popup button{display:block;width:100%;text-align:left;padding:9px 12px;border-radius:7px;font-size:var(--fs-sm);color:var(--text2);transition:all .15s}
+.tr-mode-popup button:hover{background:var(--blue-bg);color:var(--blue)}
+.tr-mode-popup button.active{color:var(--blue)}
+.tr-mode-popup button .pop-label{font-size:10px;color:var(--text3);display:block}
+.tr-options{display:flex;justify-content:space-between;align-items:center;margin:4px 0 10px;flex-shrink:0}
 .auto-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
-.toggle-track{
-  width:34px;height:20px;border-radius:10px;background:var(--surface3);
-  position:relative;cursor:pointer;transition:background .25s;
-}
-.toggle-track.on{background:var(--accent)}
-.toggle-track::after{
-  content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;
-  border-radius:50%;background:#fff;transition:transform .25s;
-  box-shadow:0 1px 3px rgba(0,0,0,0.2);
-}
+.toggle-track{width:34px;height:20px;border-radius:10px;background:var(--border);position:relative;cursor:pointer;transition:background .25s}
+.toggle-track.on{background:var(--blue)}
+.toggle-track::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .25s}
 .toggle-track.on::after{transform:translateX(14px)}
-.tr-actions{display:flex;gap:6px;flex-shrink:0}
-.tr-actions button{
-  flex:1;padding:11px;border-radius:10px;font-size:var(--fs-sm);font-weight:600;
-  transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px
-}
-.btn-primary{background:linear-gradient(135deg,var(--accent),#fd7a95);color:#fff;box-shadow:0 4px 12px rgba(252,92,125,0.25)}
-.btn-primary:active{transform:scale(0.97)}
-.btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--surface3)}
-.btn-secondary:active{background:var(--surface3)}
-.btn-secondary:disabled{opacity:0.4}
-
-.tr-result{
-  margin:8px 0;padding:16px;border-radius:var(--radius);background:var(--surface2);flex-shrink:0;
-  animation:slideUp .3s ease;
-}
+.tr-actions{display:flex;gap:8px;flex-shrink:0;margin-bottom:10px;align-items:center}
+.btn-translate{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;font-size:14px;font-weight:700;flex-shrink:0;box-shadow:0 4px 20px rgba(37,99,235,.25);display:flex;align-items:center;justify-content:center}
+.btn-translate:active{transform:scale(.93)}
+.btn-translate:disabled{opacity:.5;transform:none}
+.btn-speak{flex:1;padding:12px;border-radius:var(--radius-sm);font-size:var(--fs-sm);font-weight:600;background:var(--surface);color:var(--text2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;gap:5px}
+.btn-speak:active{background:var(--blue-bg);border-color:var(--blue)}
+.btn-speak:disabled{opacity:.35}
+.tr-result{margin:4px 0 10px;padding:16px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);flex-shrink:0;animation:fadeIn .25s ease}
 .tr-result .tr-source{font-size:var(--fs-sm);color:var(--text3);margin-bottom:4px}
-.tr-result .tr-text{font-size:calc(var(--fs) + 4px);color:var(--text);line-height:1.5;font-weight:500}
-.tr-result .tr-phonetic{font-size:var(--fs-sm);color:var(--text2);margin-top:4px;font-style:italic}
-.tr-result .tr-extras{margin-top:10px;padding-top:10px;border-top:1px solid var(--surface3)}
-.tr-result .tr-extras .extra-item{font-size:var(--fs-sm);color:var(--text2);padding:3px 0;line-height:1.5}
-.tr-result .tr-extras .extra-item strong{color:var(--accent2)}
-.tr-result .tr-save{
-  margin-top:10px;display:inline-flex;align-items:center;gap:4px;font-size:12px;
-  padding:5px 12px;border-radius:8px;background:var(--surface);color:var(--accent2);
-  border:1px solid var(--surface3);transition:all .2s;
-}
-.tr-result .tr-save:active{background:var(--surface3)}
-
-.tr-history{flex:1;overflow-y:auto;min-height:80px;margin-top:2px}
-.tr-history .hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 4px 4px}
-.hdr-title{font-size:var(--fs-sm);color:var(--text3);font-weight:500}
-.hdr-clear{font-size:12px;color:var(--danger)}
-.h-item{
-  display:flex;align-items:center;gap:8px;padding:10px 10px;border-radius:10px;
-  background:var(--surface2);margin-bottom:5px;transition:background .15s;
-}
-.h-item:active{background:var(--surface3)}
-.h-item .h-icon{font-size:16px;color:var(--text3);flex-shrink:0}
+.tr-result .tr-text{font-size:18px;color:var(--text);line-height:1.5;font-weight:500}
+.tr-result .tr-phonetic{font-size:var(--fs-sm);color:var(--text2);margin-top:4px}
+.tr-result .tr-save{margin-top:10px;display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:6px 14px;border-radius:20px;background:var(--input);border:1px solid var(--border);color:var(--text2)}
+.tr-result .tr-save:active{background:var(--blue-bg);border-color:var(--blue);color:var(--blue)}
+.history-trigger{font-size:11px;color:var(--text3);cursor:pointer;padding:4px 8px;border-radius:6px;display:flex;align-items:center;gap:3px}
+.history-trigger:hover{color:var(--text)}
+.history-trigger .ht-count{background:var(--border);color:var(--text2);font-size:10px;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.history-popup{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.history-popup.show{display:flex}
+.history-popup .hp-panel{width:100%;max-width:480px;max-height:60vh;background:var(--surface);border-radius:18px 18px 0 0;display:flex;flex-direction:column;animation:slideUp .3s ease}
+.history-popup .hp-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.history-popup .hp-hdr .hp-title{font-weight:600;font-size:15px;color:var(--blue)}
+.history-popup .hp-list{flex:1;overflow-y:auto;padding:6px 12px 12px}
+.h-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;margin-bottom:4px;border:1px solid transparent}
+.h-item:active{background:var(--input);border-color:var(--border)}
+.h-item .h-icon{font-size:12px;color:var(--text3);flex-shrink:0}
 .h-item .h-body{flex:1;min-width:0}
 .h-item .h-src{font-size:var(--fs-xs);color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .h-item .h-tgt{font-size:var(--fs-sm);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
-.h-item .h-play-btn{font-size:16px;color:var(--text3);padding:6px}
-.empty-state{text-align:center;padding:40px 12px;color:var(--text3);font-size:var(--fs-sm);line-height:1.8}
+.empty-state{text-align:center;padding:36px 12px;color:var(--text3);font-size:var(--fs-sm);line-height:1.8}
 
-/* ════════════════════════ TEXTBOOK + GRAMMAR ════════════════ */
-.tb-sub-tabs{display:flex;gap:4px;margin-bottom:10px;flex-shrink:0}
-.tb-sub{flex:1;padding:9px 0;text-align:center;border-radius:10px;font-size:var(--fs-sm);font-weight:500;color:var(--text2);background:var(--surface2);transition:all .2s}
-.tb-sub.active{background:rgba(252,92,125,0.12);color:var(--accent)}
+/* ═══ LEARN - Subject tabs ═══ */
+.subj-tabs{display:flex;gap:6px;margin-bottom:10px;flex-shrink:0}
+.subj-tab{flex:1;padding:10px 0;text-align:center;border-radius:var(--radius-sm);font-size:var(--fs-sm);font-weight:600;color:var(--text3);background:var(--surface);border:1.5px solid var(--border);transition:all .2s}
+.subj-tab.active{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
+.subj-tab.disabled{opacity:.4}
 
-.tb-book-tabs{display:flex;gap:4px;margin-bottom:10px;flex-shrink:0;overflow-x:auto;padding:2px 0}
-.tb-book-tabs::-webkit-scrollbar{display:none}
-.tb-book{flex-shrink:0;padding:7px 14px;border-radius:9px;font-size:var(--fs-sm);font-weight:500;color:var(--text3);background:var(--surface2);transition:all .2s;white-space:nowrap}
-.tb-book.active{background:rgba(252,92,125,0.12);color:var(--accent)}
-.tb-book:active{transform:scale(0.95)}
+/* Sub-tabs */
+.sub-tabs{display:flex;gap:3px;margin-bottom:10px;flex-shrink:0;flex-wrap:wrap}
+.sub-tab{padding:7px 13px;border-radius:18px;font-size:var(--fs-sm);font-weight:500;color:var(--text3);background:var(--surface);border:1px solid var(--border);transition:all .2s;white-space:nowrap}
+.sub-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 
-.tb-search{margin-bottom:8px;flex-shrink:0;position:relative}
-.tb-search input{padding:9px 14px;font-size:var(--fs-sm);padding-left:36px}
-.tb-search .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px}
+/* Lesson detail tabs */
+.les-tabs{display:flex;gap:4px;margin:8px 0;flex-shrink:0}
+.les-tab{flex:1;padding:7px 0;text-align:center;border-radius:6px;font-size:var(--fs-sm);font-weight:500;color:var(--text3);background:var(--input);transition:all .15s}
+.les-tab.active{background:var(--blue-bg);color:var(--blue)}
 
-.tb-lessons{flex:1;overflow-y:auto;min-height:0;padding-bottom:4px}
-.lesson-card{border-radius:var(--radius);overflow:hidden;background:var(--surface2);margin-bottom:8px}
-.lesson-hdr{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:12px 14px;cursor:pointer;transition:background .2s;
-}
-.lesson-hdr:active{background:var(--surface3)}
-.lesson-hdr .l-num{font-weight:600;color:var(--accent2);font-size:var(--fs-sm)}
-.lesson-hdr .l-title{font-size:var(--fs-sm);color:var(--text2);margin-top:1px}
-.lesson-hdr .l-arrow{font-size:12px;color:var(--text3);transition:transform .3s}
-.lesson-card.open .lesson-hdr .l-arrow{transform:rotate(180deg)}
-.lesson-body{display:none;padding:0 4px 10px 4px}
-.lesson-card.open .lesson-body{display:block}
-.vocab-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:0;padding:0 10px}
-.vocab-grid .vg-ru{padding:5px 4px;font-weight:500;color:var(--accent2);font-size:var(--fs-sm);border-bottom:1px solid var(--surface3);display:flex;align-items:center;gap:4px}
-.vocab-grid .vg-cn{padding:5px 4px;color:var(--text);font-size:var(--fs-sm);border-bottom:1px solid var(--surface3);display:flex;align-items:center}
-.vocab-grid .vg-note{padding:5px 0 5px 4px;color:var(--text3);font-size:var(--fs-xs);border-bottom:1px solid var(--surface3)}
-.vocab-grid .vg-play{color:var(--text3);font-size:14px;cursor:pointer;padding:5px 2px}
-.vocab-grid .vg-play:active{color:var(--accent)}
-.vocab-grid .vg-save{color:var(--text3);font-size:12px;cursor:pointer;padding:5px 2px}
-.vocab-grid .vg-save:active{color:var(--accent2)}
-.vocab-grid .vg-save.saved{color:var(--accent2)}
-.grid-header{padding:5px 4px;font-size:var(--fs-xs);color:var(--text3);font-weight:600;border-bottom:2px solid var(--surface3)}
+/* Book selector */
+.book-bar{display:flex;gap:4px;margin-bottom:8px;flex-shrink:0;overflow-x:auto}
+.book-bar::-webkit-scrollbar{display:none}
+.book-chip{flex-shrink:0;padding:6px 13px;border-radius:18px;font-size:var(--fs-sm);font-weight:500;color:var(--text3);background:var(--surface);border:1.5px solid var(--border);transition:all .2s}
+.book-chip.active{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
+.search-box{margin-bottom:8px;flex-shrink:0;position:relative}
+.search-box input{padding:9px 14px 9px 34px;font-size:var(--fs-sm);background:var(--surface)}
+.search-box .sicon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px}
+.les-scroll{flex:1;overflow-y:auto;min-height:0}
+.les-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;overflow:hidden}
+.les-card-hdr{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer}
+.les-card-hdr:active{background:var(--input)}
+.les-card-hdr .les-num{font-weight:600;color:var(--blue);font-size:var(--fs-sm)}
+.les-card-hdr .les-title{font-size:var(--fs-sm);color:var(--text2);margin-top:1px}
+.les-card-hdr .les-arrow{font-size:11px;color:var(--text3);transition:transform .25s}
+.les-card.open .les-card-hdr .les-arrow{transform:rotate(180deg)}
+.les-card-body{display:none;padding:0 10px 10px}
+.les-card.open .les-card-body{display:block}
+.vocab-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:0}
+.vg-ru{padding:5px 4px;font-weight:500;color:var(--blue);font-size:var(--fs-sm);border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:4px}
+.vg-cn{padding:5px 4px;color:var(--text);font-size:var(--fs-sm);border-bottom:1px solid var(--border2)}
+.vg-act{padding:5px 2px;font-size:12px;color:var(--text3);cursor:pointer}
+.vg-act:active{color:var(--blue)}
+.vg-act.saved{color:var(--blue)}
+.grid-hdr{padding:5px 4px;font-size:var(--fs-xs);color:var(--text3);font-weight:600;border-bottom:2px solid var(--border)}
+.grammar-mini{padding:8px 4px;font-size:var(--fs-sm);color:var(--text2);line-height:1.8}
+.grammar-mini b{color:var(--text)}
+.grammar-mini .ex{color:var(--blue);font-weight:500}
+.grammar-mini table{width:100%;border-collapse:collapse;margin:6px 0;font-size:var(--fs-xs)}
+.grammar-mini td,.grammar-mini th{padding:4px 6px;border:1px solid var(--border);text-align:center}
+.grammar-mini th{background:var(--input);color:var(--blue)}
 
-/* Grammar */
-.grammar-section{margin-bottom:12px}
-.grammar-card{border-radius:12px;overflow:hidden;background:var(--surface2);margin-bottom:6px}
-.grammar-hdr{
-  padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;
-  transition:background .2s;font-weight:500;
-}
-.grammar-hdr:active{background:var(--surface3)}
-.grammar-hdr .g-arrow{font-size:12px;color:var(--text3);transition:transform .3s}
-.grammar-card.open .grammar-hdr .g-arrow{transform:rotate(180deg)}
-.grammar-body{display:none;padding:0 14px 14px;font-size:var(--fs-sm);line-height:1.7;color:var(--text2);overflow-x:auto}
-.grammar-card.open .grammar-body{display:block}
-.grammar-body table{width:100%;border-collapse:collapse;margin:8px 0;font-size:var(--fs-sm)}
-.grammar-body td,.grammar-body th{padding:5px 8px;border:1px solid var(--surface3);text-align:center}
-.grammar-body th{background:var(--surface);color:var(--accent2);font-weight:600}
-.grammar-body .ex{color:var(--accent2);font-weight:500}
-.grammar-body code{background:var(--surface);padding:1px 6px;border-radius:4px;color:var(--accent2);font-size:var(--fs-xs)}
+/* Quiz mini */
+.quiz-mini{padding:6px 4px}
+.quiz-mini .qm-q{font-weight:500;margin-bottom:8px;font-size:var(--fs-sm)}
+.quiz-mini .qm-opt{display:block;width:100%;text-align:left;padding:10px 12px;margin-bottom:4px;border-radius:var(--radius-sm);background:var(--input);border:1.5px solid var(--border);font-size:var(--fs-sm);color:var(--text);transition:all .15s}
+.quiz-mini .qm-opt:active{transform:scale(.98)}
+.quiz-mini .qm-opt.correct{border-color:var(--green);background:rgba(34,197,94,.08);color:var(--green)}
+.quiz-mini .qm-opt.wrong{border-color:var(--red);background:rgba(239,68,68,.08);color:var(--red)}
+.quiz-mini .qm-result{margin-top:8px;font-size:var(--fs-sm);font-weight:500;display:none}
 
-/* ════════════════════════ QUIZ ════════════════════════ */
-.quiz-setup{text-align:center;padding:20px 0}
-.quiz-setup .qz-books{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}
-.quiz-setup .qz-book{padding:8px 16px;border-radius:10px;font-size:var(--fs-sm);background:var(--surface2);color:var(--text2);border:1px solid var(--surface3);transition:all .2s}
-.quiz-setup .qz-book.selected{border-color:var(--accent);background:rgba(252,92,125,0.1);color:var(--accent)}
-.quiz-setup .qz-count{font-size:var(--fs-sm);color:var(--text2);margin:8px 0}
-.quiz-setup .start-btn{
-  display:inline-flex;align-items:center;gap:6px;padding:12px 32px;border-radius:12px;
-  background:linear-gradient(135deg,var(--accent),var(--accent3));color:#fff;font-weight:600;
-  font-size:var(--fs);box-shadow:0 4px 16px rgba(252,92,125,0.25);
-}
-.quiz-setup .start-btn:active{transform:scale(0.97)}
+/* CEFR tests */
+.level-desc{padding:8px 12px;font-size:var(--fs-sm);color:var(--text2);line-height:1.8;margin-bottom:10px}
+.level-desc strong{color:var(--text)}
+.level-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:8px}
+.level-card .lc-title{font-weight:600;font-size:15px;margin-bottom:4px;color:var(--text)}
+.level-card .lc-sub{font-size:var(--fs-sm);color:var(--text3);margin-bottom:8px}
+.level-card .lc-btn{padding:8px 18px;border-radius:18px;background:var(--blue);color:#fff;font-size:var(--fs-sm);font-weight:500;display:inline-block}
+.level-card .lc-btn:active{opacity:.8}
 
-.quiz-card{
-  padding:24px 16px;text-align:center;animation:slideUp .3s ease;
-}
-.quiz-card .q-progress{font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px}
-.quiz-card .q-bar{height:4px;border-radius:2px;background:var(--surface3);margin-bottom:20px;overflow:hidden}
-.quiz-card .q-bar .q-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
-.quiz-card .q-ru{font-size:28px;font-weight:500;color:var(--accent2);margin-bottom:16px;line-height:1.4}
-.quiz-card .q-options{display:grid;gap:8px}
-.quiz-card .q-opt{
-  padding:14px 16px;border-radius:12px;background:var(--surface2);color:var(--text);
-  font-size:var(--fs);text-align:left;transition:all .2s;border:1.5px solid transparent;
-}
-.quiz-card .q-opt:active{transform:scale(0.98)}
-.quiz-card .q-opt.correct{border-color:var(--success);background:rgba(85,239,196,0.1);color:var(--success)}
-.quiz-card .q-opt.wrong{border-color:var(--danger);background:rgba(255,107,107,0.1);color:var(--danger)}
-.quiz-card .q-opt.reveal{border-color:var(--accent2);background:rgba(240,194,127,0.08)}
-.quiz-card .q-next{
-  margin-top:16px;padding:12px 28px;border-radius:10px;background:var(--accent);color:#fff;
-  font-weight:600;font-size:var(--fs-sm);
-}
-.quiz-result{text-align:center;padding:30px 16px}
-.quiz-result .qr-score{font-size:48px;font-weight:300;color:var(--accent2);margin-bottom:4px}
-.quiz-result .qr-label{font-size:var(--fs-sm);color:var(--text2);margin-bottom:16px}
-.quiz-result .qr-detail{font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px;line-height:1.8}
-.quiz-result .qr-btn{padding:12px 28px;border-radius:10px;background:var(--surface2);color:var(--text2);border:1px solid var(--surface3);margin:4px}
-
-/* ════════════════════════ FAVORITES ════════════════════════ */
-.fav-stats{font-size:var(--fs-sm);color:var(--text3);padding:4px 4px 8px}
-.fav-item{
-  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
-  background:var(--surface2);margin-bottom:5px;transition:background .15s;
-}
-.fav-item:active{background:var(--surface3)}
-.fav-item .fv-ru{font-weight:500;color:var(--accent2);font-size:var(--fs-sm);min-width:80px}
-.fav-item .fv-cn{color:var(--text);font-size:var(--fs-sm);flex:1}
-.fav-item .fv-act{font-size:16px;color:var(--text3);padding:4px}
-.fav-item .fv-act:active{color:var(--danger)}
-
-/* ════════════════════════ SETTINGS ════════════════════════ */
-.setting-group{margin-bottom:18px}
-.setting-group-title{font-size:var(--fs-sm);color:var(--accent2);font-weight:600;margin-bottom:8px;padding-left:4px;display:flex;align-items:center;gap:6px}
-.setting-card{background:var(--surface2);border-radius:12px;padding:14px;margin-bottom:6px}
-.setting-card .s-label{font-size:calc(var(--fs) - 1px);font-weight:500;color:var(--text);margin-bottom:3px}
-.setting-card .s-desc{font-size:var(--fs-sm);color:var(--text3);margin-bottom:8px;line-height:1.5}
+/* Favorites & Settings (simple) */
+.fav-stats{font-size:var(--fs-sm);color:var(--text3);padding:4px 2px 8px}
+.fav-stats strong{color:var(--blue)}
+.fav-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;background:var(--surface);margin-bottom:4px;border:1px solid var(--border)}
+.fav-item:active{background:var(--input)}
+.fav-item .fv-ru{font-weight:500;color:var(--blue);font-size:var(--fs-sm);min-width:80px}
+.fav-item .fv-cn{color:var(--text2);font-size:var(--fs-sm);flex:1}
+.fav-item .fv-act{font-size:14px;color:var(--text3);padding:4px}
+.fav-item .fv-act:active{color:var(--blue)}
+.setting-group{margin-bottom:16px}
+.setting-group-title{font-size:var(--fs-sm);color:var(--blue);font-weight:600;margin-bottom:8px}
+.setting-card{background:var(--surface);border-radius:var(--radius-sm);padding:14px;margin-bottom:6px;border:1px solid var(--border)}
+.setting-card .s-label{font-size:14px;font-weight:500;color:var(--text);margin-bottom:3px}
+.setting-card .s-desc{font-size:var(--fs-sm);color:var(--text3);margin-bottom:8px}
 .setting-card .s-row{display:flex;justify-content:space-between;align-items:center}
-.setting-card .s-row .s-label{margin-bottom:0}
-.setting-card .s-val{font-size:var(--fs-sm);color:var(--accent);font-weight:500}
+.spd-grid{display:flex;flex-wrap:wrap;gap:4px}
+.spd-chip{padding:5px 12px;border-radius:6px;font-size:12px;color:var(--text3);background:var(--input);border:1px solid var(--border)}
+.spd-chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+input[type="range"]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:2px;background:var(--border);outline:none;border:none;padding:0}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--blue);cursor:pointer}
 
-input[type="range"]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--surface3);outline:none;border:none;padding:0}
-input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 2px 8px rgba(252,92,125,0.3)}
-
-.spd-grid{display:flex;flex-wrap:wrap;gap:5px}
-.spd-chip{padding:5px 12px;border-radius:7px;font-size:12px;color:var(--text2);background:var(--surface);border:1px solid var(--surface3);transition:all .2s}
-.spd-chip.active{background:rgba(252,92,125,0.12);color:var(--accent);border-color:var(--accent)}
-.spd-chip:active{transform:scale(0.95)}
-
-.mdl-card{padding:10px 14px;border-radius:10px;border:1px solid var(--surface3);margin-bottom:6px;transition:all .2s;cursor:pointer;background:var(--surface)}
-.mdl-card:active{transform:scale(0.98)}
-.mdl-card.selected{border-color:var(--accent);background:rgba(252,92,125,0.06)}
-.mdl-card .mdl-name{font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between}
-.mdl-card .mdl-desc{font-size:var(--fs-xs);color:var(--text3);line-height:1.4}
-.mdl-card .mdl-check{color:var(--accent);display:none}
-.mdl-card.selected .mdl-check{display:inline}
-
-.theme-pick{display:flex;gap:8px}
-.theme-pick button{
-  flex:1;padding:8px;border-radius:8px;text-align:center;font-size:var(--fs-sm);
-  background:var(--surface);border:1px solid var(--surface3);transition:all .2s
-}
-.theme-pick button.active{background:rgba(252,92,125,0.12);border-color:var(--accent);color:var(--accent)}
-
-.about-box{text-align:center;padding:16px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9}
-
-/* ════════════════════════ ANIMATIONS ════════════════════════ */
-@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-.anim-in{animation:slideUp .3s ease}
-.fade-in{animation:fadeIn .25s ease}
-
-/* loading dots */
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+.anim-in{animation:fadeIn .25s ease}
 .lds{display:flex;gap:5px;justify-content:center;align-items:center;padding:20px}
-.lds span{width:8px;height:8px;border-radius:50%;background:var(--text3);animation:ld 1.2s infinite}
+.lds span{width:7px;height:7px;border-radius:50%;background:var(--text3);animation:ld 1.2s infinite}
 .lds span:nth-child(2){animation-delay:.15s}
 .lds span:nth-child(3){animation-delay:.3s}
-@keyframes ld{0%,80%,100%{opacity:.3;transform:scale(.7)}40%{opacity:1;transform:scale(1);background:var(--accent)}}
-
-.toast{
-  position:fixed;bottom:calc(var(--nav-h) + 16px + var(--safe-b));left:50%;transform:translateX(-50%);
-  background:var(--surface);color:var(--text);padding:10px 22px;border-radius:10px;
-  font-size:var(--fs-sm);box-shadow:var(--shadow);border:1px solid var(--surface3);
-  z-index:999;opacity:0;transition:opacity .3s ease,bottom .3s ease;pointer-events:none;
-  white-space:nowrap;max-width:80vw;
-}
-.toast.show{opacity:1;bottom:calc(var(--nav-h) + 30px + var(--safe-b))}
-
-@media(min-width:481px){
-  .app{border-left:1px solid var(--surface3);border-right:1px solid var(--surface3)}
-}
+@keyframes ld{0%,80%,100%{opacity:.3;transform:scale(.7)}40%{opacity:1;transform:scale(1);background:var(--blue)}}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surface);color:var(--blue);border:1px solid var(--border);padding:10px 22px;border-radius:20px;font-size:var(--fs-sm);z-index:999;opacity:0;transition:opacity .3s,bottom .3s;pointer-events:none;white-space:nowrap;max-width:80vw}
+.toast.show{opacity:1;bottom:94px}
+@media(min-width:481px){.app{border-left:1px solid var(--border);border-right:1px solid var(--border)}}
 </style>
 </head>
 <body>
-
 <div class="app" id="app">
-  <!-- Header -->
-  <header class="header">
-    <h1>📖 俄语学习</h1>
-    <span class="status" id="status">
-      <span class="dot" id="statusDot"></span>
-      <span id="statusText">在线</span>
-    </span>
-  </header>
-
-  <!-- Content -->
+  <header class="header"><h1>俄语学习</h1></header>
   <div class="content" id="content">
 
-    <!-- ══ 翻译 ══ -->
+    <!-- ══ TRANSLATE ══ -->
     <div class="screen active" id="sTranslate">
-      <div class="tr-lang-bar">
-        <button class="lang-btn active" id="srcLang">俄语</button>
+      <div class="lang-bar">
+        <div class="lang-sel" id="srcSel">
+          <button class="lang-sel-btn" id="srcLangBtn">俄语</button>
+          <div class="lang-popup" id="srcPopup">
+            <button data-lang="ru" class="active">Русский</button>
+            <button data-lang="en">English</button>
+            <button data-lang="zh-CN">中文</button>
+          </div>
+        </div>
         <button class="swap-btn" id="swapLang">⇄</button>
-        <button class="lang-btn" id="tgtLang">中文</button>
+        <div class="lang-sel" id="tgtSel">
+          <button class="lang-sel-btn" id="tgtLangBtn">中文</button>
+          <div class="lang-popup" id="tgtPopup">
+            <button data-lang="zh-CN" class="active">中文</button>
+            <button data-lang="en">English</button>
+            <button data-lang="ru">Русский</button>
+          </div>
+        </div>
       </div>
       <div class="tr-input-wrap">
-        <textarea id="trInput" placeholder="输入俄语或中文..." rows="2" autocomplete="off"></textarea>
+        <textarea id="trInput" placeholder="输入文本..." rows="2" autocomplete="off"></textarea>
+        <div class="tr-mode-wrap">
+          <button class="tr-mode-trigger" id="modeTrigger">⚡ 快速</button>
+          <div class="tr-mode-popup" id="modePopup">
+            <button data-mode="fast" class="active"><span>⚡ 快速</span><span class="pop-label">免费引擎</span></button>
+            <button data-mode="deep"><span>🧠 深度</span><span class="pop-label">DeepSeek</span></button>
+          </div>
+        </div>
         <button class="clear-btn" id="clearInput">✕</button>
       </div>
       <div class="tr-options">
-        <label class="auto-toggle">
-          <span class="toggle-track on" id="autoToggle"></span>
-          <span>自动翻译</span>
-        </label>
-        <span style="font-size:11px;color:var(--text3)" id="charCount">0</span>
+        <label class="auto-toggle"><span class="toggle-track on" id="autoToggle"></span><span>自动翻译</span></label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:11px;color:var(--text3)" id="charCount">0</span>
+          <span class="history-trigger" id="historyTrigger">📄 记录<span class="ht-count" id="htCount">0</span></span>
+        </div>
       </div>
       <div class="tr-actions">
-        <button class="btn-primary" id="btnTranslate">🔍 翻译</button>
-        <button class="btn-secondary" id="btnSpeak" disabled>🔊 朗读</button>
+        <button class="btn-translate" id="btnTranslate">&#9654;</button>
+        <button class="btn-speak" id="btnSpeak" disabled>🔊 朗读</button>
       </div>
       <div id="trResult"></div>
-      <div class="tr-history" id="trHistory">
-        <div class="hdr">
-          <span class="hdr-title">📋 翻译记录</span>
-          <span class="hdr-clear" id="clearHistory">清空</span>
-        </div>
-        <div id="historyList"><div class="empty-state">暂无记录<br>翻译过的内容会显示在这里</div></div>
-      </div>
     </div>
 
-    <!-- ══ 学习 ══ -->
+    <!-- ══ LEARN ══ -->
     <div class="screen" id="sLearn">
-      <div class="tb-sub-tabs">
-        <button class="tb-sub active" data-sub="textbook">📖 课本</button>
-        <button class="tb-sub" data-sub="grammar">📝 语法</button>
+      <!-- Subject tabs: Russian / English -->
+      <div class="subj-tabs" id="subjTabs">
+        <button class="subj-tab active" data-subj="ru">🇷🇺 俄语</button>
+        <button class="subj-tab disabled" data-subj="en">🇬🇧 英语 (即将开放)</button>
       </div>
-      <!-- Textbook sub-panel -->
-      <div id="subTextbook" style="display:flex;flex-direction:column;flex:1;min-height:0">
-        <div class="tb-book-tabs" id="bookTabs"></div>
-        <div class="tb-search">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="tbSearch" placeholder="搜索单词或短语...">
-        </div>
-        <div class="tb-lessons" id="tbLessons"></div>
+      <!-- Sub-tabs: 课本 / 专业 / 等级 / 设置 -->
+      <div class="sub-tabs" id="learnTabs">
+        <button class="sub-tab active" data-tab="book">课本</button>
+        <button class="sub-tab" data-tab="major">专业俄语</button>
+        <button class="sub-tab" data-tab="cefr">等级考试</button>
+        <button class="sub-tab" data-tab="settings">设置</button>
       </div>
-      <!-- Grammar sub-panel -->
-      <div id="subGrammar" style="display:none;flex:1;overflow-y:auto">
-        <div id="grammarContent"></div>
-      </div>
+      <!-- Content area -->
+      <div id="learnContent" style="flex:1;overflow-y:auto;min-height:0"></div>
     </div>
 
-    <!-- ══ 测验 ══ -->
-    <div class="screen" id="sQuiz">
-      <div id="quizArea"></div>
-    </div>
+    <!-- ══ QUIZ ══ -->
+    <div class="screen" id="sQuiz"><div id="quizArea"></div></div>
 
-    <!-- ══ 更多 ══ -->
+    <!-- ══ MORE ══ -->
     <div class="screen" id="sMore">
-      <div class="tb-sub-tabs">
-        <button class="tb-sub active" data-more="fav">⭐ 收藏</button>
-        <button class="tb-sub" data-more="settings">⚙️ 设置</button>
+      <div class="sub-tabs" style="margin-bottom:10px">
+        <button class="sub-tab active" data-more="fav">收藏</button>
+        <button class="sub-tab" data-more="app-settings">设置</button>
       </div>
       <div id="subFav" style="flex:1;overflow-y:auto">
         <div class="fav-stats" id="favStats">已收藏 <strong>0</strong> 个单词</div>
-        <div id="favList"><div class="empty-state">还没有收藏的单词<br>翻译时点击 ☆ 即可收藏</div></div>
+        <div id="favList"><div class="empty-state">还没有收藏的单词</div></div>
       </div>
-      <div id="subSettings" style="display:none;flex:1;overflow-y:auto">
-        <div id="settingsContent"></div>
-      </div>
+      <div id="subAppSettings" style="display:none;flex:1;overflow-y:auto"><div id="appSettingsContent"></div></div>
     </div>
-
   </div>
 
-  <!-- Nav -->
   <nav class="nav" id="nav">
     <button class="nav-btn active" data-screen="sTranslate"><span class="icon">🌐</span><span>翻译</span></button>
     <button class="nav-btn" data-screen="sLearn"><span class="icon">📚</span><span>学习</span></button>
-    <button class="nav-btn" data-screen="sQuiz"><span class="icon">🎯</span><span>测验</span><span class="badge" id="quizBadge">NEW</span></button>
+    <button class="nav-btn" data-screen="sQuiz"><span class="icon">🎯</span><span>测验</span></button>
     <button class="nav-btn" data-screen="sMore"><span class="icon">📦</span><span>更多</span></button>
   </nav>
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="history-popup" id="historyPopup">
+  <div class="hp-panel">
+    <div class="hp-hdr"><span class="hp-title">翻译记录</span><div style="display:flex;align-items:center;gap:8px"><button id="popupClearHistory" style="font-size:12px;color:var(--text2)">清空</button><button class="hp-close" id="popupClose">✕</button></div></div>
+    <div class="hp-list" id="popupHistoryList"><div class="empty-state">暂无记录</div></div>
+  </div>
+</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-//  CONFIG & STATE
+//  TRANSLATION ENGINE (unchanged core)
 // ═══════════════════════════════════════════════════════════════
-const CFG = {
-  models: [
-    { id:'mymemory', name:'MyMemory (神经网络)', desc:'基于神经网络的翻译引擎，语料库大，适合句子和日常用语翻译。免费不限次。', api:'https://api.mymemory.translated.net/get' },
-    { id:'libre', name:'LibreTranslate (开源OPUS-MT)', desc:'开源翻译引擎，专注欧洲语言，俄语翻译优秀。隐私保护好，可自部署。', api:'https://translate.terraprint.co/translate' },
-  ],
-  speeds: [0.25,0.5,0.75,1,1.25,1.5,1.75,2],
-  fsRange: [13,24],
-};
-
+const LANGS={ru:'俄语',en:'英语','zh-CN':'中文'};
+const LANG_TO_API={ru:'ru',en:'en','zh-CN':'zh-CN'};
+const CFG={models:[{id:'mymemory',name:'MyMemory',desc:'神经网络翻译引擎，免费不限次',api:'https://api.mymemory.translated.net/get'},{id:'libre',name:'LibreTranslate',desc:'开源翻译引擎，俄语翻译优秀',api:'https://translate.terraprint.co/translate'}],speeds:[0.25,0.5,0.75,1,1.25,1.5,1.75,2],fsRange:[13,24]};
 function ls(k,d){try{return JSON.parse(localStorage.getItem('ru_'+k))||d}catch{return d}}
 function ss(k,v){localStorage.setItem('ru_'+k,JSON.stringify(v))}
-
-const S = {
-  settings: ls('settings',{model:'mymemory',speed:.75,fontSize:16,theme:'dark',autoTr:true}),
-  history: ls('history',[]),
-  favs: ls('favs',[]),
-  isSpeaking:false, result:null,
-  lang:'ru|zh-CN',
-};
-
+const S={settings:ls('settings',{model:'mymemory',speed:.75,fontSize:16,autoTr:true,mode:'fast',dsKey:'sk-ce11d037357b463697124e730bdb77a4'}),history:ls('history',[]),favs:ls('favs',[]),isSpeaking:false,result:null,langSrc:'ru',langTgt:'zh-CN'};
 function save(k){ss(k,S[k])}
 
-// ═══════════════════════════════════════════════════════════════
-//  TOAST
-// ═══════════════════════════════════════════════════════════════
 let _tt;
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2200)}
 
-// ═══════════════════════════════════════════════════════════════
-//  NAV
-// ═══════════════════════════════════════════════════════════════
-document.querySelectorAll('.nav-btn').forEach(b=>{
-  b.addEventListener('click',()=>{
-    document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    document.getElementById(b.dataset.screen).classList.add('active');
-    document.getElementById('content').scrollTop=0;
-  });
-});
+// Nav
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.screen).classList.add('active');document.getElementById('content').scrollTop=0}));
 
-// ═══════════════════════════════════════════════════════════════
-//  THEME / FONT
-// ═══════════════════════════════════════════════════════════════
-function applyTheme(t){document.body.classList.toggle('light',t==='light');S.settings.theme=t;save('settings')}
+// Lang selectors
+function updateLangUI(){document.getElementById('srcLangBtn').textContent=LANGS[S.langSrc];document.getElementById('tgtLangBtn').textContent=LANGS[S.langTgt];document.querySelectorAll('#srcPopup button').forEach(b=>b.classList.toggle('active',b.dataset.lang===S.langSrc));document.querySelectorAll('#tgtPopup button').forEach(b=>b.classList.toggle('active',b.dataset.lang===S.langTgt))}
+document.getElementById('srcLangBtn').addEventListener('click',e=>{e.stopPropagation();document.getElementById('srcPopup').classList.toggle('show');document.getElementById('tgtPopup').classList.remove('show')});
+document.querySelectorAll('#srcPopup button').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.langSrc=b.dataset.lang;if(S.langSrc===S.langTgt)S.langTgt=S.langSrc==='zh-CN'?'ru':'zh-CN';updateLangUI();document.getElementById('srcPopup').classList.remove('show');if(document.getElementById('trInput').value.trim())doTranslate()}));
+document.getElementById('tgtLangBtn').addEventListener('click',e=>{e.stopPropagation();document.getElementById('tgtPopup').classList.toggle('show');document.getElementById('srcPopup').classList.remove('show')});
+document.querySelectorAll('#tgtPopup button').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.langTgt=b.dataset.lang;if(S.langSrc===S.langTgt)S.langSrc=S.langTgt==='zh-CN'?'ru':'zh-CN';updateLangUI();document.getElementById('tgtPopup').classList.remove('show');if(document.getElementById('trInput').value.trim())doTranslate()}));
+document.getElementById('swapLang').addEventListener('click',()=>{[S.langSrc,S.langTgt]=[S.langTgt,S.langSrc];updateLangUI();if(document.getElementById('trInput').value.trim())doTranslate()});
+document.addEventListener('click',()=>{document.getElementById('srcPopup').classList.remove('show');document.getElementById('tgtPopup').classList.remove('show')});
+function detectLang(t){if(/[а-яА-ЯёЁ]/.test(t))return'ru';if(/[一-鿿]/.test(t))return'zh-CN';return'en'}
+function autoSrcLang(t){const d=detectLang(t);if(S.langSrc!==d&&(d==='ru'||d==='en'||d==='zh-CN')){S.langSrc=d;updateLangUI()}}
+
 function applyFont(v){const r=document.documentElement;r.style.setProperty('--fs',v+'px');r.style.setProperty('--fs-sm',Math.max(11,v-3)+'px');r.style.setProperty('--fs-xs',Math.max(9,v-5)+'px');S.settings.fontSize=v;save('settings')}
 
-// ═══════════════════════════════════════════════════════════════
-//  TRANSLATE ENGINE
-// ═══════════════════════════════════════════════════════════════
-function detectLang(t){return/[а-яА-ЯёЁ]/.test(t)?'ru':'zh-CN'}
-function autoSetLang(t){const d=detectLang(t),p=S.lang.split('|');if(d==='ru'&&p[0]!=='ru')S.lang='ru|zh-CN';else if(d==='zh-CN'&&p[0]!=='zh-CN')S.lang='zh-CN|ru';updateLangs()}
-function updateLangs(){const p=S.lang.split('|');document.getElementById('srcLang').textContent=p[0]==='ru'?'俄语':'中文';document.getElementById('tgtLang').textContent=p[1]==='zh-CN'?'中文':'俄语'}
-
-async function translate(txt,mid){
-  if(!txt.trim())return null;
-  const p=S.lang.split('|'),src=p[0],tgt=p[1];
-  if(mid==='mymemory'){
-    const r=await fetch(`${CFG.models[0].api}?q=${encodeURIComponent(txt)}&langpair=${src}|${tgt}`,{signal:AbortSignal.timeout(8000)});
-    const d=await r.json();
-    if(d.responseStatus===200&&d.responseData)return{text:d.responseData.translatedText,det:'match:'+Math.round(d.responseData.match)+'%'};
-    throw new Error(d.responseDetails||'失败');
-  }else{
-    const lz={ru:'ru','zh-CN':'zh'},r=await fetch(CFG.models[1].api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:txt,source:lz[src],target:lz[tgt],format:'text'}),signal:AbortSignal.timeout(8000)});
-    const d=await r.json();
-    if(d.translatedText)return{text:d.translatedText,det:'LibreTranslate'};
-    throw new Error(d.error||'失败');
-  }
-}
-
+// Translate
+async function translateFree(txt,mid){if(!txt.trim())return null;const src=LANG_TO_API[S.langSrc],tgt=LANG_TO_API[S.langTgt];if(mid==='mymemory'){const r=await fetch(`${CFG.models[0].api}?q=${encodeURIComponent(txt)}&langpair=${src}|${tgt}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();if(d.responseStatus===200&&d.responseData)return{text:d.responseData.translatedText,det:'MyMemory'};throw new Error(d.responseDetails||'失败')}else{const lz={ru:'ru',en:'en','zh-CN':'zh'};const r=await fetch(CFG.models[1].api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:txt,source:lz[src],target:lz[tgt],format:'text'}),signal:AbortSignal.timeout(8000)});const d=await r.json();if(d.translatedText)return{text:d.translatedText,det:'LibreTranslate'};throw new Error(d.error||'失败')}}
+async function translateDeepSeek(txt){if(!txt.trim())return null;const p=S.langSrc==='ru'?'俄语':S.langSrc==='en'?'英语':'中文';const q=S.langTgt==='ru'?'俄语':S.langTgt==='en'?'英语':'中文';const resp=await fetch('https://api.deepseek.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.settings.dsKey},body:JSON.stringify({model:'deepseek-chat',max_tokens:2000,temperature:.1,messages:[{role:'system',content:'你是专业的'+p+'→'+q+'翻译助手。只返回译文，不增不减不加解释。'},{role:'user',content:txt}]}),signal:AbortSignal.timeout(20000)});const d=await resp.json();if(d.error)throw new Error(d.error.message||'API错误');if(!d.choices||!d.choices[0])throw new Error('返回为空');return{text:d.choices[0].message.content.trim(),det:'DeepSeek'}}
 function escape(s){return String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}
 
-// ═══════════════════════════════════════════════════════════════
-//  TTS
-// ═══════════════════════════════════════════════════════════════
-function speak(t,lang,rate){
-  if(!window.speechSynthesis||S.isSpeaking)return;
-  S.isSpeaking=true;
-  const u=new SpeechSynthesisUtterance(t);
-  u.lang=lang==='ru'?'ru-RU':'zh-CN';u.rate=rate||S.settings.speed;
-  const v=window.speechSynthesis.getVoices().find(v=>v.lang.startsWith(lang==='ru'?'ru':'zh'));
-  if(v)u.voice=v;
-  u.onend=()=>S.isSpeaking=false;u.onerror=()=>S.isSpeaking=false;
-  window.speechSynthesis.speak(u);
-}
+function speak(t,lang,rate){if(!window.speechSynthesis||S.isSpeaking)return;S.isSpeaking=true;const u=new SpeechSynthesisUtterance(t);const m={ru:'ru-RU',en:'en-US','zh-CN':'zh-CN'};u.lang=m[lang]||'zh-CN';u.rate=rate||S.settings.speed;const v=window.speechSynthesis.getVoices().find(v=>v.lang.startsWith(u.lang.split('-')[0]));if(v)u.voice=v;u.onend=()=>S.isSpeaking=false;u.onerror=()=>S.isSpeaking=false;window.speechSynthesis.speak(u)}
 
-// ═══════════════════════════════════════════════════════════════
-//  TRANSLATE UI
-// ═══════════════════════════════════════════════════════════════
-const $trInput=document.getElementById('trInput');
-const $trResult=document.getElementById('trResult');
-const $btnTr=document.getElementById('btnTranslate');
-const $btnSpeak=document.getElementById('btnSpeak');
-
-async function doTranslate(){
-  const t=$trInput.value.trim();
-  if(!t){toast('请输入内容');return}
-  autoSetLang(t);
-  $trResult.innerHTML='<div class="lds"><span></span><span></span><span></span></div>';
-  $btnTr.disabled=true;$btnTr.textContent='⏳';
-  try{
-    const r=await translate(t,S.settings.model);
-    if(!r){toast('结果为空');$trResult.innerHTML='';return}
-    S.result=r;
-    renderResult(r,t);
-    addHistory(t,r.text);
-    $btnSpeak.disabled=false;
-  }catch(e){
-    $trResult.innerHTML=`<div class="tr-result"><div class="tr-text" style="color:var(--danger)">❌ ${e.message}</div></div>`;
-    toast('翻译失败，请检查网络');
-  }finally{$btnTr.disabled=false;$btnTr.textContent='🔍 翻译'}
-}
-
-function renderResult(r,src){
-  const p=S.lang.split('|'),isRu=p[0]==='ru';
-  const isFav=S.favs.some(f=>f.ru===src||f.cn===src);
-  $trResult.innerHTML=`
-    <div class="tr-result">
-      <div class="tr-source">${isRu?'🇷🇺 俄语':'🇨🇳 中文'}: ${escape(src)}</div>
-      <div class="tr-text">${isRu?'🇨🇳':'🇷🇺'} ${escape(r.text)}</div>
-      ${r.det?`<div class="tr-phonetic">${r.det}</div>`:''}
-      <div class="tr-extras"></div>
-      <button class="tr-save" id="saveWordBtn">${isFav?'★ 已收藏':'☆ 收藏单词'}</button>
-    </div>
-  `;
-  document.getElementById('saveWordBtn').addEventListener('click',()=>{
-    const isRu=S.lang.split('|')[0]==='ru';
-    toggleFav(isRu?src:r.text,isRu?r.text:src);
-  });
-}
-
-// Auto-translate
-let _deb;
-$trInput.addEventListener('input',()=>{
-  document.getElementById('charCount').textContent=$trInput.value.length;
-  if(!S.settings.autoTr)return;
-  clearTimeout(_deb);_deb=setTimeout(doTranslate,600);
-});
-
-// Enter to translate
+const $trInput=document.getElementById('trInput'),$trResult=document.getElementById('trResult'),$btnTr=document.getElementById('btnTranslate'),$btnSpeak=document.getElementById('btnSpeak');
+async function doTranslate(){const t=$trInput.value.trim();if(!t){toast('请输入内容');return}autoSrcLang(t);$trResult.innerHTML='<div class="lds"><span></span><span></span><span></span></div>';$btnTr.disabled=true;try{const r=S.settings.mode==='deep'?await translateDeepSeek(t):await translateFree(t,S.settings.model);if(!r){toast('结果为空');$trResult.innerHTML='';return}S.result=r;renderResult(r,t);addHistory(t,r.text);$btnSpeak.disabled=false}catch(e){$trResult.innerHTML=`<div class="tr-result"><div class="tr-text" style="color:var(--text3)">翻译失败: ${e.message}</div></div>`;toast('翻译失败')}finally{$btnTr.disabled=false}}
+function renderResult(r,src){const isFav=S.favs.some(f=>f.ru===src||f.cn===src||f.en===src);$trResult.innerHTML=`<div class="tr-result"><div class="tr-source">${LANGS[S.langSrc]}: ${escape(src)}</div><div class="tr-text">${escape(r.text)}</div>${r.det?`<div class="tr-phonetic">${r.det}</div>`:''}<button class="tr-save" id="saveWordBtn">${isFav?'★ 已收藏':'☆ 收藏'}</button></div>`;document.getElementById('saveWordBtn').addEventListener('click',()=>{toggleFav(src,r.text)})}
+let _deb;$trInput.addEventListener('input',()=>{document.getElementById('charCount').textContent=$trInput.value.length;if(!S.settings.autoTr)return;clearTimeout(_deb);_deb=setTimeout(doTranslate,600)});
 $trInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doTranslate()}});
-
 document.getElementById('clearInput').addEventListener('click',()=>{$trInput.value='';$trResult.innerHTML='';$btnSpeak.disabled=true;S.result=null;document.getElementById('charCount').textContent='0'});
-document.getElementById('swapLang').addEventListener('click',()=>{const p=S.lang.split('|');S.lang=p[1]+'|'+p[0];updateLangs();if($trInput.value.trim())doTranslate()});
 document.getElementById('btnTranslate').addEventListener('click',doTranslate);
-document.getElementById('btnSpeak').addEventListener('click',()=>{
-  if(!S.result)return;
-  const p=S.lang.split('|'),isRu=p[0]==='ru';
-  speak(S.result.text,isRu?'zh-CN':'ru',S.settings.speed);
-});
-document.getElementById('autoToggle').addEventListener('click',function(){
-  S.settings.autoTr=!S.settings.autoTr;this.classList.toggle('on',S.settings.autoTr);save('settings');
-});
+document.getElementById('btnSpeak').addEventListener('click',()=>{if(!S.result)return;speak(S.result.text,S.langTgt,S.settings.speed)});
+document.getElementById('autoToggle').addEventListener('click',function(){S.settings.autoTr=!S.settings.autoTr;this.classList.toggle('on',S.settings.autoTr);save('settings')});
 
-// ═══════════════════════════════════════════════════════════════
-//  HISTORY
-// ═══════════════════════════════════════════════════════════════
-function addHistory(src,tgt){
-  S.history.unshift({src,tgt,lang:S.lang,time:Date.now()});
-  if(S.history.length>200)S.history.pop();
-  save('history');renderHistory();
-}
-function renderHistory(){
-  const el=document.getElementById('historyList');
-  if(!S.history.length){el.innerHTML='<div class="empty-state">暂无记录<br>翻译过的内容会显示在这里</div>';return}
-  el.innerHTML=S.history.map((h,i)=>`<div class="h-item" data-i="${i}">
-    <span class="h-icon">${h.lang.startsWith('ru')?'🇷🇺':'🇨🇳'}</span>
-    <div class="h-body"><div class="h-src">${escape(h.src.slice(0,50))}</div><div class="h-tgt">${escape(h.tgt.slice(0,50))}</div></div>
-    <button class="h-play-btn" data-i="${i}">🔊</button>
-  </div>`).join('');
-  el.querySelectorAll('.h-item').forEach(item=>{
-    item.addEventListener('click',e=>{
-      if(e.target.closest('.h-play-btn'))return;
-      const h=S.history[parseInt(item.dataset.i)];
-      if(h){$trInput.value=h.src;S.lang=h.lang;updateLangs();doTranslate()}
-    });
-  });
-  el.querySelectorAll('.h-play-btn').forEach(btn=>{
-    btn.addEventListener('click',e=>{e.stopPropagation();const h=S.history[parseInt(btn.dataset.i)];if(h){const p=h.lang.split('|');speak(h.tgt,p[1]==='zh-CN'?'zh-CN':'ru',S.settings.speed)}});
-  });
-}
-document.getElementById('clearHistory').addEventListener('click',()=>{S.history=[];save('history');renderHistory();toast('已清空')});
+// Mode popup
+const $modeTrigger=document.getElementById('modeTrigger'),$modePopup=document.getElementById('modePopup');
+function updateModeUI(){const m=S.settings.mode;$modeTrigger.textContent=m==='deep'?'🧠 深度':'⚡ 快速';$modeTrigger.classList.toggle('deep',m==='deep');$modePopup.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.mode===m))}
+$modeTrigger.addEventListener('click',e=>{e.stopPropagation();$modePopup.classList.toggle('show')});
+$modePopup.querySelectorAll('button').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.settings.mode=b.dataset.mode;save('settings');updateModeUI();$modePopup.classList.remove('show');if($trInput.value.trim())doTranslate()}));
+document.addEventListener('click',()=>$modePopup.classList.remove('show'));
 
-// ═══════════════════════════════════════════════════════════════
-//  FAVORITES
-// ═══════════════════════════════════════════════════════════════
-function toggleFav(ru,cn){
-  const idx=S.favs.findIndex(f=>f.ru===ru);
-  if(idx>=0){S.favs.splice(idx,1);save('favs');renderFavs();toast('已取消收藏')}
-  else{S.favs.unshift({ru,cn,time:Date.now()});save('favs');renderFavs();toast('⭐ 已收藏')}
-  // Update save button
-  const btn=document.getElementById('saveWordBtn');
-  if(btn){
-    const isFav=S.favs.some(f=>f.ru===ru||f.cn===cn);
-    btn.textContent=isFav?'★ 已收藏':'☆ 收藏单词';
-  }
-}
-function renderFavs(){
-  const el=document.getElementById('favList');
-  document.getElementById('favStats').innerHTML=`已收藏 <strong>${S.favs.length}</strong> 个单词`;
-  if(!S.favs.length){el.innerHTML='<div class="empty-state">还没有收藏的单词<br>翻译时点击 ☆ 即可收藏</div>';return}
-  el.innerHTML=S.favs.map((f,i)=>`<div class="fav-item">
-    <span class="fv-ru">${escape(f.ru)}</span>
-    <span class="fv-cn">${escape(f.cn)}</span>
-    <button class="fv-act" data-i="${i}">🔊</button>
-    <button class="fv-act" data-i="${i}" data-del="1">✕</button>
-  </div>`).join('');
-  el.querySelectorAll('.fv-act[data-del]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.favs.splice(parseInt(b.dataset.i),1);save('favs');renderFavs()}));
-  el.querySelectorAll('.fv-act:not([data-del])').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const f=S.favs[parseInt(b.dataset.i)];if(f)speak(f.ru,'ru',S.settings.speed)}));
-}
+// History
+function addHistory(src,tgt){S.history.unshift({src,tgt,langSrc:S.langSrc,langTgt:S.langTgt,time:Date.now()});if(S.history.length>200)S.history.pop();save('history')}
+function renderHistory(){const el=document.getElementById('popupHistoryList');document.getElementById('htCount').textContent=S.history.length;if(!S.history.length){el.innerHTML='<div class="empty-state">暂无记录</div>';return}el.innerHTML=S.history.map((h,i)=>`<div class="h-item" data-i="${i}"><span class="h-icon">${LANGS[h.langSrc]}</span><div class="h-body"><div class="h-src">${escape(h.src.slice(0,50))}</div><div class="h-tgt">${escape(h.tgt.slice(0,50))}</div></div><button class="h-play-btn" data-i="${i}">&#9654;</button></div>`).join('');el.querySelectorAll('.h-item').forEach(item=>{item.addEventListener('click',e=>{if(e.target.closest('.h-play-btn'))return;const h=S.history[parseInt(item.dataset.i)];if(h){$trInput.value=h.src;S.langSrc=h.langSrc;S.langTgt=h.langTgt;updateLangUI();closeHistoryPopup();doTranslate()}})});el.querySelectorAll('.h-play-btn').forEach(btn=>{btn.addEventListener('click',e=>{e.stopPropagation();const h=S.history[parseInt(btn.dataset.i)];if(h)speak(h.tgt,h.langTgt,S.settings.speed)})})}
+const $histPopup=document.getElementById('historyPopup');
+function openHistoryPopup(){$histPopup.classList.add('show');renderHistory()}function closeHistoryPopup(){$histPopup.classList.remove('show')}
+document.getElementById('historyTrigger').addEventListener('click',openHistoryPopup);document.getElementById('popupClose').addEventListener('click',closeHistoryPopup);$histPopup.addEventListener('click',e=>{if(e.target===$histPopup)closeHistoryPopup()});document.getElementById('popupClearHistory').addEventListener('click',()=>{S.history=[];save('history');toast('已清空');renderHistory()});
+
+// Favorites
+function toggleFav(orig,trans){const idx=S.favs.findIndex(f=>f.ru===orig||f.cn===orig||f.en===orig);const label=S.langSrc==='ru'?'ru':S.langSrc==='en'?'en':'cn';if(idx>=0){S.favs.splice(idx,1);save('favs');renderFavs()}else{const e={time:Date.now()};e[label]=orig;e.trans=trans;e.lang=S.langSrc;S.favs.unshift(e);save('favs');renderFavs()}const btn=document.getElementById('saveWordBtn');if(btn){const isFav=S.favs.some(f=>f.ru===orig||f.cn===orig||f.en===orig);btn.textContent=isFav?'★ 已收藏':'☆ 收藏'}}
+function renderFavs(){const el=document.getElementById('favList');document.getElementById('favStats').innerHTML=`已收藏 <strong>${S.favs.length}</strong> 个单词`;if(!S.favs.length){el.innerHTML='<div class="empty-state">还没有收藏的单词</div>';return}el.innerHTML=S.favs.map((f,i)=>{const w=f.ru||f.en||f.cn||'';const t=f.trans||'';return`<div class="fav-item"><span class="fv-ru">${escape(w)}</span><span class="fv-cn">${escape(t)}</span><button class="fv-act" data-i="${i}">&#9654;</button><button class="fv-act" data-i="${i}" data-del="1">&#10005;</button></div>`}).join('');el.querySelectorAll('.fv-act[data-del]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.favs.splice(parseInt(b.dataset.i),1);save('favs');renderFavs()}));el.querySelectorAll('.fv-act:not([data-del])').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const f=S.favs[parseInt(b.dataset.i)];if(f)speak(f.ru||f.en||f.cn||'',f.lang||'ru',S.settings.speed)}))}
 renderFavs();
 
 // ═══════════════════════════════════════════════════════════════
-//  TEXTBOOKS + GRAMMAR
+//  TEXTBOOK DATA - 走遍俄罗斯 with grammar + quiz per lesson
 // ═══════════════════════════════════════════════════════════════
 const BOOKS=[{id:1,title:'走遍俄罗斯 1'},{id:2,title:'走遍俄罗斯 2'},{id:3,title:'走遍俄罗斯 3'},{id:4,title:'走遍俄罗斯 4'}];
-
 const VOCAB={
 1:[
-{lesson:1,title:'第一课 字母与问候',words:[
-{ru:'Здравствуйте',cn:'您好'},{ru:'Привет',cn:'你好'},{ru:'До свидания',cn:'再见'},{ru:'Пока',cn:'拜拜'},{ru:'Спасибо',cn:'谢谢'},{ru:'Пожалуйста',cn:'请；不客气'},{ru:'Да',cn:'是的'},{ru:'Нет',cn:'不是'},{ru:'Как дела?',cn:'你好吗？'},{ru:'Хорошо',cn:'好'},{ru:'Плохо',cn:'不好'},{ru:'Меня зовут…',cn:'我叫…'},{ru:'Как вас зовут?',cn:'您叫什么？'},{ru:'Извините',cn:'对不起；打扰一下'},{ru:'Простите',cn:'请原谅'},{ru:'Очень приятно',cn:'很高兴认识您'}]},
-{lesson:2,title:'第二课 名词与代词',words:[
-{ru:'Я',cn:'我'},{ru:'Ты',cn:'你'},{ru:'Он',cn:'他'},{ru:'Она',cn:'她'},{ru:'Оно',cn:'它'},{ru:'Мы',cn:'我们'},{ru:'Вы',cn:'您；你们'},{ru:'Они',cn:'他们'},{ru:'Кто это?',cn:'这是谁？'},{ru:'Что это?',cn:'这是什么？'},{ru:'Студент',cn:'大学生(男)'},{ru:'Студентка',cn:'大学生(女)'},{ru:'Учитель',cn:'老师'},{ru:'Учительница',cn:'女老师'},{ru:'Друг',cn:'朋友'},{ru:'Семья',cn:'家庭'}]},
-{lesson:3,title:'第三课 动词与问路',words:[
-{ru:'Где?',cn:'在哪里？'},{ru:'Здесь',cn:'这里'},{ru:'Там',cn:'那里'},{ru:'Идти',cn:'走；步行'},{ru:'Ехать',cn:'乘车去'},{ru:'Читать',cn:'读'},{ru:'Писать',cn:'写'},{ru:'Говорить',cn:'说；讲'},{ru:'Понимать',cn:'懂；理解'},{ru:'Улица',cn:'街道'},{ru:'Город',cn:'城市'},{ru:'Метро',cn:'地铁'},{ru:'Автобус',cn:'公交'},{ru:'Остановка',cn:'车站'},{ru:'Далеко',cn:'远'},{ru:'Близко',cn:'近'}]},
-{lesson:4,title:'第四课 数字与购物',words:[
-{ru:'Один',cn:'一'},{ru:'Два',cn:'二'},{ru:'Три',cn:'三'},{ru:'Четыре',cn:'四'},{ru:'Пять',cn:'五'},{ru:'Шесть',cn:'六'},{ru:'Семь',cn:'七'},{ru:'Восемь',cn:'八'},{ru:'Девять',cn:'九'},{ru:'Десять',cn:'十'},{ru:'Сто',cn:'百'},{ru:'Тысяча',cn:'千'},{ru:'Магазин',cn:'商店'},{ru:'Цена',cn:'价格'},{ru:'Деньги',cn:'钱'},{ru:'Купить',cn:'买'},{ru:'Сколько?',cn:'多少？'},{ru:'Дорого',cn:'贵'},{ru:'Дешево',cn:'便宜'}]},
-{lesson:5,title:'第五课 饮食与餐厅',words:[
-{ru:'Еда',cn:'食物'},{ru:'Вода',cn:'水'},{ru:'Хлеб',cn:'面包'},{ru:'Молоко',cn:'牛奶'},{ru:'Масло',cn:'黄油；油'},{ru:'Мясо',cn:'肉'},{ru:'Рыба',cn:'鱼'},{ru:'Соль',cn:'盐'},{ru:'Сахар',cn:'糖'},{ru:'Чай',cn:'茶'},{ru:'Кофе',cn:'咖啡'},{ru:'Ресторан',cn:'餐厅'},{ru:'Меню',cn:'菜单'},{ru:'Вкусно',cn:'好吃'},{ru:'Горячий',cn:'热的'},{ru:'Холодный',cn:'冷的'},{ru:'Голоден',cn:'饿的'},{ru:'Счёт',cn:'账单'}]},
-{lesson:6,title:'第六课 时间与日期',words:[
-{ru:'Сейчас',cn:'现在'},{ru:'Сегодня',cn:'今天'},{ru:'Завтра',cn:'明天'},{ru:'Вчера',cn:'昨天'},{ru:'Час',cn:'小时'},{ru:'Минута',cn:'分钟'},{ru:'Секунда',cn:'秒'},{ru:'День',cn:'天；日'},{ru:'Неделя',cn:'周'},{ru:'Месяц',cn:'月'},{ru:'Год',cn:'年'},{ru:'Утро',cn:'早上'},{ru:'День',cn:'白天；下午'},{ru:'Вечер',cn:'晚上'},{ru:'Ночь',cn:'夜晚'},{ru:'Когда?',cn:'什么时候？'},{ru:'Время',cn:'时间'}]},
+{lesson:1,title:'字母与问候',words:[
+{ru:'Здравствуйте',cn:'您好'},{ru:'Привет',cn:'你好'},{ru:'До свидания',cn:'再见'},{ru:'Пока',cn:'拜拜'},{ru:'Спасибо',cn:'谢谢'},{ru:'Пожалуйста',cn:'请；不客气'},{ru:'Да',cn:'是的'},{ru:'Нет',cn:'不是'},{ru:'Как дела?',cn:'你好吗？'},{ru:'Хорошо',cn:'好'},{ru:'Плохо',cn:'不好'},{ru:'Меня зовут…',cn:'我叫…'},{ru:'Как вас зовут?',cn:'您叫什么？'},{ru:'Извините',cn:'对不起'},{ru:'Простите',cn:'请原谅'},{ru:'Очень приятно',cn:'很高兴认识您'}
+],grammar:'<b>俄语字母</b>：共33个字母，10个元音 + 21个辅音 + 2个无音符号(ь,ъ)。<br><br><b>元音</b>：Аа Оо Уу Ээ Ыы Яя Ёё Юю Ее Ии<br><br><b>关键辅音</b>：Кк Гг Хх — 硬音；Чч Щщ — 永远软音；Жж Шш Цц — 永远硬音<br><br><b>重音</b>：俄语重音不固定，会影响元音发音。如 <span class="ex">молоко</span>（牛奶）读作 "малако"<br><br><b>语调</b>：疑问句用升调(ИК-3)，陈述句用降调(ИК-1)',quiz:[{q:'"谢谢" 的俄语是？',opts:['Спасибо','Пожалуйста','Извините','До свидания'],ans:0},{q:'"Да" 是什么意思？',opts:['不是','是的','谢谢','再见'],ans:1},{q:'俄语有几个字母？',opts:['26','33','30','28'],ans:1}]},
+{lesson:2,title:'名词与代词',words:[
+{ru:'Я',cn:'我'},{ru:'Ты',cn:'你'},{ru:'Он',cn:'他'},{ru:'Она',cn:'她'},{ru:'Оно',cn:'它'},{ru:'Мы',cn:'我们'},{ru:'Вы',cn:'您；你们'},{ru:'Они',cn:'他们'},{ru:'Кто это?',cn:'这是谁？'},{ru:'Что это?',cn:'这是什么？'},{ru:'Студент',cn:'大学生(男)'},{ru:'Студентка',cn:'大学生(女)'},{ru:'Учитель',cn:'老师'},{ru:'Учительница',cn:'女老师'},{ru:'Друг',cn:'朋友'},{ru:'Семья',cn:'家庭'}
+],grammar:'<b>名词的性</b>：<br>• 阳性：辅音结尾 + -й + -ь（部分）<br>• 阴性：-а/-я + -ь（部分）<br>• 中性：-о/-е/-мя<br><br><b>人称代词</b>：<table><tr><th>单数</th><th>复数</th></tr><tr><td>я 我</td><td>мы 我们</td></tr><tr><td>ты 你</td><td>вы 您/你们</td></tr><tr><td>он/она/оно 他/她/它</td><td>они 他们</td></tr></table><b>注意</b>：вы 可表示"您"(尊称单数)或"你们"(复数)',quiz:[{q:'"Кто это?" 是什么意思？',opts:['这是什么？','这是谁？','你在哪？','你好吗？'],ans:1},{q:'он 指的是？',opts:['她','他','它','我'],ans:1},{q:'哪个是阴性名词？',opts:['студент','друг','студентка','учитель'],ans:2}]},
+{lesson:3,title:'动词与问路',words:[
+{ru:'Где?',cn:'在哪里？'},{ru:'Здесь',cn:'这里'},{ru:'Там',cn:'那里'},{ru:'Идти',cn:'走；步行'},{ru:'Ехать',cn:'乘车去'},{ru:'Читать',cn:'读'},{ru:'Писать',cn:'写'},{ru:'Говорить',cn:'说；讲'},{ru:'Понимать',cn:'懂；理解'},{ru:'Улица',cn:'街道'},{ru:'Город',cn:'城市'},{ru:'Метро',cn:'地铁'},{ru:'Автобус',cn:'公交'},{ru:'Остановка',cn:'车站'},{ru:'Далеко',cn:'远'},{ru:'Близко',cn:'近'}
+],grammar:'<b>动词不定式</b>：大多以 -ть 结尾：читать(读), писать(写), говорить(说)<br><br><b>现在时变位初步</b>：<br>я чита<strong>ю</strong> — 我读<br>ты чита<strong>ешь</strong> — 你读<br>он чита<strong>ет</strong> — 他读<br><br><b>где 问路句型</b>：<br>Где метро? — 地铁在哪？<br>Где остановка? — 车站在哪？',quiz:[{q:'"Понимать" 意思是？',opts:['读','写','走','懂；理解'],ans:3},{q:'"Где метро?" 是问什么？',opts:['多少钱','地铁在哪','你是谁','这是什么'],ans:1},{q:'я читаю 中的 читаю 是第几人称？',opts:['第二人称','第三人称','第一人称','不定式'],ans:2}]},
+{lesson:4,title:'数字与购物',words:[
+{ru:'Один',cn:'一'},{ru:'Два',cn:'二'},{ru:'Три',cn:'三'},{ru:'Четыре',cn:'四'},{ru:'Пять',cn:'五'},{ru:'Шесть',cn:'六'},{ru:'Семь',cn:'七'},{ru:'Восемь',cn:'八'},{ru:'Девять',cn:'九'},{ru:'Десять',cn:'十'},{ru:'Сто',cn:'百'},{ru:'Тысяча',cn:'千'},{ru:'Магазин',cn:'商店'},{ru:'Цена',cn:'价格'},{ru:'Деньги',cn:'钱'},{ru:'Купить',cn:'买'},{ru:'Сколько?',cn:'多少？'},{ru:'Дорого',cn:'贵'},{ru:'Дешево',cn:'便宜'}
+],grammar:'<b>基数词 1-10</b>：<table><tr><td>1</td><td>один</td><td>6</td><td>шесть</td></tr><tr><td>2</td><td>два</td><td>7</td><td>семь</td></tr><tr><td>3</td><td>три</td><td>8</td><td>восемь</td></tr><tr><td>4</td><td>четыре</td><td>9</td><td>девять</td></tr><tr><td>5</td><td>пять</td><td>10</td><td>десять</td></tr></table><b>购物用语</b>：<br>Сколько стоит? — 多少钱？<br>Это дорого. — 这个贵。<br>Я хочу купить... — 我想买…',quiz:[{q:'"Сколько?" 意思是？',opts:['什么','哪里','多少','谁'],ans:2},{q:'数字 "семь" 是？',opts:['五','六','七','八'],ans:2},{q:'"Дорого" 的反义词是？',opts:['Хорошо','Дешево','Близко','Вкусно'],ans:1}]},
+{lesson:5,title:'饮食与餐厅',words:[
+{ru:'Еда',cn:'食物'},{ru:'Вода',cn:'水'},{ru:'Хлеб',cn:'面包'},{ru:'Молоко',cn:'牛奶'},{ru:'Масло',cn:'黄油；油'},{ru:'Мясо',cn:'肉'},{ru:'Рыба',cn:'鱼'},{ru:'Соль',cn:'盐'},{ru:'Сахар',cn:'糖'},{ru:'Чай',cn:'茶'},{ru:'Кофе',cn:'咖啡'},{ru:'Ресторан',cn:'餐厅'},{ru:'Меню',cn:'菜单'},{ru:'Вкусно',cn:'好吃'},{ru:'Горячий',cn:'热的'},{ru:'Холодный',cn:'冷的'},{ru:'Голоден',cn:'饿的'},{ru:'Счёт',cn:'账单'}
+],grammar:'<b>形容词短尾</b>：<br>голодный → голоден（饿的）<br><br><b>名词属格初步</b>（用于"没有"）：<br>Нет + 属格：Нет хлеба.（没有面包）<br>Нет воды.（没有水）<br><br><b>餐厅用语</b>：<br>Дайте меню, пожалуйста. — 请给我菜单<br>Счёт, пожалуйста. — 请买单',quiz:[{q:'"Хлеб" 是什么？',opts:['牛奶','面包','水','盐'],ans:1},{q:'"Счёт" 在餐厅里指？',opts:['菜单','账单','食物','饮料'],ans:1},{q:'"Вкусно" 意思是？',opts:['热的','冷的','好吃','便宜'],ans:2}]},
+{lesson:6,title:'时间与日期',words:[
+{ru:'Сейчас',cn:'现在'},{ru:'Сегодня',cn:'今天'},{ru:'Завтра',cn:'明天'},{ru:'Вчера',cn:'昨天'},{ru:'Час',cn:'小时'},{ru:'Минута',cn:'分钟'},{ru:'Секунда',cn:'秒'},{ru:'День',cn:'天；日'},{ru:'Неделя',cn:'周'},{ru:'Месяц',cn:'月'},{ru:'Год',cn:'年'},{ru:'Утро',cn:'早上'},{ru:'Вечер',cn:'晚上'},{ru:'Ночь',cn:'夜晚'},{ru:'Когда?',cn:'什么时候？'},{ru:'Время',cn:'时间'}
+],grammar:'<b>时间表达</b>：<br>Который час? — 几点了？<br>Сейчас два часа. — 现在两点。<br><br><b>星期</b>：понедельник(周一), вторник(周二), среда(周三), четверг(周四), пятница(周五), суббота(周六), воскресенье(周日)<br><br><b>月份</b>：январь(1月), февраль(2月), март(3月), апрель(4月), май(5月), июнь(6月), июль(7月), август(8月), сентябрь(9月), октябрь(10月), ноябрь(11月), декабрь(12月)',quiz:[{q:'"Завтра" 意思是？',opts:['今天','昨天','明天','现在'],ans:2},{q:'"Когда?" 是问什么？',opts:['哪里','什么时候','为什么','多少'],ans:1},{q:'"Вечер" 指什么时间？',opts:['早上','下午','晚上','深夜'],ans:2}]}
 ],
 2:[
-{lesson:1,title:'第一课 复习与深入',words:[
-{ru:'Повторение',cn:'复习'},{ru:'Правило',cn:'规则'},{ru:'Грамматика',cn:'语法'},{ru:'Слово',cn:'单词'},{ru:'Фраза',cn:'短语'},{ru:'Предложение',cn:'句子'},{ru:'Упражнение',cn:'练习'},{ru:'Ошибка',cn:'错误'},{ru:'Исправлять',cn:'改正'},{ru:'Вопрос',cn:'问题'},{ru:'Ответ',cn:'回答'}]},
-{lesson:2,title:'第二课 方位与方向',words:[
-{ru:'Направо',cn:'向右'},{ru:'Налево',cn:'向左'},{ru:'Прямо',cn:'直走'},{ru:'Вверх',cn:'向上'},{ru:'Вниз',cn:'向下'},{ru:'Рядом',cn:'旁边'},{ru:'Далеко',cn:'远'},{ru:'Близко',cn:'近'},{ru:'Внутри',cn:'里面'},{ru:'Снаружи',cn:'外面'},{ru:'Между',cn:'之间'},{ru:'Напротив',cn:'对面'},{ru:'Угол',cn:'角落；拐角'},{ru:'Площадь',cn:'广场'}]},
-{lesson:3,title:'第三课 天气与季节',words:[
-{ru:'Погода',cn:'天气'},{ru:'Весна',cn:'春天'},{ru:'Лето',cn:'夏天'},{ru:'Осень',cn:'秋天'},{ru:'Зима',cn:'冬天'},{ru:'Дождь',cn:'雨'},{ru:'Снег',cn:'雪'},{ru:'Солнце',cn:'太阳'},{ru:'Ветер',cn:'风'},{ru:'Температура',cn:'温度'},{ru:'Тепло',cn:'温暖'},{ru:'Холодно',cn:'冷'},{ru:'Жарко',cn:'炎热'},{ru:'Прохладно',cn:'凉爽'},{ru:'Облачно',cn:'多云'},{ru:'Ясно',cn:'晴朗'}]},
-{lesson:4,title:'第四课 兴趣爱好',words:[
-{ru:'Хобби',cn:'爱好'},{ru:'Спорт',cn:'运动'},{ru:'Музыка',cn:'音乐'},{ru:'Книга',cn:'书'},{ru:'Фильм',cn:'电影'},{ru:'Фотография',cn:'照片'},{ru:'Рисовать',cn:'画画'},{ru:'Петь',cn:'唱歌'},{ru:'Танцевать',cn:'跳舞'},{ru:'Готовить',cn:'做饭'},{ru:'Путешествовать',cn:'旅行'},{ru:'Играть',cn:'玩；演奏'},{ru:'Слушать',cn:'听'},{ru:'Смотреть',cn:'看；观看'}]},
-{lesson:5,title:'第五课 看病与健康',words:[
-{ru:'Больница',cn:'医院'},{ru:'Врач',cn:'医生'},{ru:'Болезнь',cn:'疾病'},{ru:'Голова',cn:'头'},{ru:'Рука',cn:'手；胳膊'},{ru:'Нога',cn:'腿；脚'},{ru:'Глаз',cn:'眼睛'},{ru:'Сердце',cn:'心脏'},{ru:'Здоровье',cn:'健康'},{ru:'Лекарство',cn:'药'},{ru:'Боль',cn:'疼痛'},{ru:'Простуда',cn:'感冒'},{ru:'Кашель',cn:'咳嗽'},{ru:'Выздоравливать',cn:'康复'}]},
+{lesson:1,title:'复习与深入',words:[
+{ru:'Повторение',cn:'复习'},{ru:'Правило',cn:'规则'},{ru:'Грамматика',cn:'语法'},{ru:'Слово',cn:'单词'},{ru:'Фраза',cn:'短语'},{ru:'Предложение',cn:'句子'},{ru:'Упражнение',cn:'练习'},{ru:'Ошибка',cn:'错误'},{ru:'Исправлять',cn:'改正'},{ru:'Вопрос',cn:'问题'},{ru:'Ответ',cn:'回答'}
+],grammar:'<b>名词六格复习</b>：重点复习主格(Им.)和前置格(Пр.)<br><br><b>前置格用法</b>：<br>о + 前置格：о книге（关于书）<br>в + 前置格：в городе（在城市里）<br>на + 前置格：на улице（在街上）<br><br><b>动词过去时</b>：<br>читать → читал(阳)/читала(阴)/читало(中)/читали(复)',quiz:[{q:'前置格通常和什么介词连用？',opts:['с','о/в/на','к','без'],ans:1}]},
+{lesson:2,title:'方位与方向',words:[
+{ru:'Направо',cn:'向右'},{ru:'Налево',cn:'向左'},{ru:'Прямо',cn:'直走'},{ru:'Вверх',cn:'向上'},{ru:'Вниз',cn:'向下'},{ru:'Рядом',cn:'旁边'},{ru:'Далеко',cn:'远'},{ru:'Близко',cn:'近'},{ru:'Внутри',cn:'里面'},{ru:'Снаружи',cn:'外面'},{ru:'Между',cn:'之间'},{ru:'Напротив',cn:'对面'},{ru:'Угол',cn:'角落；拐角'},{ru:'Площадь',cn:'广场'}
+],grammar:'<b>方位副词</b>：направо(向右), налево(向左), прямо(直走)<br><br><b>方位前置词</b>：<br>рядом с + 工具格：рядом с домом（房子旁边）<br>между + 工具格：между домом и школой（房子和学校之间）<br>напротив + 属格：напротив музея（博物馆对面）',quiz:[{q:'"Прямо" 意思是？',opts:['向左','向右','直走','后退'],ans:2},{q:'"Напротив" 后面用什么格？',opts:['主格','属格','与格','宾格'],ans:1}]},
+{lesson:3,title:'天气与季节',words:[
+{ru:'Погода',cn:'天气'},{ru:'Весна',cn:'春天'},{ru:'Лето',cn:'夏天'},{ru:'Осень',cn:'秋天'},{ru:'Зима',cn:'冬天'},{ru:'Дождь',cn:'雨'},{ru:'Снег',cn:'雪'},{ru:'Солнце',cn:'太阳'},{ru:'Ветер',cn:'风'},{ru:'Температура',cn:'温度'},{ru:'Тепло',cn:'温暖'},{ru:'Холодно',cn:'冷'},{ru:'Жарко',cn:'炎热'},{ru:'Прохладно',cn:'凉爽'},{ru:'Облачно',cn:'多云'},{ru:'Ясно',cn:'晴朗'}
+],grammar:'<b>无人称句</b>：用副词谓语表示状态<br>Холодно. — 冷<br>Тепло. — 暖和<br>Жарко. — 热<br><br><b>какая погода?</b> — 天气怎么样？<br>Сегодня хорошая погода. — 今天天气好<br>Идёт дождь. — 下雨<br>Идёт снег. — 下雪',quiz:[{q:'"Осень" 是哪个季节？',opts:['春天','夏天','秋天','冬天'],ans:2},{q:'"Идёт дождь" 意思是？',opts:['下雪','下雨','刮风','晴天'],ans:1}]},
+{lesson:4,title:'兴趣爱好',words:[
+{ru:'Хобби',cn:'爱好'},{ru:'Спорт',cn:'运动'},{ru:'Музыка',cn:'音乐'},{ru:'Книга',cn:'书'},{ru:'Фильм',cn:'电影'},{ru:'Фотография',cn:'照片'},{ru:'Рисовать',cn:'画画'},{ru:'Петь',cn:'唱歌'},{ru:'Танцевать',cn:'跳舞'},{ru:'Готовить',cn:'做饭'},{ru:'Путешествовать',cn:'旅行'},{ru:'Играть',cn:'玩；演奏'},{ru:'Слушать',cn:'听'},{ru:'Смотреть',cn:'看；观看'}
+],grammar:'<b>动词+宾格</b>：<br>любить + 宾格：Я люблю спорт.（我爱运动）<br><br><b>动词+不定式</b>：<br>Я люблю читать.（我爱读书）<br>Я хочу путешествовать.（我想旅行）<br><br><b>играть в/на</b>：<br>играть в футбол（踢足球）<br>играть на гитаре（弹吉他）',quiz:[{q:'"Рисовать" 是？',opts:['唱歌','跳舞','画画','旅行'],ans:2},{q:'"Я люблю читать" — читать 是什么形式？',opts:['过去时','不定式','现在时','将来时'],ans:1}]},
+{lesson:5,title:'看病与健康',words:[
+{ru:'Больница',cn:'医院'},{ru:'Врач',cn:'医生'},{ru:'Болезнь',cn:'疾病'},{ru:'Голова',cn:'头'},{ru:'Рука',cn:'手；胳膊'},{ru:'Нога',cn:'腿；脚'},{ru:'Глаз',cn:'眼睛'},{ru:'Сердце',cn:'心脏'},{ru:'Здоровье',cn:'健康'},{ru:'Лекарство',cn:'药'},{ru:'Боль',cn:'疼痛'},{ru:'Простуда',cn:'感冒'},{ru:'Кашель',cn:'咳嗽'},{ru:'Выздоравливать',cn:'康复'}
+],grammar:'<b>身体部位+与格</b>（表示"疼"）：<br>У меня болит голова. — 我头疼<br>У меня болит горло. — 我嗓子疼<br><br><b>复数属格</b>：<br>много людей — 很多人<br>мало времени — 没时间',quiz:[{q:'"У меня болит голова" — 哪里疼？',opts:['手','腿','头','眼睛'],ans:2},{q:'"Врач" 是？',opts:['医院','医生','药','疾病'],ans:1}]}
 ],
 3:[
-{lesson:1,title:'第一课 高级语法结构',words:[
-{ru:'Причастие',cn:'形动词'},{ru:'Деепричастие',cn:'副动词'},{ru:'Сослагательное наклонение',cn:'虚拟语气'},{ru:'Условное предложение',cn:'条件句'},{ru:'Страдательный залог',cn:'被动语态'},{ru:'Прямая речь',cn:'直接引语'},{ru:'Косвенная речь',cn:'间接引语'},{ru:'Сложное предложение',cn:'复合句'},{ru:'Союз',cn:'连接词'}]},
-{lesson:2,title:'第二课 社会与话题',words:[
-{ru:'Общество',cn:'社会'},{ru:'Экономика',cn:'经济'},{ru:'Политика',cn:'政治'},{ru:'Культура',cn:'文化'},{ru:'Образование',cn:'教育'},{ru:'Наука',cn:'科学'},{ru:'Технология',cn:'技术'},{ru:'Экология',cn:'生态'},{ru:'Традиция',cn:'传统'},{ru:'Закон',cn:'法律'},{ru:'Право',cn:'权利'},{ru:'Выборы',cn:'选举'},{ru:'СМИ',cn:'媒体'}]},
-{lesson:3,title:'第三课 工作与职业',words:[
-{ru:'Работа',cn:'工作'},{ru:'Профессия',cn:'职业'},{ru:'Инженер',cn:'工程师'},{ru:'Программист',cn:'程序员'},{ru:'Переводчик',cn:'翻译'},{ru:'Журналист',cn:'记者'},{ru:'Бизнес',cn:'商业'},{ru:'Компания',cn:'公司'},{ru:'Коллега',cn:'同事'},{ru:'Начальник',cn:'领导'},{ru:'Сотрудник',cn:'员工'},{ru:'Зарплата',cn:'工资'},{ru:'Отпуск',cn:'假期'},{ru:'Собеседование',cn:'面试'}]},
-{lesson:4,title:'第四课 旅行与交通',words:[
-{ru:'Путешествие',cn:'旅行'},{ru:'Билет',cn:'票'},{ru:'Поезд',cn:'火车'},{ru:'Самолёт',cn:'飞机'},{ru:'Аэропорт',cn:'机场'},{ru:'Вокзал',cn:'火车站'},{ru:'Такси',cn:'出租车'},{ru:'Корабль',cn:'船'},{ru:'Гостиница',cn:'酒店'},{ru:'Номер',cn:'房间'},{ru:'Багаж',cn:'行李'},{ru:'Паспорт',cn:'护照'},{ru:'Виза',cn:'签证'},{ru:'Экскурсия',cn:'游览'}]},
+{lesson:1,title:'高级语法结构',words:[{ru:'Причастие',cn:'形动词'},{ru:'Деепричастие',cn:'副动词'},{ru:'Сослагательное наклонение',cn:'虚拟语气'},{ru:'Условное предложение',cn:'条件句'},{ru:'Страдательный залог',cn:'被动语态'},{ru:'Прямая речь',cn:'直接引语'},{ru:'Косвенная речь',cn:'间接引语'},{ru:'Сложное предложение',cn:'复合句'},{ru:'Союз',cn:'连接词'}],grammar:'<b>形动词 (причастие)</b>：动词派生的形容词<br>• 主动形动词现在时：читающий（正在读的）<br>• 被动形动词过去时：прочитанный（已被读完的）<br><br><b>副动词 (деепричастие)</b>：表示伴随动作<br>• читая（在阅读时）<br>• прочитав（读完之后）',quiz:[{q:'形动词是？',opts:['动词的一种时态','动词派生的形容词','名词的一种格','一种连接词'],ans:1},{q:'"читая" 属于什么语法形式？',opts:['形动词','副动词','过去时','命令式'],ans:1}]},
+{lesson:2,title:'社会与话题',words:[{ru:'Общество',cn:'社会'},{ru:'Экономика',cn:'经济'},{ru:'Политика',cn:'政治'},{ru:'Культура',cn:'文化'},{ru:'Образование',cn:'教育'},{ru:'Наука',cn:'科学'},{ru:'Технология',cn:'技术'},{ru:'Экология',cn:'生态'},{ru:'Традиция',cn:'传统'},{ru:'Закон',cn:'法律'},{ru:'Право',cn:'权利'},{ru:'Выборы',cn:'选举'},{ru:'СМИ',cn:'媒体'}],grammar:'<b>条件句</b>：если бы + 过去时 → 虚拟语气<br>Если бы я знал... — 要是我知道的话…<br><br><b>被动语态</b>：<br>Дом строится. — 房子正在被建<br>Дом был построен. — 房子被建好了',quiz:[{q:'"Образование" 意思是？',opts:['社会','教育','文化','科学'],ans:1}]},
+{lesson:3,title:'工作与职业',words:[{ru:'Работа',cn:'工作'},{ru:'Профессия',cn:'职业'},{ru:'Инженер',cn:'工程师'},{ru:'Программист',cn:'程序员'},{ru:'Переводчик',cn:'翻译'},{ru:'Журналист',cn:'记者'},{ru:'Бизнес',cn:'商业'},{ru:'Компания',cn:'公司'},{ru:'Коллега',cn:'同事'},{ru:'Начальник',cn:'领导'},{ru:'Сотрудник',cn:'员工'},{ru:'Зарплата',cn:'工资'},{ru:'Отпуск',cn:'假期'},{ru:'Собеседование',cn:'面试'}],grammar:'<b>职业名词的性</b>：很多职业名词有阴阳对应<br>учитель → учительница（老师）<br>продавец → продавщица（售货员）<br>但：врач(医生), инженер(工程师) 男女通用<br><br><b>кем работать?</b>（从事什么工作，用工具格）<br>Я работаю программистом.<br>Он работает инженером.',quiz:[{q:'"Я работаю врачом" 中 врачом 是什么格？',opts:['主格','宾格','工具格','属格'],ans:2}]},
+{lesson:4,title:'旅行与交通',words:[{ru:'Путешествие',cn:'旅行'},{ru:'Билет',cn:'票'},{ru:'Поезд',cn:'火车'},{ru:'Самолёт',cn:'飞机'},{ru:'Аэропорт',cn:'机场'},{ru:'Вокзал',cn:'火车站'},{ru:'Такси',cn:'出租车'},{ru:'Корабль',cn:'船'},{ru:'Гостиница',cn:'酒店'},{ru:'Номер',cn:'房间'},{ru:'Багаж',cn:'行李'},{ru:'Паспорт',cn:'护照'},{ru:'Виза',cn:'签证'},{ru:'Экскурсия',cn:'游览'}],grammar:'<b>运动动词深入</b>：<br>ехать(定向) / ездить(不定向)<br>идти(定向) / ходить(不定向)<br><br>定向：正在去…<br>Я еду в аэропорт.（我正在去机场）<br><br>不定向：经常去/往返<br>Я часто езжу в Москву.（我常去莫斯科）',quiz:[{q:'"Я еду в аэропорт" 用的什么动词？',opts:['ездить','ехать','идти','ходить'],ans:1},{q:'"Багаж" 是？',opts:['护照','机票','行李','签证'],ans:2}]}
 ],
 4:[
-{lesson:1,title:'第一课 文学与艺术',words:[
-{ru:'Литература',cn:'文学'},{ru:'Поэзия',cn:'诗歌'},{ru:'Роман',cn:'小说'},{ru:'Писатель',cn:'作家'},{ru:'Поэт',cn:'诗人'},{ru:'Художник',cn:'画家'},{ru:'Театр',cn:'剧院'},{ru:'Выставка',cn:'展览'},{ru:'Музей',cn:'博物馆'},{ru:'Шедевр',cn:'杰作'},{ru:'Вдохновение',cn:'灵感'},{ru:'Творчество',cn:'创作'}]},
-{lesson:2,title:'第二课 科技与未来',words:[
-{ru:'Будущее',cn:'未来'},{ru:'Космос',cn:'宇宙'},{ru:'Робот',cn:'机器人'},{ru:'Искусственный интеллект',cn:'人工智能'},{ru:'Интернет',cn:'互联网'},{ru:'Компьютер',cn:'电脑'},{ru:'Изобретение',cn:'发明'},{ru:'Открытие',cn:'发现'},{ru:'Исследование',cn:'研究'},{ru:'Развитие',cn:'发展'},{ru:'Прогресс',cn:'进步'},{ru:'Инновация',cn:'创新'}]},
-{lesson:3,title:'第三课 环境与自然',words:[
-{ru:'Природа',cn:'自然'},{ru:'Окружающая среда',cn:'环境'},{ru:'Загрязнение',cn:'污染'},{ru:'Изменение климата',cn:'气候变化'},{ru:'Ресурс',cn:'资源'},{ru:'Энергия',cn:'能源'},{ru:'Возобновляемый',cn:'可再生的'},{ru:'Биоразнообразие',cn:'生物多样性'},{ru:'Защита',cn:'保护'},{ru:'Отходы',cn:'废物'},{ru:'Переработка',cn:'回收'},{ru:'Экосистема',cn:'生态系统'}]},
-{lesson:4,title:'第四课 俄罗斯文化精髓',words:[
-{ru:'Душа',cn:'灵魂'},{ru:'Тоска',cn:'忧郁；思念'},{ru:'Самовар',cn:'茶炊'},{ru:'Балалайка',cn:'巴拉莱卡琴'},{ru:'Матрешка',cn:'套娃'},{ru:'Водка',cn:'伏特加'},{ru:'Борщ',cn:'罗宋汤'},{ru:'Блины',cn:'薄饼'},{ru:'Икра',cn:'鱼子酱'},{ru:'Пельмени',cn:'饺子'},{ru:'Тройка',cn:'三驾马车'},{ru:'Берёза',cn:'白桦树'},{ru:'Мороз',cn:'严寒'},{ru:'Кремль',cn:'克里姆林宫'}]},
+{lesson:1,title:'文学与艺术',words:[{ru:'Литература',cn:'文学'},{ru:'Поэзия',cn:'诗歌'},{ru:'Роман',cn:'小说'},{ru:'Писатель',cn:'作家'},{ru:'Поэт',cn:'诗人'},{ru:'Художник',cn:'画家'},{ru:'Театр',cn:'剧院'},{ru:'Выставка',cn:'展览'},{ru:'Музей',cn:'博物馆'},{ru:'Шедевр',cn:'杰作'},{ru:'Вдохновение',cn:'灵感'},{ru:'Творчество',cn:'创作'}],grammar:'<b>形动词深入</b>：用于书面语和文学表达<br>человек, читающий книгу — 正在读书的人<br>книга, прочитанная мной — 我读完的书<br><br><b>被动形动词短尾</b>：<br>Книга прочитана. — 书被读完了',quiz:[{q:'"Писатель" 是？',opts:['诗人','作家','画家','读者'],ans:1}]},
+{lesson:2,title:'科技与未来',words:[{ru:'Будущее',cn:'未来'},{ru:'Космос',cn:'宇宙'},{ru:'Робот',cn:'机器人'},{ru:'Искусственный интеллект',cn:'人工智能'},{ru:'Интернет',cn:'互联网'},{ru:'Компьютер',cn:'电脑'},{ru:'Изобретение',cn:'发明'},{ru:'Открытие',cn:'发现'},{ru:'Исследование',cn:'研究'},{ru:'Развитие',cn:'发展'},{ru:'Прогресс',cn:'进步'},{ru:'Инновация',cn:'创新'}],grammar:'<b>科学语体特点</b>：<br>• 大量使用被动语态和无人称句<br>• 形动词和副动词频率高<br>• 名词化结构多<br><br><b>科技俄语常用结构</b>：<br>следует отметить, что... — 应当指出…<br>в результате... — 由于…<br>в процессе... — 在…过程中',quiz:[{q:'"Искусственный интеллект" 是？',opts:['人工智能','机器人','互联网','电脑'],ans:0}]},
+{lesson:3,title:'环境与自然',words:[{ru:'Природа',cn:'自然'},{ru:'Окружающая среда',cn:'环境'},{ru:'Загрязнение',cn:'污染'},{ru:'Изменение климата',cn:'气候变化'},{ru:'Ресурс',cn:'资源'},{ru:'Энергия',cn:'能源'},{ru:'Возобновляемый',cn:'可再生的'},{ru:'Биоразнообразие',cn:'生物多样性'},{ru:'Защита',cn:'保护'},{ru:'Отходы',cn:'废物'},{ru:'Переработка',cn:'回收'},{ru:'Экосистема',cn:'生态系统'}],grammar:'<b>带 -ся 动词</b>（反身动词）：<br>защищать(保护) → защищаться(被保护/自我保护)<br>изменять(改变) → изменяться(变化)<br><br><b>начинать/начинаться</b>：<br>начинать + 宾格（及物）: начинать работу<br>начинаться（不及物）: Работа начинается.',quiz:[{q:'"Загрязнение" 意思是？',opts:['保护','污染','自然','能源'],ans:1}]},
+{lesson:4,title:'俄罗斯文化精髓',words:[{ru:'Душа',cn:'灵魂'},{ru:'Тоска',cn:'忧郁；思念'},{ru:'Самовар',cn:'茶炊'},{ru:'Балалайка',cn:'巴拉莱卡琴'},{ru:'Матрешка',cn:'套娃'},{ru:'Водка',cn:'伏特加'},{ru:'Борщ',cn:'罗宋汤'},{ru:'Блины',cn:'薄饼'},{ru:'Икра',cn:'鱼子酱'},{ru:'Пельмени',cn:'饺子'},{ru:'Тройка',cn:'三驾马车'},{ru:'Берёза',cn:'白桦树'},{ru:'Мороз',cn:'严寒'},{ru:'Кремль',cn:'克里姆林宫'}],grammar:'<b>文化词汇的隐喻</b>：<br>душа — 不仅指"灵魂"，更是俄罗斯精神的核心概念<br>тоска — 无法简单翻译，指深沉的忧郁和思念<br>берёза — 俄罗斯的象征，常在诗歌中出现<br><br><b>俄罗斯谚语</b>：<br>В гостях хорошо, а дома лучше.（做客虽好，在家更好）<br>Утро вечера мудренее.（一日之计在于晨）',quiz:[{q:'俄罗斯的象征树是？',opts:['松树','白桦树','橡树','柳树'],ans:1},{q:'"Душа" 在俄语文化中代表？',opts:['身体','金钱','灵魂/精神','力量'],ans:2}]}
 ]};
 
-// Grammar data
-const GRAMMAR=[
-{title:'名词六格变化',content:`<table><tr><th>格</th><th>阳性</th><th>阴性</th><th>中性</th></tr>
-<tr><td><b>Им.</b> 主格</td><td>стол (<em>桌子</em>)</td><td>книга (<em>书</em>)</td><td>окно (<em>窗</em>)</td></tr>
-<tr><td><b>Род.</b> 属格</td><td>стол<strong>а</strong></td><td>книг<strong>и</strong></td><td>окн<strong>а</strong></td></tr>
-<tr><td><b>Дат.</b> 与格</td><td>стол<strong>у</strong></td><td>книг<strong>е</strong></td><td>окн<strong>у</strong></td></tr>
-<tr><td><b>Вин.</b> 宾格</td><td>стол</td><td>книг<strong>у</strong></td><td>окно</td></tr>
-<tr><td><b>Тв.</b> 工具格</td><td>стол<strong>ом</strong></td><td>книг<strong>ой</strong></td><td>окн<strong>ом</strong></td></tr>
-<tr><td><b>Пр.</b> 前置格</td><td>о стол<strong>е</strong></td><td>о книг<strong>е</strong></td><td>об окн<strong>е</strong></td></tr></table>
-<p><strong>用法：</strong></p>
-<p>• <b>Им.</b> 主格 — 主语：<span class="ex">Стол стоит здесь.</span></p>
-<p>• <b>Род.</b> 属格 — 所属/否定：<span class="ex">Нет книги.</span></p>
-<p>• <b>Дат.</b> 与格 — 间接宾语：<span class="ex">Дать другу.</span></p>
-<p>• <b>Вин.</b> 宾格 — 直接宾语：<span class="ex">Вижу книгу.</span></p>
-<p>• <b>Тв.</b> 工具格 — 工具/一起：<span class="ex">Писать ручкой.</span></p>
-<p>• <b>Пр.</b> 前置格 — 关于/在…：<span class="ex">О работе.</span></p>`},
-{title:'动词现在时变位',content:`<p><strong>第一变位法 (-ть / -ти)</strong></p>
-<table><tr><th>人称</th><th>читать (读)</th><th>писать (写)</th></tr>
-<tr><td>я</td><td>чита<strong>ю</strong></td><td>пиш<strong>у</strong></td></tr>
-<tr><td>ты</td><td>чита<strong>ешь</strong></td><td>пиш<strong>ешь</strong></td></tr>
-<tr><td>он/она/оно</td><td>чита<strong>ет</strong></td><td>пиш<strong>ет</strong></td></tr>
-<tr><td>мы</td><td>чита<strong>ем</strong></td><td>пиш<strong>ем</strong></td></tr>
-<tr><td>вы</td><td>чита<strong>ете</strong></td><td>пиш<strong>ете</strong></td></tr>
-<tr><td>они</td><td>чита<strong>ют</strong></td><td>пиш<strong>ут</strong></td></tr></table>
-<p><strong>第二变位法 (-ить)</strong></p>
-<table><tr><th>人称</th><th>говорить (说)</th><th>любить (爱)</th></tr>
-<tr><td>я</td><td>говор<strong>ю</strong></td><td>любл<strong>ю</strong></td></tr>
-<tr><td>ты</td><td>говор<strong>ишь</strong></td><td>люб<strong>ишь</strong></td></tr>
-<tr><td>он/она/оно</td><td>говор<strong>ит</strong></td><td>люб<strong>ит</strong></td></tr>
-<tr><td>мы</td><td>говор<strong>им</strong></td><td>люб<strong>им</strong></td></tr>
-<tr><td>вы</td><td>говор<strong>ите</strong></td><td>люб<strong>ите</strong></td></tr>
-<tr><td>они</td><td>говор<strong>ят</strong></td><td>люб<strong>ят</strong></td></tr></table>
-<p>⭐ <b>记忆口诀：</b>第一变位 <code>у/ю, ешь/ёшь, ет/ёт, ем/ём, ете/ёте, ут/ют</code><br>第二变位 <code>у/ю, ишь, ит, им, ите, ат/ят</code></p>`},
-{title:'动词完成体/未完成体',content:`<p>俄语动词分为 <strong>未完成体 (НСВ)</strong> 和 <strong>完成体 (СВ)</strong>：</p>
-<p>• <b>未完成体</b> — 动作进行中、重复、常态：<span class="ex">Я читаю книгу.</span> (我在读书)</p>
-<p>• <b>完成体</b> — 动作已完成、一次性结果：<span class="ex">Я прочитал книгу.</span> (我读完了书)</p>
-<br><p><strong>常见对应：</strong></p>
-<table><tr><th>未完成体</th><th>完成体</th><th>中文</th></tr>
-<tr><td>делать</td><td>сделать</td><td>做</td></tr>
-<tr><td>читать</td><td>прочитать</td><td>读</td></tr>
-<tr><td>писать</td><td>написать</td><td>写</td></tr>
-<tr><td>говорить</td><td>сказать</td><td>说</td></tr>
-<tr><td>понимать</td><td>понять</td><td>理解</td></tr>
-<tr><td>купить</td><td>покупать</td><td>买</td></tr></table>`},
-{title:'形容词的变化',content:`<p>形容词要与名词保持<strong>性、数、格</strong>一致：</p>
-<table><tr><th>格</th><th>阳性</th><th>阴性</th><th>中性</th><th>复数</th></tr>
-<tr><td><b>Им.</b></td><td>нов<strong>ый</strong></td><td>нов<strong>ая</strong></td><td>нов<strong>ое</strong></td><td>нов<strong>ые</strong></td></tr>
-<tr><td><b>Род.</b></td><td>нов<strong>ого</strong></td><td>нов<strong>ой</strong></td><td>нов<strong>ого</strong></td><td>нов<strong>ых</strong></td></tr>
-<tr><td><b>Дат.</b></td><td>нов<strong>ому</strong></td><td>нов<strong>ой</strong></td><td>нов<strong>ому</strong></td><td>нов<strong>ым</strong></td></tr>
-<tr><td><b>Вин.</b></td><td>как Им./Род.</td><td>нов<strong>ую</strong></td><td>как Им.</td><td>как Им./Род.</td></tr>
-<tr><td><b>Тв.</b></td><td>нов<strong>ым</strong></td><td>нов<strong>ой</strong></td><td>нов<strong>ым</strong></td><td>нов<strong>ыми</strong></td></tr>
-<tr><td><b>Пр.</b></td><td>о нов<strong>ом</strong></td><td>о нов<strong>ой</strong></td><td>о нов<strong>ом</strong></td><td>о нов<strong>ых</strong></td></tr></table>
-<p>例：<span class="ex">новый студент</span>（新男生）、<span class="ex">новая книга</span>（新书）</p>`},
-{title:'数词与名词的搭配',content:`<p><strong>基数词与名词的格变化：</strong></p>
-<p>• <b>1</b> — 名词主格单数：<span class="ex">один стол</span></p>
-<p>• <b>2,3,4</b> — 名词属格单数：<span class="ex">два стол<strong>а</strong></span></p>
-<p>• <b>5+</b> — 名词属格复数：<span class="ex">пять стол<strong>ов</strong></span></p>
-<br><p><strong>数词变位：</strong></p>
-<table><tr><th>格</th><th>два (二)</th><th>пять (五)</th></tr>
-<tr><td>Им.</td><td>два</td><td>пять</td></tr>
-<tr><td>Род.</td><td>двух</td><td>пяти</td></tr>
-<tr><td>Дат.</td><td>двум</td><td>пяти</td></tr>
-<tr><td>Вин.</td><td>как Им./Род.</td><td>как Им./Род.</td></tr>
-<tr><td>Тв.</td><td>двумя</td><td>пятью</td></tr>
-<tr><td>Пр.</td><td>о двух</td><td>о пяти</td></tr></table>`},
-{title:'运动动词',content:`<p>俄语运动动词有<strong>定向/不定向</strong>之分：</p>
-<table><tr><th>不定向 (多向)</th><th>定向 (单向)</th><th>中文</th></tr>
-<tr><td>ходить</td><td>идти</td><td>走 (步行)</td></tr>
-<tr><td>ездить</td><td>ехать</td><td>乘车</td></tr>
-<tr><td>бегать</td><td>бежать</td><td>跑</td></tr>
-<tr><td>плавать</td><td>плыть</td><td>游泳</td></tr>
-<tr><td>летать</td><td>лететь</td><td>飞</td></tr>
-<tr><td>носить</td><td>нести</td><td>携带</td></tr></table>
-<p><strong>区别：</strong></p>
-<p>• 定向 — 一次、一个方向：<span class="ex">Я иду в школу.</span> (我正在去学校)</p>
-<p>• 不定向 — 往返、习惯、能力：<span class="ex">Я хожу в школу.</span> (我平时去学校上学)</p>`},
-];
-
-// ─── Render Textbook sub-tabs ───
-let curBook=1;
-function renderBookTabs(){
-  const el=document.getElementById('bookTabs');
-  el.innerHTML=BOOKS.map(b=>`<button class="tb-book${b.id===curBook?' active':''}" data-id="${b.id}">${b.title}</button>`).join('');
-  el.querySelectorAll('.tb-book').forEach(b=>b.addEventListener('click',()=>{curBook=parseInt(b.dataset.id);renderBookTabs();renderLessons(curBook,document.getElementById('tbSearch').value)}));
-}
-
-function renderLessons(bid,q){
-  const el=document.getElementById('tbLessons');
-  const lessons=VOCAB[bid]||[];
-  const sq=(q||'').toLowerCase().trim();
-  let data=lessons;
-  if(sq){
-    data=lessons.map(l=>{const w=l.words.filter(w=>w.ru.toLowerCase().includes(sq)||w.cn.includes(sq));return w.length?{...l,words:w}:null}).filter(Boolean);
-    if(!data.length){el.innerHTML='<div class="empty-state">没有匹配的单词</div>';return}
-  }
-  el.innerHTML=data.map((l,li)=>`<div class="lesson-card">
-    <div class="lesson-hdr" onclick="toggleLesson(this)">
-      <div><div class="l-num">Урок ${l.lesson}</div><div class="l-title">${l.title}</div></div>
-      <span class="l-arrow">▾</span>
-    </div>
-    <div class="lesson-body">
-      <div class="vocab-grid">
-        <div class="grid-header">俄语</div><div class="grid-header">中文</div><div class="grid-header"></div>
-        ${l.words.map(w=>`<div class="vg-ru"><span class="vg-play" onclick="event.stopPropagation();speakText('${w.ru.replace(/'/g,"\\'")}','ru')">🔊</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><div class="vg-note"><span class="vg-save${S.favs.some(f=>f.ru===w.ru)?' saved':''}" onclick="event.stopPropagation();toggleFav('${w.ru.replace(/'/g,"\\'")}','${w.cn}')">${S.favs.some(f=>f.ru===w.ru)?'★':'☆'}</span></div>`).join('')}
-      </div>
-    </div>
-  </div>`).join('');
-  // auto-open
-  if(!sq){const f=el.querySelector('.lesson-card');if(f)f.classList.add('open')}
-}
-function toggleLesson(h){h.closest('.lesson-card').classList.toggle('open')}
-window.toggleLesson=toggleLesson;window.speakText=(t,l)=>speak(t,l,S.settings.speed);window.toggleFav=toggleFav;
-
-document.getElementById('tbSearch').addEventListener('input',e=>renderLessons(curBook,e.target.value));
-
-// ─── Grammar ───
-function renderGrammar(){
-  const el=document.getElementById('grammarContent');
-  el.innerHTML=GRAMMAR.map(g=>`<div class="grammar-card">
-    <div class="grammar-hdr" onclick="this.closest('.grammar-card').classList.toggle('open')">
-      <span>${g.title}</span>
-      <span class="g-arrow">▾</span>
-    </div>
-    <div class="grammar-body">${g.content}</div>
-  </div>`).join('');
-}
-renderGrammar();
-
-// ─── Learn sub-tabs ───
-document.querySelectorAll('.tb-sub').forEach(b=>{
-  b.addEventListener('click',()=>{
-    document.querySelectorAll('#sLearn .tb-sub').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    const sub=b.dataset.sub;
-    document.getElementById('subTextbook').style.display=sub==='textbook'?'flex':'none';
-    document.getElementById('subGrammar').style.display=sub==='grammar'?'block':'none';
-  });
-});
-renderBookTabs();renderLessons(1,'');
+// ═══════════════════════════════════════════════════════════════
+//  COMPUTER SCIENCE RUSSIAN
+// ═══════════════════════════════════════════════════════════════
+const CS_RUSSIAN={
+title:'计算机专业俄语',
+desc:'面向计算机专业学生的俄语词汇与表达，涵盖编程、硬件、网络、数据库等领域。',
+sections:[
+{title:'基础编程术语',words:[
+{ru:'Алгоритм',cn:'算法'},{ru:'Программа',cn:'程序'},{ru:'Код',cn:'代码'},{ru:'Язык программирования',cn:'编程语言'},{ru:'Переменная',cn:'变量'},{ru:'Функция',cn:'函数'},{ru:'Цикл',cn:'循环'},{ru:'Условие',cn:'条件'},{ru:'Массив',cn:'数组'},{ru:'Строка',cn:'字符串'},{ru:'Объект',cn:'对象'},{ru:'Класс',cn:'类'},{ru:'Метод',cn:'方法'},{ru:'Интерфейс',cn:'接口'},{ru:'Наследование',cn:'继承'},{ru:'Компилятор',cn:'编译器'},{ru:'Отладка',cn:'调试'},{ru:'Ошибка',cn:'错误/ bug'}
+]},
+{title:'硬件与系统',words:[
+{ru:'Процессор',cn:'处理器'},{ru:'Память',cn:'内存'},{ru:'Жёсткий диск',cn:'硬盘'},{ru:'Видеокарта',cn:'显卡'},{ru:'Материнская плата',cn:'主板'},{ru:'Сервер',cn:'服务器'},{ru:'Операционная система',cn:'操作系统'},{ru:'Драйвер',cn:'驱动程序'},{ru:'Ядро',cn:'内核'},{ru:'Процесс',cn:'进程'},{ru:'Поток',cn:'线程'}
+]},
+{title:'网络与安全',words:[
+{ru:'Сеть',cn:'网络'},{ru:'Интернет',cn:'互联网'},{ru:'Протокол',cn:'协议'},{ru:'Прокси',cn:'代理'},{ru:'Брандмауэр',cn:'防火墙'},{ru:'Шифрование',cn:'加密'},{ru:'База данных',cn:'数据库'},{ru:'Запрос',cn:'查询'},{ru:'API',cn:'应用程序接口'},{ru:'Облако',cn:'云'},{ru:'Токен',cn:'令牌'}
+]},
+{title:'技术文档常用表达',grammar:'<b>技术写作句型</b>：<br>• <span class="ex">Следует отметить, что...</span> — 需要注意的是…<br>• <span class="ex">В данном случае...</span> — 在这种情况下…<br>• <span class="ex">Как показано выше...</span> — 如上所述…<br>• <span class="ex">Необходимо учитывать...</span> — 必须考虑到…<br>• <span class="ex">В отличие от...</span> — 与…不同<br><br><b>代码注释常用</b>：<br>• входные данные — 输入数据<br>• выходные данные — 输出数据<br>• возвращает — 返回<br>• проверяет — 检查<br>• вызывает — 调用'}
+]};
 
 // ═══════════════════════════════════════════════════════════════
-//  QUIZ
+//  CEFR LEVELS - A1 to C2 (Russian)
+// ═══════════════════════════════════════════════════════════════
+const CEFR={
+title:'俄语等级考试（基于CEFR标准）',
+desc:'欧洲共同语言参考框架 (CEFR) 将语言能力分为 A1-C2 六个等级。以下内容基于 ТРКИ (Тест по русскому языку как иностранному) 考试标准。',
+levels:[
+{id:'A1',name:'A1 — 入门级 (Элементарный)',desc:'<strong>词汇量：约 500-800 词</strong><br><br><strong>能力描述：</strong><br>• 能理解并使用日常熟悉表达和基本短语<br>• 能自我介绍和介绍他人<br>• 能提问和回答有关个人信息的问题<br>• 能以缓慢清晰的方式与母语者简单交流<br><br><strong>核心语法：</strong><br>• 名词的性与数<br>• 主格和前置格（Им. / Пр.）<br>• 动词现在时第一、第二变位法<br>• 基数词 1-100',test:[{q:'A1级别要求掌握几个格？(ТРКИ标准)',opts:['全部6格','4格','主格和前置格','只需要主格'],ans:2},{q:'A1的词汇量要求约？',opts:['200-300','500-800','1000-1500','2000+'],ans:1},{q:'"Меня зовут Анна" 属于哪个级别的基础表达？',opts:['B1','A2','A1','B2'],ans:2}]},
+{id:'A2',name:'A2 — 基础级 (Базовый)',desc:'<strong>词汇量：约 1000-1500 词</strong><br><br><strong>能力描述：</strong><br>• 能理解与个人相关领域的句子和常用表达<br>• 能就熟悉的日常话题进行简单直接的信息交流<br>• 能用简单语言描述自己的背景、周围环境<br><br><strong>核心语法：</strong><br>• 全部6格的基本用法<br>• 动词完成体/未完成体初步<br>• 动词过去时和将来时<br>• 运动动词 идти/ходить, ехать/ездить<br>• 形容词与名词的一致关系',test:[{q:'A2级别需要掌握几个格？',opts:['2格','4格','全部6格','3格'],ans:2},{q:'A2的词汇量要求约？',opts:['500-800','1000-1500','2000-3000','4000+'],ans:1},{q:'以下哪组运动动词是A2必须掌握的？',opts:['бежать/бегать','идти/ходить','нест/носить','плыть/плавать'],ans:1}]},
+{id:'B1',name:'B1 — 中级 (Первый сертификационный)',desc:'<strong>词汇量：约 2000-3000 词</strong><br><br><strong>能力描述：</strong><br>• 能理解工作、学习、休闲中熟悉事项的清晰标准输入<br>• 能处理旅行中可能遇到的大多数情况<br>• 能就熟悉或个人感兴趣的话题撰写连贯文本<br>• 能描述经历、事件、梦想、希望和抱负<br><br><strong>核心语法：</strong><br>• 动词体深入运用<br>• 形动词和副动词初步<br>• 条件句和虚拟语气<br>• 间接引语<br>• 定量数词与名词的格搭配',test:[{q:'B1级别对应ТРКИ的哪个证书？',opts:['Элементарный','Базовый','Первый сертификационный','Второй сертификационный'],ans:2},{q:'B1开始学习的语法点是？',opts:['字母表','六格变化','形动词和副动词','名词的性'],ans:2},{q:'B1的词汇量要求约？',opts:['1000-1500','2000-3000','4000-6000','8000+'],ans:1}]},
+{id:'B2',name:'B2 — 中高级 (Второй сертификационный)',desc:'<strong>词汇量：约 4000-6000 词</strong><br><br><strong>能力描述：</strong><br>• 能理解具体和抽象主题复杂文本的主要思想<br>• 能与母语者进行一定程度的流畅自然交互<br>• 能就各种主题撰写清晰详细的文本<br>• 能解释对某一问题的观点，给出利弊<br><br><strong>核心语法：</strong><br>• 形动词和副动词的完全掌握<br>• 被动语态<br>• 复杂句法结构<br>• 科技/公务语体<br>• 词的支配关系（动词+格）',test:[{q:'B2在俄罗斯留学中通常用于？',opts:['旅游签证','预科入学','本科/研究生入学','短期游学'],ans:2},{q:'B2需要掌握的语体包括？',opts:['只有口语','科技语体和公务语体','只有书面语','诗歌'],ans:1}]},
+{id:'C1',name:'C1 — 流利级 (Третий сертификационный)',desc:'<strong>词汇量：约 8000-10000 词</strong><br><br><strong>能力描述：</strong><br>• 能理解各种要求较高的长篇文本并识别隐含意义<br>• 能流利自发地表达思想而不需明显寻找措辞<br>• 能在社交、学术和职业场合灵活有效地使用语言<br>• 能就复杂主题撰写清晰、结构良好的详细文本<br><br><strong>核心语法：</strong><br>• 句法修辞手法<br>• 熟语和成语<br>• 不同功能语体的自由切换<br>• 近义词辨析<br>• 复杂句子的标点符号规则',test:[{q:'C1级别可担任什么工作？',opts:['不需要俄语的工作','翻译/教师/新闻工作者','只能做体力劳动','不需要证书'],ans:1},{q:'C1的词汇量要求约？',opts:['2000-3000','4000-6000','8000-10000','15000+'],ans:2}]},
+{id:'C2',name:'C2 — 精通级 (Четвёртый сертификационный)',desc:'<strong>词汇量：15000 词以上（接近母语者）</strong><br><br><strong>能力描述：</strong><br>• 能轻松理解几乎所有听到和读到的东西<br>• 能从不同口头和书面来源总结信息<br>• 能连贯地重构论点和叙述<br>• 能自发、流畅、精确地表达，即使在最复杂情况下也能区分细微意义差别<br><br><strong>核心要求：</strong><br>• 全面掌握俄语所有语法和修辞手段<br>• 能理解俄语经典文学<br>• 能撰写专业学术论文<br>• 接近母语者的语感',test:[{q:'C2级别相当于？',opts:['入门','基础交流','接近母语者水平','能读懂菜单'],ans:2},{q:'ТРКИ四级证书(С2)的最低年龄要求？',opts:['无限制','16岁','18岁','21岁'],ans:1}]}
+]};
+
+// ═══════════════════════════════════════════════════════════════
+//  LEARN MODULE RENDERING
+// ═══════════════════════════════════════════════════════════════
+let curBook=1,curLearnTab='book',curLesTab=0;
+
+function renderLearn(){
+  const el=document.getElementById('learnContent');
+  if(curLearnTab==='book')renderBook(el);
+  else if(curLearnTab==='major')renderMajor(el);
+  else if(curLearnTab==='cefr')renderCefr(el);
+  else renderLearnSettings(el);
+}
+
+// ── Textbook view ──
+function renderBook(el){
+  const q=(document.getElementById('tbSearch')?document.getElementById('tbSearch').value:'').toLowerCase().trim();
+  let lessons=VOCAB[curBook]||[];
+  if(q){lessons=lessons.map(l=>{const w=l.words.filter(w=>w.ru.toLowerCase().includes(q)||w.cn.includes(q));return w.length?{...l,words:w}:null}).filter(Boolean);if(!lessons.length){el.innerHTML='<div class="empty-state">没有匹配的单词</div>';return}}
+  el.innerHTML=`
+    <div class="book-bar">${BOOKS.map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-bid="${b.id}">${b.title}</button>`).join('')}</div>
+    <div class="search-box"><span class="sicon">🔍</span><input type="text" id="tbSearch" placeholder="搜索单词..." value="${escape(q)}"></div>
+    <div class="les-scroll">${lessons.map((l,i)=>`
+      <div class="les-card${i===0&&!q?' open':''}">
+        <div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')">
+          <div><div class="les-num">Урок ${l.lesson}</div><div class="les-title">${l.title}</div></div>
+          <span class="les-arrow">&#9660;</span>
+        </div>
+        <div class="les-card-body">
+          <div class="les-tabs">
+            <button class="les-tab active" onclick="switchLesTab(this,0,'${l.lesson}')">单词</button>
+            <button class="les-tab" onclick="switchLesTab(this,1,'${l.lesson}')">语法</button>
+            <button class="les-tab" onclick="switchLesTab(this,2,'${l.lesson}')">测试</button>
+          </div>
+          <div class="les-tab-content" id="lesTab_${l.lesson}_0">
+            <div class="vocab-grid"><div class="grid-hdr">俄语</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>
+            ${l.words.map(w=>`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${w.ru.replace(/'/g,"\\'")}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${S.favs.some(f=>f.ru===w.ru)?' saved':''}" onclick="event.stopPropagation();toggleFav('${w.ru.replace(/'/g,"\\'")}','${w.cn}')">${S.favs.some(f=>f.ru===w.ru)?'★':'☆'}</span>`).join('')}
+            </div>
+          </div>
+          <div class="les-tab-content" id="lesTab_${l.lesson}_1" style="display:none">
+            <div class="grammar-mini">${l.grammar||'暂无语法内容'}</div>
+          </div>
+          <div class="les-tab-content" id="lesTab_${l.lesson}_2" style="display:none">
+            ${l.quiz?`<div class="quiz-mini" id="quiz_${l.lesson}">${renderLesQuiz(l.quiz,l.lesson)}</div>`:'<div class="grammar-mini">暂无测验</div>'}
+          </div>
+        </div>
+      </div>`).join('')}</div>`;
+  // Events
+  el.querySelectorAll('.book-chip').forEach(b=>b.addEventListener('click',()=>{curBook=parseInt(b.dataset.bid);renderLearn()}));
+  el.querySelector('#tbSearch')?.addEventListener('input',()=>{renderLearn()});
+}
+function switchLesTab(btn,idx,lid){
+  const card=btn.closest('.les-card-body');
+  card.querySelectorAll('.les-tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');
+  for(let i=0;i<3;i++){const t=card.querySelector(`#lesTab_${lid}_${i}`);if(t)t.style.display=i===idx?'block':'none'}
+}
+function renderLesQuiz(quiz,lid){
+  return quiz.map((q,qi)=>`<div style="margin-bottom:12px"><div class="qm-q">${qi+1}. ${q.q}</div>${q.opts.map((o,oi)=>`<button class="qm-opt" onclick="answerLesQuiz(this,${oi},${q.ans},'quiz_${lid}',${qi})">${o}</button>`).join('')}<div class="qm-result" id="qr_${lid}_${qi}"></div></div>`).join('')
+}
+window.answerLesQuiz=function(btn,chosen,ans,quizId,qi){
+  const btns=btn.parentElement.querySelectorAll('.qm-opt');
+  btns.forEach(b=>b.disabled=true);
+  btns[ans].classList.add('correct');
+  const res=document.getElementById(`qr_${qi}_${quizId}`);
+  if(chosen===ans){res.textContent='✓ 正确！';res.style.color='var(--green)';}else{btns[chosen].classList.add('wrong');res.textContent='✗ 错误，正确答案已标出';res.style.color='var(--red)';}
+  res.style.display='block';
+};
+window.speakText=(t,l)=>speak(t,l,S.settings.speed);
+window.toggleFav=toggleFav;
+
+// ── Major (CS Russian) ──
+function renderMajor(el){
+  let html=`<div style="font-weight:600;font-size:16px;margin-bottom:4px;color:var(--blue)">${CS_RUSSIAN.title}</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">${CS_RUSSIAN.desc}</div>`;
+  CS_RUSSIAN.sections.forEach(s=>{
+    if(s.words){
+      html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="vocab-grid"><div class="grid-hdr">俄语</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>`;
+      s.words.forEach(w=>{html+=`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${w.ru.replace(/'/g,"\\'")}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${S.favs.some(f=>f.ru===w.ru)?' saved':''}" onclick="event.stopPropagation();toggleFav('${w.ru.replace(/'/g,"\\'")}','${w.cn}')">${S.favs.some(f=>f.ru===w.ru)?'★':'☆'}</span>`});
+      html+='</div></div></div>';
+    }
+    if(s.grammar){html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="grammar-mini">${s.grammar}</div></div></div>`}
+  });
+  el.innerHTML=html;
+}
+
+// ── CEFR Levels ──
+function renderCefr(el){
+  let html=`<div style="font-weight:600;font-size:16px;margin-bottom:4px;color:var(--blue)">${CEFR.title}</div><div class="level-desc">${CEFR.desc}</div>`;
+  CEFR.levels.forEach(lv=>{
+    html+=`<div class="level-card"><div class="lc-title">${lv.name}</div><div class="level-desc">${lv.desc}</div><button class="lc-btn" onclick="startCefrTest('${lv.id}',this)">开始测试</button><div class="quiz-mini" id="cefrTest_${lv.id}" style="display:none;margin-top:12px"></div></div>`;
+  });
+  el.innerHTML=html;
+}
+window.startCefrTest=function(lid,btn){
+  const lv=CEFR.levels.find(l=>l.id===lid);
+  if(!lv||!lv.test)return;
+  const el=document.getElementById('cefrTest_'+lid);
+  el.style.display='block';
+  el.innerHTML=lv.test.map((q,qi)=>`<div style="margin-bottom:12px"><div class="qm-q">${qi+1}. ${q.q}</div>${q.opts.map((o,oi)=>`<button class="qm-opt" onclick="answerCefr(this,${oi},${q.ans},'cefrTest_${lid}',${qi})">${o}</button>`).join('')}<div class="qm-result" id="cr_${lid}_${qi}"></div></div>`).join('');
+  btn.style.display='none';
+};
+window.answerCefr=function(btn,chosen,ans,cid,qi){
+  const btns=btn.parentElement.querySelectorAll('.qm-opt');
+  btns.forEach(b=>b.disabled=true);
+  btns[ans].classList.add('correct');
+  const res=document.getElementById(`cr_${qi}_${cid}`);
+  if(chosen===ans){res.textContent='✓ 正确！';res.style.color='var(--green)';}else{btns[chosen].classList.add('wrong');res.textContent='✗ 错误';res.style.color='var(--red)';}
+  res.style.display='block';
+};
+
+// ── Learn Settings ──
+function renderLearnSettings(el){
+  el.innerHTML=`<div class="setting-group"><div class="setting-group-title">学习设置</div><div class="setting-card"><div class="s-label">默认课本</div><div class="s-desc">打开课本时默认显示的教材</div><div class="book-bar" style="margin:0">${BOOKS.map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-ls="${b.id}" onclick="curBook=${b.id};renderLearn()">${b.title}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">考试准备</div><div class="setting-card"><div class="s-label">目标等级</div><div class="s-desc">选择备考的目标CEFR等级，课程将优先展示相关内容</div><div class="spd-grid">${CEFR.levels.map(l=>`<button class="spd-chip" onclick="toast('目标等级: ${l.name.split(' ')[0]}')">${l.name.split(' ')[0]}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">数据管理</div><div class="setting-card"><div class="s-label">收藏单词</div><div class="s-desc">已收藏 <strong style="color:var(--blue)">${S.favs.length}</strong> 个单词</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--red);color:#fff;margin-top:6px" onclick="if(confirm('确定清空所有收藏？')){S.favs=[];save('favs');renderFavs();renderLearn();toast('已清空')}">清空收藏</button></div></div>`;
+}
+
+// Sub-tab switch
+document.querySelectorAll('#learnTabs .sub-tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#learnTabs .sub-tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');curLearnTab=b.dataset.tab;renderLearn();
+}));
+
+// English disabled
+document.querySelectorAll('.subj-tab.disabled').forEach(b=>b.addEventListener('click',()=>toast('英语功能即将开放')));
+document.querySelectorAll('.subj-tab:not(.disabled)').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.subj-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active')}));
+
+// ═══════════════════════════════════════════════════════════════
+//  QUIZ (word quiz from all books)
 // ═══════════════════════════════════════════════════════════════
 let quizState={};
-
-function renderQuizSetup(){
-  const el=document.getElementById('quizArea');
-  el.innerHTML=`<div class="quiz-setup anim-in">
-    <div style="font-size:16px;font-weight:500;margin-bottom:6px">🎯 单词测验</div>
-    <div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">从课本中选择测验范围</div>
-    <div class="qz-books">${BOOKS.map(b=>`<button class="qz-book selected" data-b="${b.id}">${b.title}</button>`).join('')}</div>
-    <div class="qz-count">已选 <strong id="qzTotal">0</strong> 个单词</div>
-    <button class="start-btn" id="qzStart">🚀 开始测验</button>
-  </div>`;
-  let selected=new Set([1,2,3,4]);
-  function updateTotal(){
-    let total=0;selected.forEach(bid=>{const l=VOCAB[bid];if(l)l.forEach(ls=>total+=ls.words.length)});
-    document.getElementById('qzTotal').textContent=total;
-  }
-  updateTotal();
-  document.querySelectorAll('.qz-book').forEach(b=>b.addEventListener('click',()=>{
-    const id=parseInt(b.dataset.b);b.classList.toggle('selected');
-    if(b.classList.contains('selected'))selected.add(id);else selected.delete(id);
-    if(!selected.size){selected.add(id);b.classList.add('selected')}
-    updateTotal();
-  }));
-  document.getElementById('qzStart').addEventListener('click',()=>{
-    const words=[];selected.forEach(bid=>{const l=VOCAB[bid];if(l)l.forEach(ls=>ls.words.forEach(w=>words.push({...w,book:bid})))});
-    if(words.length<4){toast('至少需要4个单词');return}
-    shuffle(words);
-    quizState={words,idx:0,correct:0,wrong:[]};
-    renderQuizQ();
-  });
-}
-
+function renderQuizSetup(){const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="text-align:center;padding:24px 0"><div style="font-size:16px;font-weight:500;margin-bottom:4px">单词测验</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">选择测验范围</div><div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0">${BOOKS.map(b=>`<button class="book-chip selected" data-b="${b.id}">${b.title}</button>`).join('')}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin:8px 0">已选 <strong id="qzTotal">0</strong> 个单词</div><button class="lc-btn" id="qzStart" style="font-size:var(--fs)">开始测验</button></div>`;let selected=new Set([1,2,3,4]);function updateTotal(){let t=0;selected.forEach(bid=>{const l=VOCAB[bid];if(l)l.forEach(ls=>t+=ls.words.length)});document.getElementById('qzTotal').textContent=t}updateTotal();el.querySelectorAll('.book-chip').forEach(b=>b.addEventListener('click',()=>{const id=parseInt(b.dataset.b);b.classList.toggle('selected');if(b.classList.contains('selected'))selected.add(id);else selected.delete(id);if(!selected.size){selected.add(id);b.classList.add('selected')}updateTotal()}));document.getElementById('qzStart').addEventListener('click',()=>{const words=[];selected.forEach(bid=>{const l=VOCAB[bid];if(l)l.forEach(ls=>ls.words.forEach(w=>words.push({...w,book:bid})))});if(words.length<4){toast('至少需要4个单词');return}shuffle(words);quizState={words,idx:0,correct:0,wrong:[]};renderQuizQ()})}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
-
-function renderQuizQ(){
-  const qs=quizState;if(qs.idx>=qs.words.length){renderQuizResult();return}
-  const w=qs.words[qs.idx];
-  // Generate options: 1 correct + 3 random
-  let opts=[w.cn];
-  const pool=qs.words.filter(x=>x.cn!==w.cn);
-  shuffle(pool);
-  for(let i=0;i<3&&i<pool.length;i++)opts.push(pool[i].cn);
-  // If not enough distinct options, add some from other books
-  if(opts.length<4){const all=Object.values(VOCAB).flatMap(l=>l.flatMap(ls=>ls.words)).filter(x=>!opts.includes(x.cn));shuffle(all);for(let i=0;opts.length<4&&i<all.length;i++)if(!opts.includes(all[i].cn))opts.push(all[i].cn)}
-  shuffle(opts);
-
-  const el=document.getElementById('quizArea');
-  el.innerHTML=`<div class="quiz-card anim-in">
-    <div class="q-progress">${qs.idx+1}/${qs.words.length}</div>
-    <div class="q-bar"><div class="q-fill" style="width:${(qs.idx/qs.words.length*100)}%"></div></div>
-    <div class="q-ru">${w.ru}</div>
-    <div class="q-options" id="qOpts">
-      ${opts.map(o=>`<button class="q-opt" data-v="${o}">${o}</button>`).join('')}
-    </div>
-  </div>`;
-  let answered=false;
-  el.querySelectorAll('.q-opt').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      if(answered)return;answered=true;
-      const val=btn.dataset.v;
-      const isCorrect=val===w.cn;
-      if(isCorrect){qs.correct++;btn.classList.add('correct')}
-      else{btn.classList.add('wrong');qs.wrong.push(w);el.querySelector(`.q-opt[data-v="${escape(w.cn)}"]`).classList.add('reveal')}
-      // Next button
-      const nextBtn=document.createElement('button');
-      nextBtn.className='q-next';nextBtn.textContent=qs.idx+1>=qs.words.length?'查看结果':'下一题 →';
-      nextBtn.addEventListener('click',()=>{qs.idx++;renderQuizQ()});
-      el.querySelector('.quiz-card').appendChild(nextBtn);
-    });
-  });
-}
-
-function renderQuizResult(){
-  const qs=quizState;const pct=Math.round(qs.correct/qs.words.length*100);
-  const el=document.getElementById('quizArea');
-  el.innerHTML=`<div class="quiz-result anim-in">
-    <div class="qr-score">${qs.correct}/${qs.words.length}</div>
-    <div class="qr-label">正确率 ${pct}%</div>
-    <div class="qr-detail">
-      ${qs.wrong.length?`需要复习：${qs.wrong.map(w=>`${w.ru}(${w.cn})`).join('、')}`:'🎉 全部正确！太棒了！'}
-    </div>
-    <button class="qr-btn" onclick="renderQuizSetup()">🔄 再来一次</button>
-    <button class="qr-btn" onclick="document.querySelector('.nav-btn[data-screen=sLearn]').click()">📚 去复习</button>
-  </div>`;
-}
+function renderQuizQ(){const qs=quizState;if(qs.idx>=qs.words.length){renderQuizResult();return}const w=qs.words[qs.idx];let opts=[w.cn];const pool=qs.words.filter(x=>x.cn!==w.cn);shuffle(pool);for(let i=0;i<3&&i<pool.length;i++)opts.push(pool[i].cn);if(opts.length<4){const all=Object.values(VOCAB).flatMap(l=>l.flatMap(ls=>ls.words)).filter(x=>!opts.includes(x.cn));shuffle(all);for(let i=0;opts.length<4&&i<all.length;i++)if(!opts.includes(all[i].cn))opts.push(all[i].cn)}shuffle(opts);const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="padding:24px 16px;text-align:center"><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:10px">${qs.idx+1}/${qs.words.length}</div><div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:20px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${(qs.idx/qs.words.length*100)}%"></div></div><div style="font-size:28px;font-weight:500;color:var(--blue);margin-bottom:16px;line-height:1.4">${w.ru}</div><div style="display:grid;gap:8px" id="qOpts">${opts.map(o=>`<button style="padding:14px 16px;border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:var(--fs);text-align:left;border:1.5px solid var(--border)" data-v="${o}">${o}</button>`).join('')}</div></div>`;let answered=false;el.querySelectorAll('#qOpts button').forEach(btn=>{btn.addEventListener('click',()=>{if(answered)return;answered=true;const val=btn.textContent;const isCorrect=val===w.cn;if(isCorrect){qs.correct++;btn.style.borderColor='var(--green)';btn.style.color='var(--green)';btn.style.background='rgba(34,197,94,.08)'}else{btn.style.borderColor='var(--red)';btn.style.color='var(--red)';qs.wrong.push(w);el.querySelector(`#qOpts button[data-v="${escape(w.cn)}"]`).style.borderColor='var(--blue)';el.querySelector(`#qOpts button[data-v="${escape(w.cn)}"]`).style.color='var(--blue)'}const nb=document.createElement('button');nb.style.cssText='margin-top:16px;padding:11px 28px;border-radius:20px;background:var(--blue);color:#fff;font-weight:600;font-size:var(--fs-sm);border:none;cursor:pointer';nb.textContent=qs.idx+1>=qs.words.length?'查看结果':'下一题';nb.addEventListener('click',()=>{qs.idx++;renderQuizQ()});el.querySelector('.anim-in').appendChild(nb)})})}
+function renderQuizResult(){const qs=quizState;const pct=Math.round(qs.correct/qs.words.length*100);document.getElementById('quizArea').innerHTML=`<div class="anim-in" style="text-align:center;padding:32px 16px"><div style="font-size:48px;font-weight:300;color:var(--blue);margin-bottom:4px">${qs.correct}/${qs.words.length}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">正确率 ${pct}%</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px;line-height:1.8">${qs.wrong.length?`需要复习：${qs.wrong.map(w=>w.ru+'('+w.cn+')').join('、')}`:'全部正确！'}</div><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="renderQuizSetup()">再来一次</button><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="document.querySelector('.nav-btn[data-screen=sLearn]').click()">去复习</button></div>`}
 renderQuizSetup();
 
 // ═══════════════════════════════════════════════════════════════
-//  SETTINGS
+//  APP SETTINGS
 // ═══════════════════════════════════════════════════════════════
-function renderSettings(){
-  const s=S.settings,el=document.getElementById('settingsContent');
-  el.innerHTML=`
-    <div class="setting-group">
-      <div class="setting-group-title">🎨 外观</div>
-      <div class="setting-card">
-        <div class="s-label">主题模式</div>
-        <div class="theme-pick" style="margin-top:6px">
-          <button class="${s.theme==='dark'?'active':''}" data-t="dark">🌙 深色</button>
-          <button class="${s.theme==='light'?'active':''}" data-t="light">☀️ 浅色</button>
-        </div>
-      </div>
-      <div class="setting-card">
-        <div class="s-label">字体大小</div>
-        <div class="s-row" style="margin-top:6px">
-          <input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1">
-          <span style="margin-left:10px;color:var(--accent);font-weight:500;min-width:28px">${s.fontSize}</span>
-        </div>
-      </div>
-    </div>
-    <div class="setting-group">
-      <div class="setting-group-title">🔊 语音</div>
-      <div class="setting-card">
-        <div class="s-label">朗读速度</div>
-        <div class="s-desc">控制俄语/中文语音播放的快慢</div>
-        <div class="spd-grid">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div>
-      </div>
-    </div>
-    <div class="setting-group">
-      <div class="setting-group-title">🤖 翻译引擎</div>
-      <div class="s-desc" style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:6px">选择俄语翻译使用的后端模型：</div>
-      ${CFG.models.map(m=>`<div class="mdl-card${s.model===m.id?' selected':''}" data-mdl="${m.id}">
-        <div class="mdl-name">${m.name} <span class="mdl-check">✓</span></div>
-        <div class="mdl-desc">${m.desc}</div>
-      </div>`).join('')}
-    </div>
-    <div class="setting-group">
-      <div class="setting-group-title">ℹ️ 关于</div>
-      <div class="about-box">
-        📖 俄语翻译学习 v2.0<br>
-        词汇数据: 走遍俄罗斯 1~4 册<br>
-        翻译引擎: MyMemory + LibreTranslate<br>
-        语音引擎: Web Speech API<br><br>
-        Made with ❤️ для тебя
-      </div>
-    </div>
-  `;
-  // Theme
-  el.querySelectorAll('.theme-pick button').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.theme-pick button').forEach(x=>x.classList.remove('active'));this.classList.add('active');applyTheme(this.dataset.t);toast('主题已切换')}));
-  // Font
-  const fsl=document.getElementById('fsSlider');
-  fsl.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});
-  // Speed
-  el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast(`速度: ${S.settings.speed}x`)}));
-  // Model
-  el.querySelectorAll('.mdl-card').forEach(c=>c.addEventListener('click',function(){el.querySelectorAll('.mdl-card').forEach(x=>x.classList.remove('selected'));this.classList.add('selected');S.settings.model=this.dataset.mdl;save('settings');toast(`已切换: ${this.querySelector('.mdl-name').textContent.trim()}`)}));
-}
-renderSettings();
-
-// ─── More sub-tabs ───
-document.querySelectorAll('#sMore .tb-sub').forEach(b=>{
-  b.addEventListener('click',()=>{
-    document.querySelectorAll('#sMore .tb-sub').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    const id=b.dataset.more;
-    document.getElementById('subFav').style.display=id==='fav'?'block':'none';
-    document.getElementById('subSettings').style.display=id==='settings'?'block':'none';
-  });
-});
+function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">DeepSeek API</div><div class="setting-card"><div class="s-label">API Key</div><div class="s-desc">深度翻译模式使用</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="sk-..." style="margin-top:6px;font-size:var(--fs-sm)"><button id="dsKeySave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v4.0<br>俄·英·中 三语互译<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek</div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)})}
+renderAppSettings();
+// More sub-tabs
+document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none'}));
 
 // ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
 function init(){
-  applyTheme(S.settings.theme);
   applyFont(S.settings.fontSize);
   document.getElementById('autoToggle').classList.toggle('on',S.settings.autoTr);
-  renderHistory();
-  updateLangs();
-  // Online status
-  function setOnline(v){
-    document.getElementById('statusText').textContent=v?'在线':'离线';
-    document.getElementById('statusDot').classList.toggle('offline',!v);
-  }
-  window.addEventListener('online',()=>setOnline(true));
-  window.addEventListener('offline',()=>setOnline(false));
-  setOnline(navigator.onLine);
-  // Preload TTS voices
-  if(window.speechSynthesis){
-    window.speechSynthesis.getVoices();
-    window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
-  }
-  // PWA service worker
+  updateModeUI();updateLangUI();
+  renderLearn();renderHistory();
+  if(window.speechSynthesis){window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices()}
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 init();
