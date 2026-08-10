@@ -25,12 +25,13 @@ jobs:
 
       - name: Setup Android SDK
         run: |
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=" >> $GITHUB_ENV
           mkdir -p $HOME/android-sdk/cmdline-tools
           cd $HOME/android-sdk/cmdline-tools
           curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
           unzip -qo tools.zip
           mv cmdline-tools latest
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
       - name: Install SDK packages
@@ -45,7 +46,9 @@ jobs:
         run: npx cap sync
 
       - name: Build Debug APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+        run: |
+          unset ANDROID_SDK_ROOT
+          cd android && chmod +x gradlew && ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
