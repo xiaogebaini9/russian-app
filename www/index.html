@@ -606,6 +606,24 @@ document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('clic
 // ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
+const APP_VERSION='1.0.0';
+
+async function checkUpdate(){
+  try{
+    const r=await fetch('https://api.github.com/repos/xiaogebaini9/russian-app/releases/latest',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return;
+    const d=await r.json();
+    const latest=d.tag_name.replace('v','');
+    if(latest!==APP_VERSION){
+      setTimeout(()=>{
+        if(confirm('发现新版本 v'+latest+'，是否前往下载？')){
+          window.open('https://github.com/xiaogebaini9/russian-app/releases/latest','_blank');
+        }
+      },2000);
+    }
+  }catch(e){}
+}
+
 function init(){
   applyFont(S.settings.fontSize);
   document.getElementById('autoToggle').classList.toggle('on',S.settings.autoTr);
@@ -613,6 +631,7 @@ function init(){
   renderLearn();renderHistory();
   if(window.speechSynthesis){window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices()}
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+  checkUpdate();
 }
 init();
 </script>
