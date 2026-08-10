@@ -616,9 +616,8 @@ async function checkUpdate(){
     const latest=d.tag_name.replace('v','');
     if(latest!==APP_VERSION){
       setTimeout(()=>{
-        if(confirm('发现新版本 v'+latest+'，是否前往下载？')){
-          window.open('https://github.com/xiaogebaini9/russian-app/releases/latest','_blank');
-        }
+        alert('发现新版本 v'+latest+'，请更新后继续使用');
+        window.open('https://github.com/xiaogebaini9/russian-app/releases/latest','_blank');
       },2000);
     }
   }catch(e){}
