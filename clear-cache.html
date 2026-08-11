@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>清除缓存</title>
+<style>
+body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-align:center;padding:40px 20px;background:#f5f6fa;color:#1a1d26}
+h2{color:#2563eb} .btn{display:inline-block;margin:12px 6px;padding:14px 28px;border-radius:12px;font-size:16px;font-weight:600;text-decoration:none;cursor:pointer;border:none}
+.btn-blue{background:#2563eb;color:#fff} .btn-gray{background:#e4e6ed;color:#6b7080}
+#msg{margin-top:16px;font-size:14px;color:#22c55e}
+</style>
+</head>
+<body>
+<h2>🗑️ 清除俄语学习缓存</h2>
+<p style="color:#6b7080;margin:12px 0">如果页面功能异常，点下面按钮清除旧缓存</p>
+<button class="btn btn-blue" onclick="clearCache()">清除缓存并重新加载</button>
+<a class="btn btn-gray" href="/index.html">直接打开（不清除）</a>
+<div id="msg"></div>
+<script>
+async function clearCache(){
+  const msg=document.getElementById('msg');
+  msg.textContent='正在清除...';
+  try{
+    // Clear all caches
+    const keys=await caches.keys();
+    for(const k of keys){await caches.delete(k)}
+    msg.textContent='已清除 '+keys.length+' 个缓存';
+    // Unregister all SWs
+    const regs=await navigator.serviceWorker.getRegistrations();
+    for(const r of regs){await r.unregister()}
+    msg.textContent+=' | 已注销 '+regs.length+' 个Service Worker';
+    // Clear localStorage for this domain (optional - keeps settings)
+    msg.textContent+='\n\n✅ 缓存已清除，即将跳转...';
+    setTimeout(()=>{location.href='/index.html'},1000);
+  }catch(e){
+    msg.textContent='❌ 清除失败: '+e.message;
+  }
+}
+</script>
+</body>
+</html>
