@@ -349,6 +349,32 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
     <!-- ══ QUIZ ══ -->
     <div class="screen" id="sQuiz"><div id="quizArea"></div></div>
 
+    <!-- ══ CLASS MODE (课堂语音翻译) ══ -->
+    <div class="screen" id="sClass">
+      <div style="padding:10px 0;flex-shrink:0">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-weight:600;font-size:15px;color:var(--blue)">🎤 课堂模式</span>
+          <span id="classStatus" style="font-size:11px;color:var(--text3)">未开始</span>
+          <span style="flex:1"></span>
+          <span style="font-size:11px;color:var(--text3)" id="classCount">0 句</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button id="classStartBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--blue);color:#fff">🎙️ 开始录音</button>
+          <button id="classStopBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--input);color:var(--text2);border:1.5px solid var(--border)" disabled>⏹ 停止</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:6px" id="classHint">
+          说俄语 → 自动转文字 → 翻译显示。识别引擎：<b id="classEngine">Web Speech API</b>（Whisper 接入后自动升级）
+        </div>
+      </div>
+      <div id="classBoard" style="flex:1;overflow-y:auto;min-height:0;padding-bottom:10px">
+        <div class="empty-state" id="classEmpty">点击"开始录音"，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;padding-bottom:8px">
+        <button id="classSaveBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">💾 保存本课记录</button>
+        <button id="classClearBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">🧹 清空</button>
+      </div>
+    </div>
+
     <!-- ══ MORE ══ -->
     <div class="screen" id="sMore">
       <div class="sub-tabs" style="margin-bottom:10px">
@@ -367,6 +393,7 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
     <button class="nav-btn active" data-screen="sTranslate"><span class="icon">🌐</span><span>翻译</span></button>
     <button class="nav-btn" data-screen="sLearn"><span class="icon">📚</span><span>学习</span></button>
     <button class="nav-btn" data-screen="sQuiz"><span class="icon">🎯</span><span>测验</span></button>
+    <button class="nav-btn" data-screen="sClass"><span class="icon">🎤</span><span>课堂</span></button>
     <button class="nav-btn" data-screen="sMore"><span class="icon">📦</span><span>更多</span></button>
   </nav>
 </div>
@@ -441,7 +468,14 @@ function speak(t,lang,rate){if(!window.speechSynthesis||S.isSpeaking)return;S.is
 const $trInput=document.getElementById('trInput'),$trResult=document.getElementById('trResult'),$btnTr=document.getElementById('btnTranslate'),$btnSpeak=document.getElementById('btnSpeak');
 
 // ═══ Check if text is a single Russian word ═══
-function isSingleRussianWord(txt){const t=txt.trim();return /^[а-яА-ЯёЁ]+$/i.test(t) && t.indexOf(' ')===-1}
+function isSingleRussianWord(txt){return !!cleanRussianWord(txt)}
+// 清洗标点后取俄语单词（"читать。" → "читать"，多词/非俄语 → null）
+function cleanRussianWord(txt){
+  if(!txt)return null;
+  const t=txt.trim().replace(/[.,;:!?…"«»()\-—'’‘。！？，、；：]/g,'').trim();
+  if(t.indexOf(' ')>-1)return null;
+  return /^[а-яА-ЯёЁ]+$/i.test(t)?t:null;
+}
 
 // ═══ Fetch word analysis (aspect + time conjugation + multi meanings) ═══
 async function fetchWordAnalysis(word){
@@ -449,7 +483,7 @@ async function fetchWordAnalysis(word){
     const resp=await fetch('http://localhost:8765/api/word-analysis',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
     if(!resp.ok){const e=await resp.json().catch(()=>({error:'HTTP '+resp.status}));throw new Error(e.error||'代理错误')}
     const d=await resp.json();
-    if(d.error){throw new Error(d.error)}
+    if(d.error){throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''))}
     return d;
   }catch(e){return {_error:e.message}}
 }
@@ -604,8 +638,8 @@ async function doTranslate(){
 
 function renderResult(r,src){
   const isFav=S.favs.some(f=>f.ru===src||f.cn===src||f.en===src);
-  // Show analysis when either source or target is a single Russian word
-  const ruWord=(S.langSrc==='ru'&&isSingleRussianWord(src))?src:(S.langTgt==='ru'&&isSingleRussianWord(r.text))?r.text:null;
+  // Show analysis when either source or target is a single Russian word（容忍标点：如"читать。"）
+  const ruWord=(S.langSrc==='ru'&&cleanRussianWord(src))||(S.langTgt==='ru'&&cleanRussianWord(r.text))||null;
   const showAnalysis=!!ruWord;
   $trResult.innerHTML=`<div class="tr-result"><div class="tr-source">${LANGS[S.langSrc]}: ${escape(src)}</div><div class="tr-text">${escape(r.text)}</div>${r.det?`<div class="tr-phonetic">${r.det}</div>`:''}<button class="tr-save" id="saveWordBtn">${isFav?'★ 已收藏':'☆ 收藏'}</button><button class="tr-copy" id="copyBtn">📋 复制</button>${showAnalysis?`<div class="tr-analysis-btns"><button class="tr-analysis-btn" id="btnAspect">🔄 完成体 / 未完成体</button><button class="tr-analysis-btn" id="btnTense">⏳ 时态变位</button></div><div id="analysisPanels"></div>`:''}</div>`;
   document.getElementById('saveWordBtn').addEventListener('click',()=>{toggleFav(src,r.text)});
@@ -626,12 +660,14 @@ function renderResult(r,src){
     document.getElementById('btnAspect').addEventListener('click',async()=>{
       document.getElementById('btnAspect').style.background='var(--blue-bg)';document.getElementById('btnTense').style.background='';
       const a=await ensure();if(!a)return;
-      document.getElementById('analysisPanels').innerHTML=(a.meanings?renderMultiMeanings(a):'')+renderAspectPanel(a)+renderDeclensionPanel(a);
+      const tag=a._model?`<div style="font-size:11px;color:var(--text3);margin:8px 0 2px;text-align:right">🤖 ${escape(a._model)}</div>`:'';
+      document.getElementById('analysisPanels').innerHTML=tag+(a.meanings?renderMultiMeanings(a):'')+renderAspectPanel(a)+renderDeclensionPanel(a);
     });
     document.getElementById('btnTense').addEventListener('click',async()=>{
       document.getElementById('btnTense').style.background='var(--blue-bg)';document.getElementById('btnAspect').style.background='';
       const a=await ensure();if(!a)return;
-      document.getElementById('analysisPanels').innerHTML=(a.meanings?renderMultiMeanings(a):'')+renderTensePanel(a)+renderDeclensionPanel(a);
+      const tag=a._model?`<div style="font-size:11px;color:var(--text3);margin:8px 0 2px;text-align:right">🤖 ${escape(a._model)}</div>`:'';
+      document.getElementById('analysisPanels').innerHTML=tag+(a.meanings?renderMultiMeanings(a):'')+renderTensePanel(a)+renderDeclensionPanel(a);
     });
   }
 }
@@ -681,7 +717,7 @@ async function doDictSearch(){
     const resp=await fetch('http://localhost:8765/api/dictionary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
     if(!resp.ok){const e=await resp.json().catch(()=>({error:'失败'}));throw new Error(e.error||'代理错误')}
     const d=await resp.json();
-    if(d.error){throw new Error(d.error)}
+    if(d.error){throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''))}
     renderDictResult(d);
   }catch(e){
     $dictResult.innerHTML=`<div class="dict-card"><div class="tr-text" style="color:var(--text3)">查询失败: ${e.message}</div></div>`;
@@ -954,7 +990,7 @@ window.answerCefr=function(btn,chosen,ans,cid,qi){
 };
 
 function renderLearnSettings(el){
-  el.innerHTML=`<div class="setting-group"><div class="setting-group-title">学习设置</div><div class="setting-card"><div class="s-label">默认课本</div><div class="s-desc">打开课本时默认显示的教材</div><div class="book-bar" style="margin:0">${BOOKS.map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-ls="${b.id}" onclick="curBook=${b.id};renderLearn()">${b.title}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">考试准备</div><div class="setting-card"><div class="s-label">目标等级</div><div class="s-desc">选择备考的目标CEFR等级，课程将优先展示相关内容</div><div class="spd-grid">${CEFR.levels.map(l=>`<button class="spd-chip" onclick="toast('目标等级: ${l.name.split(' ')[0]}')">${l.name.split(' ')[0]}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">数据管理</div><div class="setting-card"><div class="s-label">收藏单词</div><div class="s-desc">已收藏 <strong style="color:var(--blue)">${S.favs.length}</strong> 个单词</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--red);color:#fff;margin-top:6px" onclick="if(confirm('确定清空所有收藏？')){S.favs=[];save('favs');renderFavs();renderLearn();toast('已清空')}">清空收藏</button></div></div>`;
+  el.innerHTML=`<div class="setting-group"><div class="setting-group-title">学习设置</div><div class="setting-card"><div class="s-label">默认课本</div><div class="s-desc">打开课本时默认显示的教材</div><div class="book-bar" style="margin:0">${BOOKS.map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-ls="${b.id}" onclick="curBook=${b.id};renderLearn()">${b.title}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">考试准备</div><div class="setting-card"><div class="s-label">目标等级</div><div class="s-desc">选择备考的目标CEFR等级，课程将优先展示相关内容</div><div class="spd-grid">${CEFR.levels.map(l=>`<button class="spd-chip" onclick="toast('目标等级: ${l.name.split(' ')[0]}')">${l.name.split(' ')[0]}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">数据管理</div><div class="setting-card"><div class="s-label">收藏单词</div><div class="s-desc">已收藏 <strong style="color:var(--blue)">${S.favs.length}</strong> 个单词</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--red);color:#fff;margin-top:6px" onclick="if(confirm('确定清空所有收藏？')){S.favs=[];save('favs');renderFavs();renderLearn();toast('已清空')}">清空收藏</button></div></div><div class="setting-group"><div class="setting-group-title">🔧 系统诊断</div><div class="setting-card"><div class="s-desc">一键检查：代理服务器、翻译引擎、网络状态</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--blue);color:#fff" onclick="runDiagnose(this)">运行诊断</button><div id="diagResult" style="margin-top:8px;font-size:12px;line-height:1.9"></div></div></div>`;
 }
 
 document.querySelectorAll('#learnTabs .sub-tab').forEach(b=>b.addEventListener('click',()=>{
@@ -976,11 +1012,180 @@ function renderQuizResult(){const qs=quizState;const pct=Math.round(qs.correct/q
 renderQuizSetup();
 
 // ═══════════════════════════════════════════════════════════════
+//  CLASS MODE (课堂语音翻译)
+// ═══════════════════════════════════════════════════════════════
+const CLASS={running:false,rec:null,items:[],pending:''};
+
+function classAddItem(original,translation,note){
+  const now=new Date();
+  const time=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
+  CLASS.items.push({time,original,translation,note:note||''});
+  if(CLASS.items.length>200)CLASS.items.shift();
+  classRender();
+  const board=document.getElementById('classBoard');
+  board.scrollTop=board.scrollHeight;
+}
+
+function classRender(){
+  const el=document.getElementById('classBoard');
+  document.getElementById('classCount').textContent=CLASS.items.length+' 句';
+  if(!CLASS.items.length){el.innerHTML='<div class="empty-state" id="classEmpty">点击"开始录音"，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div>';return}
+  el.innerHTML=CLASS.items.map((it,i)=>`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:6px;animation:fadeIn .2s ease">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:10px;color:var(--text3)">${it.time}</span>
+        <span style="display:flex;gap:6px">
+          <span class="class-play" data-i="${i}" data-lang="ru" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊原文</span>
+          <span class="class-play" data-i="${i}" data-lang="zh" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊译文</span>
+        </span>
+      </div>
+      <div style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px">${escape(it.original)}</div>
+      <div style="font-size:14px;color:var(--blue);line-height:1.5">${escape(it.translation)}</div>
+      ${it.note?`<div style="font-size:11px;color:var(--yellow);margin-top:3px">⚠️ ${escape(it.note)}</div>`:''}
+    </div>`).join('');
+  el.querySelectorAll('.class-play').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const it=CLASS.items[parseInt(b.dataset.i)];
+      if(it)speak(b.dataset.lang==='ru'?it.original:it.translation,b.dataset.lang==='ru'?'ru':'zh-CN',.9);
+    });
+  });
+}
+
+async function classTranslate(text){
+  if(!S.settings.dsKey){return{original:text,translation:'（需要 DeepSeek Key 才能翻译，请在设置中填写）',note:''}}
+  try{
+    const resp=await fetch('http://localhost:8765/api/class-translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,text}),signal:AbortSignal.timeout(35000)});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const d=await resp.json();
+    if(d.error)throw new Error(d.error);
+    return{original:d.original||text,translation:d.translation||'',note:d.note||''};
+  }catch(e){
+    return{original:text,translation:'（翻译失败: '+e.message+'）',note:''};
+  }
+}
+
+function classStart(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const status=document.getElementById('classStatus');
+  if(!SR){
+    status.textContent='❌ 浏览器不支持';
+    document.getElementById('classHint').innerHTML='请用 <b>Chrome 或 Edge</b> 打开本页面使用语音识别';
+    return;
+  }
+  CLASS.running=true;
+  document.getElementById('classStartBtn').disabled=true;
+  document.getElementById('classStopBtn').disabled=false;
+  status.textContent='🎙️ 聆听中…';
+  const rec=new SR();
+  CLASS.rec=rec;
+  rec.lang='ru-RU';
+  rec.continuous=true;
+  rec.interimResults=true;
+  rec.maxAlternatives=1;
+  rec.onresult=e=>{
+    let finalText='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)finalText+=e.results[i][0].transcript+' ';
+    }
+    // 显示临时识别文字
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(!e.results[i].isFinal)interim+=e.results[i][0].transcript;
+    }
+    document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">'+(interim?'正在识别: '+escape(interim):'聆听中…')+'</span>';
+    // 句子结束 → 翻译
+    if(finalText.trim()){
+      classTranslate(finalText.trim()).then(r=>{
+        classAddItem(r.original,r.translation,r.note);
+        document.getElementById('classHint').innerHTML='说俄语 → 自动转文字 → 翻译显示';
+      });
+    }
+  };
+  rec.onerror=e=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      status.textContent='❌ 麦克风被拒绝';
+      document.getElementById('classHint').innerHTML='浏览器地址栏 🔒 → 网站设置 → 允许麦克风';
+    }else if(e.error==='network'){
+      status.textContent='⚠️ 识别服务连不上（网络）';
+      document.getElementById('classHint').innerHTML='Web Speech API 依赖云端服务。Whisper 本地方案接入后不再依赖网络';
+    }
+  };
+  rec.onend=()=>{if(CLASS.running){try{rec.start()}catch(e){}}}; // 自动续听
+  try{rec.start()}catch(e){}
+}
+
+function classStop(){
+  CLASS.running=false;
+  if(CLASS.rec){CLASS.rec.onend=null;try{CLASS.rec.stop()}catch(e){}CLASS.rec=null}
+  document.getElementById('classStartBtn').disabled=false;
+  document.getElementById('classStopBtn').disabled=true;
+  document.getElementById('classStatus').textContent='已停止';
+}
+
+function classSave(){
+  if(!CLASS.items.length){toast('还没有记录');return}
+  const date=new Date().toISOString().slice(0,10);
+  const all=ls('class_records',{});
+  all[date]=CLASS.items.slice();
+  ss('class_records',all);
+  const text=CLASS.items.map((it,i)=>`${i+1}. [${it.time}] ${it.original}\n    ${it.translation}${it.note?' ⚠️'+it.note:''}`).join('\n\n');
+  try{navigator.clipboard.writeText(text).then(()=>toast('已保存到本地，已复制到剪贴板'))}catch(e){toast('已保存到本地')}
+}
+
+function classClear(){
+  if(CLASS.items.length&&!confirm('清空当前字幕板？'))return;
+  CLASS.items=[];
+  classRender();
+}
+
+document.getElementById('classStartBtn').addEventListener('click',classStart);
+document.getElementById('classStopBtn').addEventListener('click',classStop);
+document.getElementById('classSaveBtn').addEventListener('click',classSave);
+document.getElementById('classClearBtn').addEventListener('click',classClear);
+
+// ═══════════════════════════════════════════════════════════════
 //  APP SETTINGS
 // ═══════════════════════════════════════════════════════════════
 function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">DeepSeek API</div><div class="setting-card"><div class="s-label">API Key</div><div class="s-desc">深度翻译、字典和单词分析共用</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="sk-..." style="margin-top:6px;font-size:var(--fs-sm)"><button id="dsKeySave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v5.0<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek</div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)})}
 renderAppSettings();
 document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none'}));
+
+// ═══ 系统诊断 ═══
+window.runDiagnose=async function(btn){
+  const el=document.getElementById('diagResult');
+  el.innerHTML='<div style="color:var(--text3)">检查中…</div>';
+  btn.disabled=true;
+  const lines=[];
+  // 1. 代理可达 + 各服务状态
+  try{
+    const r=await fetch('http://localhost:8765/api/diagnose',{signal:AbortSignal.timeout(15000)});
+    if(r.ok){
+      const d=await r.json();
+      lines.push('🖥️ 代理服务器: '+(d.server==='ok'?'✅ 运行中':'⚠️ 异常'));
+      d.checks.forEach(c=>lines.push((c.ok?'✅':'❌')+' '+c.name+': '+c.detail));
+    }else{
+      lines.push('❌ 代理响应异常: HTTP '+r.status);
+    }
+  }catch(e){
+    lines.push('❌ 代理服务器不可达: '+e.message);
+    lines.push('   → 电脑上运行: cd russian-app && node proxy.js');
+  }
+  // 2. DeepSeek Key
+  if(S.settings.dsKey){
+    lines.push('🔑 DeepSeek Key: 已配置 ('+S.settings.dsKey.slice(0,8)+'…)');
+  }else{
+    lines.push('⚠️ DeepSeek Key: 未配置（深度翻译/字典/变位需要）');
+  }
+  // 3. Service Worker
+  if(navigator.serviceWorker){
+    try{
+      const regs=await navigator.serviceWorker.getRegistrations();
+      lines.push(regs.length?('ℹ️ Service Worker: '+regs.length+' 个已注册（页面异常时去 /clear-cache.html 清理）'):'ℹ️ Service Worker: 未注册');
+    }catch(e){}
+  }
+  el.innerHTML=lines.join('<br>')+'<br><button style="margin-top:8px;padding:5px 12px;border-radius:6px;font-size:11px;background:var(--input);color:var(--text2)" onclick="window.open(\'/clear-cache.html\',\'_blank\')">🧹 打开缓存清理页</button>';
+  btn.disabled=false;
+};
 
 // ═══════════════════════════════════════════════════════════════
 //  INIT

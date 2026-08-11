@@ -13,19 +13,22 @@ const ROOT = __dirname; // russian-app 目录
 // ⚡ 单词分析内存缓存（同词二次查询秒回）
 const analysisCache = new Map();
 
-// ⚡ DeepSeek 调用（模型回退：deepseek-v4-flash 失败时自动退回 deepseek-chat）
-async function callDeepSeek(key, messages, maxTokens, timeoutMs) {
-  const models = ['deepseek-v4-flash', 'deepseek-chat'];
+// ⚡ DeepSeek 调用（模型回退：第一个模型失败时自动试下一个）
+async function callDeepSeek(key, messages, maxTokens, timeoutMs, models, useJsonMode) {
+  const list = models || ['deepseek-v4-flash', 'deepseek-chat'];
   let lastErr = null;
-  for (const model of models) {
+  for (const model of list) {
     try {
+      const body = { model, max_tokens: maxTokens, temperature: 0.1, messages };
+      // JSON 模式：强制模型只输出合法 JSON（DeepSeek 支持 OpenAI 兼容的 response_format）
+      if (useJsonMode) body.response_format = { type: 'json_object' };
       const resp = await fetch(`${DEEPSEEK}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${key}`
         },
-        body: JSON.stringify({ model, max_tokens: maxTokens, temperature: 0.1, messages }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs)
       });
       const d = await resp.json();
@@ -37,7 +40,7 @@ async function callDeepSeek(key, messages, maxTokens, timeoutMs) {
         lastErr = new Error(msg);
         continue;
       }
-      return d;
+      return { data: d, model };
     } catch (e) {
       if (/auth|invalid api key|authentication/i.test(e.message || '')) throw e;
       lastErr = e;
@@ -53,32 +56,42 @@ function extractJson(raw) {
   let s = raw.replace(/```(?:json)?\s*\n?([\s\S]*?)\n?```/g, '$1').trim();
   // 2. 直接解析
   try { return JSON.parse(s); } catch (e) {}
-  // 3. 截取第一个 { 到最后一个 } 再解析
+  // 3. 截取第一个 { 到最后一个 }，清洗后解析
   const b = s.indexOf('{'), e2 = s.lastIndexOf('}');
   if (b >= 0 && e2 > b) {
-    try { return JSON.parse(s.slice(b, e2 + 1)); } catch (e) {}
+    let seg = s.slice(b, e2 + 1);
+    // 去注释（// 行注释、/* */ 块注释）
+    seg = seg.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n"]*/g, '');
+    // 去尾逗号（JSON 不允许 ,} 和 ,]）
+    seg = seg.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+    try { return JSON.parse(seg); } catch (e) {}
   }
   // 4. 截取第一个 [ 到最后一个 ] 再解析（数组型）
   const ab = s.indexOf('['), ae = s.lastIndexOf(']');
   if (ab >= 0 && ae > ab) {
-    try { return JSON.parse(s.slice(ab, ae + 1)); } catch (e) {}
+    let seg = s.slice(ab, ae + 1);
+    seg = seg.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n"]*/g, '');
+    seg = seg.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+    try { return JSON.parse(seg); } catch (e) {}
   }
   return null;
 }
 
-// ⚡ 请求 JSON 分析并解析（失败自动用稳定模型重试一次）
+// ⚡ 请求 JSON 分析并解析（失败时真正换模型重试）
 async function requestJsonAnalysis(key, messages, maxTokens, timeoutMs) {
-  // 第一次：flash 优先（快）
-  let d = await callDeepSeek(key, messages, maxTokens, timeoutMs);
-  let raw = d.choices?.[0]?.message?.content?.trim() || '';
+  // 第一次：v4-flash + 强制JSON模式（快）
+  let r = await callDeepSeek(key, messages, maxTokens, timeoutMs, ['deepseek-v4-flash'], true);
+  let raw = r.data.choices?.[0]?.message?.content?.trim() || '';
   let parsed = extractJson(raw);
-  if (parsed) return { parsed, raw };
-  // 第二次：只用稳定模型 deepseek-chat 重试一次
-  d = await callDeepSeek(key, messages, maxTokens, timeoutMs);
-  raw = d.choices?.[0]?.message?.content?.trim() || '';
+  if (parsed) return { parsed, raw, model: r.model };
+  // 第二次：真正换模型 → deepseek-chat + 强制JSON模式（稳）
+  r = await callDeepSeek(key, messages, maxTokens, timeoutMs, ['deepseek-chat'], true);
+  raw = r.data.choices?.[0]?.message?.content?.trim() || '';
   parsed = extractJson(raw);
-  if (parsed) return { parsed, raw };
-  return { parsed: null, raw };
+  if (parsed) return { parsed, raw, model: r.model };
+  // 失败：带上模型返回的内容片段，方便诊断
+  const snippet = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
+  return { parsed: null, raw, model: r.model, snippet };
 }
 
 const MIME = {
@@ -124,12 +137,19 @@ const server = http.createServer((req, res) => {
         const tgtName=NAMES[tgt]||tgt;
 
         const d = await callDeepSeek(key, [
-          { role: 'system', content: `你是专业的${srcName}→${tgtName}翻译助手。严格忠实于原文，不增不减，不添加解释。只返回译文。` },
+          { role: 'system', content: `你是专业的${srcName}→${tgtName}翻译助手，擅长日常口语和常用表达。
+
+翻译要求：
+1. 优先选择最常用、最地道的译法，避免生僻词和过于书面化的表达
+2. 翻译单个单词时，给出该词最核心、最常用的义项
+3. 翻译句子时用自然的口语表达，符合目标语言习惯
+4. 严格忠实于原文，不增不减，不添加解释
+5. 只返回译文本身，不要任何额外内容或格式` },
           { role: 'user', content: text }
         ], 2000, 15000);
-        const translated = d.choices?.[0]?.message?.content?.trim() || '';
+        const translated = d.data.choices?.[0]?.message?.content?.trim() || '';
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ text: translated, det: 'DeepSeek' }));
+        res.end(JSON.stringify({ text: translated, det: d.model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat', model: d.model }));
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
@@ -145,7 +165,7 @@ const server = http.createServer((req, res) => {
     req.on('end', async () => {
       try {
         const { key, word } = JSON.parse(body);
-        const { parsed, raw } = await requestJsonAnalysis(key, [
+        const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
           { role: 'system', content: `你是专业的俄语词典编纂专家。请为给定的俄语单词提供高质量的词典释义。
 
 请按以下JSON格式返回（不要包含markdown代码块标记，只返回纯JSON）：
@@ -174,12 +194,13 @@ const server = http.createServer((req, res) => {
           { role: 'user', content: word }
         ], 3000, 60000);
         if (parsed) {
+          parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(parsed));
         } else {
-          // 如果JSON解析失败，返回原始文本
+          // 如果JSON解析失败，返回原始文本 + 内容片段便于诊断
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ raw: raw, error: 'JSON解析失败，返回原始内容' }));
+          res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'JSON解析失败，返回原始内容' }));
         }
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -203,15 +224,16 @@ const server = http.createServer((req, res) => {
           res.end(JSON.stringify(cached));
           return;
         }
-        const { parsed, raw } = await requestJsonAnalysis(key, [
+        const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
           { role: 'system', content: `你是俄语语法分析专家。给定俄语单词，只返回纯JSON（不要markdown代码块）：
 
 {"word":"原词","is_verb":true或false,"meanings":[{"index":1,"chinese":"中文释义","usage":"用法/语境"}],"aspect":{"imperfective":{"infinitive":"未完成体不定式","past":{"masc":"阳","fem":"阴","neut":"中","plur":"复"},"present":{"я":"","ты":"","он":"","мы":"","вы":"","они":""},"future":{"я":"","ты":"","он":"","мы":"","вы":"","они":""},"imperative":{"sg":"","pl":""},"participles":{"active_present":"","active_past":"","passive_present":"","passive_past":""},"gerunds":{"present":"","past":""}},"perfective":{"infinitive":"完成体不定式","past":{"masc":"","fem":"","neut":"","plur":""},"present":null,"future":{"я":"","ты":"","он":"","мы":"","вы":"","они":""},"imperative":{"sg":"","pl":""},"participles":{"active_past":"","passive_past":""},"gerunds":{"past":""}}},"declension":{"nominative":{"sg":"","pl":""},"genitive":{"sg":"","pl":""},"dative":{"sg":"","pl":""},"accusative":{"sg":"","pl":""},"instrumental":{"sg":"","pl":""},"prepositional":{"sg":"","pl":""}},"usage_note":"用法提示"}
 
 规则：动词→aspect两体全填+declension填null；名词/形容词→declension六格+aspect填null；完成体无现在时；俄语填写，重音用'符号；meanings至少1个义项。` },
           { role: 'user', content: word }
-        ], 1500, 60000);
+        ], 2500, 60000);
         if (parsed) {
+          parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
           analysisCache.set(word, parsed);
           if (analysisCache.size > 500) { // 防无限膨胀，删最旧的1/3
             const del = Array.from(analysisCache.keys()).slice(0, 150);
@@ -221,13 +243,91 @@ const server = http.createServer((req, res) => {
           res.end(JSON.stringify(parsed));
         } else {
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ raw: raw, error: 'JSON解析失败' }));
+          res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'JSON解析失败' }));
         }
       } catch (e) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
       }
     });
+    return;
+  }
+
+  // ── 课堂翻译（口语规整 + 学术翻译，一次调用）──
+  if (req.method === 'POST' && url === '/api/class-translate') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { key, text } = JSON.parse(body);
+        if (!text || !text.trim()) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '文本为空' }));
+          return;
+        }
+        const d = await callDeepSeek(key, [
+          { role: 'system', content: `你是同声传译专家，处理俄语大学课堂口语。
+
+任务：把老师说的话规整并翻译成中文。
+
+两步处理（都在一个回答里完成）：
+1. 规整：去掉口语填充词（ну, вот, так сказать, как бы, значит），修正不完整句和重复，保留专业术语
+2. 翻译：把规整后的俄语翻译成简洁的中文，术语准确（语言学/文学术语按学界通用译法），适合实时阅读
+
+严格按以下JSON格式返回（不要markdown代码块，只返回纯JSON）：
+{"original":"规整后的俄语原文","translation":"中文翻译","note":"术语注释（如有难译术语，无则空字符串）"}
+
+如果听不清或文本不完整，original保留原样，translation翻译能听懂的部分，note注明"音频不完整"。` },
+          { role: 'user', content: text }
+        ], 2000, 30000);
+        const raw = d.data.choices?.[0]?.message?.content?.trim() || '';
+        const parsed = extractJson(raw);
+        if (parsed && (parsed.original || parsed.translation)) {
+          parsed._model = d.model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(parsed));
+        } else {
+          // 兜底：解析失败时原文翻译分开返回
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ original: text.trim(), translation: raw, note: '规整失败，直译' }));
+        }
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── 系统自检 ──
+  if (req.method === 'GET' && url === '/api/diagnose') {
+    (async () => {
+      const result = { server: 'ok', time: Date.now(), checks: [] };
+      // 1. DeepSeek API 可达性
+      try {
+        const r = await fetch(`${DEEPSEEK}/v1/models`, { signal: AbortSignal.timeout(8000) });
+        result.checks.push({ name: 'DeepSeek API', ok: true, detail: '可达 (HTTP ' + r.status + ')' });
+      } catch (e) {
+        result.checks.push({ name: 'DeepSeek API', ok: false, detail: e.message });
+      }
+      // 2. MyMemory
+      try {
+        const r = await fetch('https://api.mymemory.translated.net/get?q=test&langpair=en|zh-CN', { signal: AbortSignal.timeout(8000) });
+        const d = await r.json();
+        result.checks.push({ name: 'MyMemory 翻译', ok: d.responseStatus === 200, detail: d.responseStatus === 200 ? '正常' : '异常: ' + (d.responseDetails || r.status) });
+      } catch (e) {
+        result.checks.push({ name: 'MyMemory 翻译', ok: false, detail: e.message });
+      }
+      // 3. LibreTranslate
+      try {
+        const r = await fetch('https://translate.terraprint.co/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q: 'test', source: 'en', target: 'zh', format: 'text' }), signal: AbortSignal.timeout(8000) });
+        result.checks.push({ name: 'LibreTranslate', ok: r.ok, detail: 'HTTP ' + r.status + (r.ok ? '' : '（可能挂了）') });
+      } catch (e) {
+        result.checks.push({ name: 'LibreTranslate', ok: false, detail: e.message });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    })();
     return;
   }
 

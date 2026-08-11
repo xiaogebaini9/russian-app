@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>语音功能测试</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f6fa;color:#1a1d26;padding:20px;max-width:600px;margin:0 auto}
+h1{font-size:20px;color:#2563eb;margin-bottom:16px}
+h2{font-size:15px;color:#1a1d26;margin:20px 0 8px}
+.card{background:#fff;border:1px solid #e4e6ed;border-radius:12px;padding:16px;margin-bottom:12px}
+button{padding:10px 20px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer;margin:4px}
+.btn-blue{background:#2563eb;color:#fff}
+.btn-gray{background:#e4e6ed;color:#6b7080}
+.btn-green{background:#22c55e;color:#fff}
+.btn-red{background:#ef4444;color:#fff}
+.result{background:#f0f1f5;border-radius:8px;padding:12px;font-size:14px;margin-top:10px;min-height:20px;white-space:pre-wrap;word-break:break-all}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;margin-left:6px}
+.ok{background:#dcfce7;color:#16a34a}.bad{background:#fee2e2;color:#dc2626}
+#micStatus{display:inline-block;width:10px;height:10px;border-radius:50%;background:#9ca3af;margin-right:4px}
+#micStatus.live{background:#ef4444;animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+small{color:#9ca3af;font-size:12px}
+</style>
+</head>
+<body>
+<h1>🎤 语音功能测试页</h1>
+<p style="color:#6b7080;font-size:13px">测试环境：浏览器识别能力 + 系统语音包，为课堂模式做准备</p>
+
+<div class="card">
+  <h2>1️⃣ 麦克风权限</h2>
+  <button class="btn-blue" onclick="testMic()">测试麦克风</button>
+  <button class="btn-gray" onclick="stopMic()">停止</button>
+  <div class="result" id="micResult">未测试</div>
+</div>
+
+<div class="card">
+  <h2>2️⃣ 语音识别测试（Web Speech API）</h2>
+  <select id="recLang">
+    <option value="ru-RU">俄语 ru-RU</option>
+    <option value="zh-CN">中文 zh-CN</option>
+    <option value="en-US">英语 en-US</option>
+  </select>
+  <button class="btn-green" onclick="startRec()">开始识别</button>
+  <button class="btn-red" onclick="stopRec()">停止</button>
+  <div class="result" id="recResult">点开始，然后说话（说俄语试试）</div>
+</div>
+
+<div class="card">
+  <h2>3️⃣ 语音朗读测试（TTS 语音包）</h2>
+  <input type="text" id="ttsText" value="Привет, я учу русский язык." style="width:100%;padding:10px;border-radius:8px;border:1px solid #e4e6ed;margin-bottom:8px">
+  <button class="btn-blue" onclick="speakTTS()">朗读</button>
+  <button class="btn-gray" onclick="listVoices()">列出可用语音</button>
+  <div class="result" id="ttsResult">俄罗斯语语音包检查结果将显示在这里</div>
+</div>
+
+<script>
+// ═══ 1. 麦克风测试 ═══
+let stream=null;
+async function testMic(){
+  const el=document.getElementById('micResult');
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const st=stream.getAudioTracks()[0];
+    el.innerHTML=`✅ 麦克风正常<br>设备: ${st.label || '未知'}<br>状态: ${st.readyState}${st.muted?'（静音）':''}`;
+  }catch(e){
+    el.innerHTML=`❌ 无法访问麦克风: ${e.message}<br><small>检查：地址栏🔒→网站设置→允许麦克风</small>`;
+  }
+}
+function stopMic(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;document.getElementById('micResult').innerHTML+='<br>🛑 已停止'}}
+
+// ═══ 2. 语音识别 ═══
+let rec=null;
+function startRec(){
+  const el=document.getElementById('recResult');
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){el.innerHTML='❌ 当前浏览器不支持语音识别<br><small>请用 Chrome 或 Edge 打开</small>';return}
+  rec=new SR();
+  rec.lang=document.getElementById('recLang').value;
+  rec.continuous=true;rec.interimResults=true;
+  rec.onstart=()=>{el.innerHTML='🎤 正在听…请说话';document.getElementById('micStatus').className='live'};
+  rec.onresult=e=>{
+    let final='',interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal)final+=t;else interim+=t;
+    }
+    el.innerHTML=(final?'✅ 识别结果: '+final+'<br>':'' )+(interim?'<i style="color:#6b7080">'+interim+'</i>':'');
+  };
+  rec.onerror=e=>{el.innerHTML='❌ 识别错误: '+e.error+'<br><small>network 错误=连不上识别服务（云端被墙）；no-speech=没听到声音</small>';document.getElementById('micStatus').className=''};
+  rec.onend=()=>{document.getElementById('micStatus').className='';if(rec)rec.start()}; // 自动续听
+  rec.start();
+}
+function stopRec(){if(rec){rec.onend=null;rec.stop();rec=null;document.getElementById('recResult').innerHTML+='<br>🛑 已停止'}}
+
+// ═══ 3. TTS 朗读 ═══
+function listVoices(){
+  const el=document.getElementById('ttsResult');
+  const voices=speechSynthesis.getVoices();
+  if(!voices.length){
+    // 有些浏览器 voices 延迟加载
+    speechSynthesis.onvoiceschanged=()=>listVoices();
+    el.innerHTML='语音列表加载中…';return;
+  }
+  const ru=voices.filter(v=>v.lang.toLowerCase().startsWith('ru'));
+  const zh=voices.filter(v=>v.lang.toLowerCase().startsWith('zh'));
+  const en=voices.filter(v=>v.lang.toLowerCase().startsWith('en'));
+  el.innerHTML=`俄语 ${ru.length?('✅ '+ru.map(v=>v.name).join(', ')):'❌ 没有俄语语音！'}<br>
+中文 ${zh.length?('✅ '+zh.map(v=>v.name).join(', ')):'❌ 没有'}<br>
+英语 ${en.length?('✅ '+en.map(v=>v.name).join(', ')):'❌ 没有'}<br><br>
+<small>俄语没有→设置→时间和语言→添加俄语→勾选语音→重启浏览器</small>`;
+}
+function speakTTS(){
+  const text=document.getElementById('ttsText').value;
+  if(!text)return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  const ru=speechSynthesis.getVoices().filter(v=>v.lang.toLowerCase().startsWith('ru'))[0];
+  u.lang=ru?'ru-RU':(text.match(/[а-яА-ЯёЁ]/)?'ru-RU':'zh-CN');
+  if(ru)u.voice=ru;
+  speechSynthesis.speak(u);
+}
+// 页面加载时预加载语音列表
+if('speechSynthesis'in window){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>{}}
+</script>
+</body>
+</html>
