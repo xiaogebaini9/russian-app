@@ -77,7 +77,7 @@ body{
 
 <script>
 const KEY = ''; // 在这里填入你的 DeepSeek API Key
-const API = 'http://localhost:8765/api/balance';
+const API = (localStorage.getItem('ru_widget_api') || 'http://localhost:8765') + '/api/balance';
 
 async function fetchBalance(){
   const dot=document.getElementById('dot');

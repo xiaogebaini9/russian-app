@@ -1,5 +1,5 @@
 // Service Worker for offline caching
-const CACHE = 'russian-app-v3';
+const CACHE = 'russian-app-v4';
 const URLS = ['index.html', 'manifest.json'];
 
 self.addEventListener('install', e => {
@@ -24,6 +24,14 @@ self.addEventListener('fetch', e => {
     // API requests: network only, show offline message on failure
     e.respondWith(
       fetch(e.request).catch(() => new Response('离线模式', { status: 200 }))
+    );
+  } else if (e.request.mode === 'navigate') {
+    // HTML: network-first, so updated pages always reach the phone when online
+    e.respondWith(
+      fetch(e.request).then(r => {
+        if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+        return r;
+      }).catch(() => caches.match(e.request).then(r => r || new Response('离线模式', { status: 200 })))
     );
   } else {
     e.respondWith(

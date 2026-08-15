@@ -109,6 +109,20 @@ const MIME = {
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
 
+  // ── CORS: 允许页面从任意来源(file://、局域网 IP、开发端口)调用 API ──
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-API-Key'
+  };
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, corsHeaders);
+    res.end();
+    return;
+  }
+  const _writeHead = res.writeHead.bind(res);
+  res.writeHead = (code, headers) => _writeHead(code, Object.assign({}, headers, corsHeaders));
+
   // ── 余额查询 ──
   if (req.method === 'GET' && url === '/api/balance') {
     const key = req.headers['x-api-key'] || '';

@@ -415,8 +415,9 @@ const LANG_TO_API={ru:'ru',en:'en','zh-CN':'zh-CN'};
 const CFG={models:[{id:'mymemory',name:'MyMemory',desc:'神经网络翻译引擎，免费不限次',api:'https://api.mymemory.translated.net/get'},{id:'libre',name:'LibreTranslate',desc:'开源翻译引擎，俄语翻译优秀',api:'https://translate.terraprint.co/translate'}],speeds:[0.25,0.5,0.75,1,1.25,1.5,1.75,2],fsRange:[13,24]};
 function ls(k,d){try{return JSON.parse(localStorage.getItem('ru_'+k))||d}catch{return d}}
 function ss(k,v){localStorage.setItem('ru_'+k,JSON.stringify(v))}
-const S={settings:ls('settings',{model:'mymemory',speed:.75,fontSize:16,autoTr:true,mode:'fast',dsKey:''}),history:ls('history',[]),favs:ls('favs',[]),isSpeaking:false,result:null,langSrc:'ru',langTgt:'zh-CN'};
+const S={settings:ls('settings',{model:'mymemory',speed:.75,fontSize:16,autoTr:true,mode:'fast',dsKey:'',apiBase:''}),history:ls('history',[]),favs:ls('favs',[]),isSpeaking:false,result:null,langSrc:'ru',langTgt:'zh-CN'};
 function save(k){ss(k,S[k])}
+const API_BASE=(S.settings.apiBase&&S.settings.apiBase.trim())||(/Android/i.test(navigator.userAgent)?'http://10.0.2.2:8765':'http://localhost:8765');
 
 let _tt;
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2200)}
@@ -460,8 +461,8 @@ async function translateFree(txt,mid){
     try{return await tryLibre()}catch(e){try{return await tryMyMemory()}catch(e2){throw new Error(e.message||'失败')}}
   }
 }
-async function translateDeepSeek(txt){if(!txt.trim())return null;const resp=await fetch('http://localhost:8765/api/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,src:S.langSrc,tgt:S.langTgt,text:txt}),signal:AbortSignal.timeout(20000)});if(!resp.ok){const e=await resp.json().catch(()=>({error:'失败'}));throw new Error(e.error||'代理错误')}const d=await resp.json();if(d.error)throw new Error(d.error);return{text:d.text,det:'DeepSeek'}}
-function escape(s){return String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}
+async function translateDeepSeek(txt){if(!txt.trim())return null;const resp=await fetch(`${API_BASE}/api/translate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,src:S.langSrc,tgt:S.langTgt,text:txt}),signal:AbortSignal.timeout(20000)});if(!resp.ok){const e=await resp.json().catch(()=>({error:'失败'}));throw new Error(e.error||'代理错误')}const d=await resp.json();if(d.error)throw new Error(d.error);return{text:d.text,det:'DeepSeek'}}
+function escape(s){return String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]))}
 
 function speak(t,lang,rate){if(!window.speechSynthesis||S.isSpeaking)return;S.isSpeaking=true;const u=new SpeechSynthesisUtterance(t);const m={ru:'ru-RU',en:'en-US','zh-CN':'zh-CN'};u.lang=m[lang]||'zh-CN';u.rate=rate||S.settings.speed;const v=window.speechSynthesis.getVoices().find(v=>v.lang.startsWith(u.lang.split('-')[0]));if(v)u.voice=v;u.onend=()=>S.isSpeaking=false;u.onerror=()=>S.isSpeaking=false;window.speechSynthesis.speak(u)}
 
@@ -480,7 +481,7 @@ function cleanRussianWord(txt){
 // ═══ Fetch word analysis (aspect + time conjugation + multi meanings) ═══
 async function fetchWordAnalysis(word){
   try{
-    const resp=await fetch('http://localhost:8765/api/word-analysis',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
+    const resp=await fetch(`${API_BASE}/api/word-analysis`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
     if(!resp.ok){const e=await resp.json().catch(()=>({error:'HTTP '+resp.status}));throw new Error(e.error||'代理错误')}
     const d=await resp.json();
     if(d.error){throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''))}
@@ -631,7 +632,7 @@ async function doTranslate(){
     addHistory(t,r.text);
     $btnSpeak.disabled=false;
   }catch(e){
-    $trResult.innerHTML=`<div class="tr-result"><div class="tr-text" style="color:var(--text3)">翻译失败: ${e.message}</div></div>`;
+    $trResult.innerHTML=`<div class="tr-result"><div class="tr-text" style="color:var(--text3)">翻译失败: ${escape(e.message)}</div></div>`;
     toast('翻译失败')
   }finally{$btnTr.disabled=false}
 }
@@ -714,13 +715,13 @@ async function doDictSearch(){
   $dictResult.innerHTML='<div class="lds"><span></span><span></span><span></span></div>';
   try{
     // Use deep mode dictionary API
-    const resp=await fetch('http://localhost:8765/api/dictionary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
+    const resp=await fetch(`${API_BASE}/api/dictionary`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
     if(!resp.ok){const e=await resp.json().catch(()=>({error:'失败'}));throw new Error(e.error||'代理错误')}
     const d=await resp.json();
     if(d.error){throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''))}
     renderDictResult(d);
   }catch(e){
-    $dictResult.innerHTML=`<div class="dict-card"><div class="tr-text" style="color:var(--text3)">查询失败: ${e.message}</div></div>`;
+    $dictResult.innerHTML=`<div class="dict-card"><div class="tr-text" style="color:var(--text3)">查询失败: ${escape(e.message)}</div></div>`;
     toast('字典查询失败')
   }
 }
@@ -931,7 +932,7 @@ function renderBook(el){
         </div>
       </div>`).join('')}</div>`;
   el.querySelectorAll('.book-chip').forEach(b=>b.addEventListener('click',()=>{curBook=parseInt(b.dataset.bid);renderLearn()}));
-  el.querySelector('#tbSearch')?.addEventListener('input',()=>{renderLearn()});
+  let _tbDeb;el.querySelector('#tbSearch')?.addEventListener('input',()=>{clearTimeout(_tbDeb);_tbDeb=setTimeout(renderLearn,350)});
 }
 function switchLesTab(btn,idx,lid){
   const card=btn.closest('.les-card-body');
@@ -939,13 +940,13 @@ function switchLesTab(btn,idx,lid){
   for(let i=0;i<3;i++){const t=card.querySelector(`#lesTab_${lid}_${i}`);if(t)t.style.display=i===idx?'block':'none'}
 }
 function renderLesQuiz(quiz,lid){
-  return quiz.map((q,qi)=>`<div style="margin-bottom:12px"><div class="qm-q">${qi+1}. ${q.q}</div>${q.opts.map((o,oi)=>`<button class="qm-opt" onclick="answerLesQuiz(this,${oi},${q.ans},'quiz_${lid}',${qi})">${o}</button>`).join('')}<div class="qm-result" id="qr_${lid}_${qi}"></div></div>`).join('')
+  return quiz.map((q,qi)=>`<div style="margin-bottom:12px"><div class="qm-q">${qi+1}. ${q.q}</div>${q.opts.map((o,oi)=>`<button class="qm-opt" onclick="answerLesQuiz(this,${oi},${q.ans},${lid},${qi})">${o}</button>`).join('')}<div class="qm-result" id="qr_${lid}_${qi}"></div></div>`).join('')
 }
 window.answerLesQuiz=function(btn,chosen,ans,quizId,qi){
   const btns=btn.parentElement.querySelectorAll('.qm-opt');
   btns.forEach(b=>b.disabled=true);
   btns[ans].classList.add('correct');
-  const res=document.getElementById(`qr_${qi}_${quizId}`);
+  const res=document.getElementById(`qr_${quizId}_${qi}`);if(!res)return;
   if(chosen===ans){res.textContent='✓ 正确！';res.style.color='var(--green)';}else{btns[chosen].classList.add('wrong');res.textContent='✗ 错误，正确答案已标出';res.style.color='var(--red)';}
   res.style.display='block';
 };
@@ -977,14 +978,14 @@ window.startCefrTest=function(lid,btn){
   if(!lv||!lv.test)return;
   const el=document.getElementById('cefrTest_'+lid);
   el.style.display='block';
-  el.innerHTML=lv.test.map((q,qi)=>`<div style="margin-bottom:12px"><div class="qm-q">${qi+1}. ${q.q}</div>${q.opts.map((o,oi)=>`<button class="qm-opt" onclick="answerCefr(this,${oi},${q.ans},'cefrTest_${lid}',${qi})">${o}</button>`).join('')}<div class="qm-result" id="cr_${lid}_${qi}"></div></div>`).join('');
+  el.innerHTML=lv.test.map((q,qi)=>`<div style="margin-bottom:12px"><div class="qm-q">${qi+1}. ${q.q}</div>${q.opts.map((o,oi)=>`<button class="qm-opt" onclick="answerCefr(this,${oi},${q.ans},'${lid}',${qi})">${o}</button>`).join('')}<div class="qm-result" id="cr_${lid}_${qi}"></div></div>`).join('');
   btn.style.display='none';
 };
 window.answerCefr=function(btn,chosen,ans,cid,qi){
   const btns=btn.parentElement.querySelectorAll('.qm-opt');
   btns.forEach(b=>b.disabled=true);
   btns[ans].classList.add('correct');
-  const res=document.getElementById(`cr_${qi}_${cid}`);
+  const res=document.getElementById(`cr_${cid}_${qi}`);if(!res)return;
   if(chosen===ans){res.textContent='✓ 正确！';res.style.color='var(--green)';}else{btns[chosen].classList.add('wrong');res.textContent='✗ 错误';res.style.color='var(--red)';}
   res.style.display='block';
 };
@@ -1054,7 +1055,7 @@ function classRender(){
 async function classTranslate(text){
   if(!S.settings.dsKey){return{original:text,translation:'（需要 DeepSeek Key 才能翻译，请在设置中填写）',note:''}}
   try{
-    const resp=await fetch('http://localhost:8765/api/class-translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,text}),signal:AbortSignal.timeout(35000)});
+    const resp=await fetch(`${API_BASE}/api/class-translate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,text}),signal:AbortSignal.timeout(35000)});
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const d=await resp.json();
     if(d.error)throw new Error(d.error);
@@ -1078,6 +1079,7 @@ function classStart(){
   status.textContent='🎙️ 聆听中…';
   const rec=new SR();
   CLASS.rec=rec;
+  const send=async(t)=>{const tt=t.trim();if(!tt||tt===CLASS._lastSent)return;CLASS._lastSent=tt;document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';classTranslate(tt).then(r=>{classAddItem(r.original,r.translation,r.note);document.getElementById('classHint').innerHTML='说俄语 → 自动转文字 → 翻译显示'})};
   rec.lang='ru-RU';
   rec.continuous=true;
   rec.interimResults=true;
@@ -1095,17 +1097,17 @@ function classStart(){
     document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">'+(interim?'正在识别: '+escape(interim):'聆听中…')+'</span>';
     // 句子结束 → 翻译
     if(finalText.trim()){
-      classTranslate(finalText.trim()).then(r=>{
-        classAddItem(r.original,r.translation,r.note);
-        document.getElementById('classHint').innerHTML='说俄语 → 自动转文字 → 翻译显示';
-      });
+      send(finalText);
+    }else if(interim.trim()){
+      clearTimeout(CLASS._interimT);
+      CLASS._interimT=setTimeout(()=>send(interim),1500);
     }
   };
   rec.onerror=e=>{
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){
       status.textContent='❌ 麦克风被拒绝';
       document.getElementById('classHint').innerHTML='浏览器地址栏 🔒 → 网站设置 → 允许麦克风';
-    }else if(e.error==='network'){
+    }else if(e.error==='no-speech'){status.textContent='🎙️ 未检测到语音，请再试一次';}else if(e.error==='network'){
       status.textContent='⚠️ 识别服务连不上（网络）';
       document.getElementById('classHint').innerHTML='Web Speech API 依赖云端服务。Whisper 本地方案接入后不再依赖网络';
     }
@@ -1115,7 +1117,7 @@ function classStart(){
 }
 
 function classStop(){
-  CLASS.running=false;
+  CLASS.running=false;clearTimeout(CLASS._interimT);CLASS._lastSent='';
   if(CLASS.rec){CLASS.rec.onend=null;try{CLASS.rec.stop()}catch(e){}CLASS.rec=null}
   document.getElementById('classStartBtn').disabled=false;
   document.getElementById('classStopBtn').disabled=true;
@@ -1146,8 +1148,9 @@ document.getElementById('classClearBtn').addEventListener('click',classClear);
 // ═══════════════════════════════════════════════════════════════
 //  APP SETTINGS
 // ═══════════════════════════════════════════════════════════════
-function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">DeepSeek API</div><div class="setting-card"><div class="s-label">API Key</div><div class="s-desc">深度翻译、字典和单词分析共用</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="sk-..." style="margin-top:6px;font-size:var(--fs-sm)"><button id="dsKeySave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v5.0<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek</div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)})}
+function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">代理服务器</div><div class="setting-card"><div class="s-label">服务器地址</div><div class="s-desc">深度翻译/字典/课堂走本地代理。电脑上保持默认；手机端填电脑的局域网 IP（如 http://192.168.x.x:8765）</div><input type="text" id="apiBaseInput" value="${s.apiBase||''}" placeholder="http://localhost:8765" style="margin-top:6px;font-size:var(--fs-sm)"><button id="apiBaseSave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="apiBaseMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">DeepSeek API</div><div class="setting-card"><div class="s-label">API Key</div><div class="s-desc">深度翻译、字典和单词分析共用</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="sk-..." style="margin-top:6px;font-size:var(--fs-sm)"><button id="dsKeySave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v6.0<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek</div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)})}
 renderAppSettings();
+document.addEventListener('click',e=>{const t=e.target;if(t&&t.id==='apiBaseSave'){S.settings.apiBase=(document.getElementById('apiBaseInput')||{value:''}).value.trim();save('settings');const m=document.getElementById('apiBaseMsg');if(m)m.textContent='已保存';setTimeout(()=>{if(m)m.textContent=''},2000)}});
 document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none'}));
 
 // ═══ 系统诊断 ═══
@@ -1158,7 +1161,7 @@ window.runDiagnose=async function(btn){
   const lines=[];
   // 1. 代理可达 + 各服务状态
   try{
-    const r=await fetch('http://localhost:8765/api/diagnose',{signal:AbortSignal.timeout(15000)});
+    const r=await fetch(`${API_BASE}/api/diagnose`,{signal:AbortSignal.timeout(15000)});
     if(r.ok){
       const d=await r.json();
       lines.push('🖥️ 代理服务器: '+(d.server==='ok'?'✅ 运行中':'⚠️ 异常'));
@@ -1167,7 +1170,7 @@ window.runDiagnose=async function(btn){
       lines.push('❌ 代理响应异常: HTTP '+r.status);
     }
   }catch(e){
-    lines.push('❌ 代理服务器不可达: '+e.message);
+    lines.push('❌ 代理服务器不可达: '+escape(e.message));
     lines.push('   → 电脑上运行: cd russian-app && node proxy.js');
   }
   // 2. DeepSeek Key
@@ -1190,7 +1193,7 @@ window.runDiagnose=async function(btn){
 // ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION='5.0.0';
+const APP_VERSION='6.0.0';
 
 function init(){
   applyFont(S.settings.fontSize);
