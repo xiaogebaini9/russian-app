@@ -14,17 +14,27 @@
 
 ## 快速使用
 
-### ✅ 最简单：直接打开网页
+### ✅ 方式一：双击打开（快速翻译）
 
-双击 `index.html` 用浏览器打开即可使用全功能。
+双击 `index.html` 用浏览器打开，**快速翻译**（MyMemory/LibreTranslate）可直接使用。
 
-> ⚠️ 部分翻译 API 需要网络环境。推荐用 VS Code Live Server 打开。
+> ⚠️ 深度翻译、字典、单词变位、课堂模式需要本地代理 + DeepSeek Key，见方式二。
+
+### ✅ 方式二：本地代理（全功能，推荐）
+
+```bash
+node proxy.js
+```
+
+浏览器打开 `http://localhost:8765`，本机启动代理后全功能可用
+（深度翻译/字典/变位需要 DeepSeek Key：设置页填写，platform.deepseek.com 获取）。
 
 ### 📱 手机使用
 
-1. 把整个文件夹传到手机
-2. 用 Chrome/Safari 打开 `index.html`
+1. 电脑运行 `node proxy.js`，手机和电脑连同一 Wi-Fi
+2. 手机浏览器打开 `http://电脑IP:8765`（启动代理时控制台会显示手机地址）
 3. 菜单 → 「添加到主屏幕」→ 像原生 App 一样用
+4. 首次使用在 设置 → 代理服务器 填电脑局域网 IP（如 `http://192.168.x.x:8765`）
 
 ---
 
@@ -97,10 +107,10 @@ russian-app/
 
 | 设置项 | 选项 |
 |--------|------|
-| 🎨 主题 | 深色 / 浅色 |
 | 🔤 字体大小 | 13~24px 可调 |
 | 🔊 语音速度 | 0.25x ~ 2x 共 8 档 |
-| 🤖 翻译引擎 | MyMemory / LibreTranslate |
+| 🤖 翻译引擎（快速模式） | MyMemory / LibreTranslate |
+| 🧠 深度翻译 | DeepSeek（需要 API Key） |
 
 ### 关于翻译引擎
 

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f5f6fa">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
-<title>俄语学习 v6</title>
+<title>俄语学习</title>
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -248,6 +248,8 @@ button{cursor:pointer;border:none;outline:none;font-family:inherit;font-size:inh
 .spd-grid{display:flex;flex-wrap:wrap;gap:4px}
 .spd-chip{padding:5px 12px;border-radius:6px;font-size:12px;color:var(--text3);background:var(--input);border:1px solid var(--border)}
 .spd-chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.mini-chip{font-size:11px;color:var(--blue);background:var(--blue-bg);padding:4px 10px;border-radius:12px}
+.mini-chip.danger{color:var(--red);background:rgba(239,68,68,.08)}
 input[type="range"]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:2px;background:var(--border);outline:none;border:none;padding:0}
 input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--blue);cursor:pointer}
 
@@ -267,7 +269,7 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
 </head>
 <body>
 <div class="app" id="app">
-  <header class="header"><h1>俄语学习 v6</h1><button class="btn-dict" id="btnOpenDict">📖 字典</button></header>
+  <header class="header"><h1>俄语学习</h1><button class="btn-dict" id="btnOpenDict">📖 字典</button></header>
   <div class="content" id="content">
 
     <!-- ══ TRANSLATE ══ -->
@@ -356,6 +358,7 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
           <span style="font-weight:600;font-size:15px;color:var(--blue)">🎤 课堂模式</span>
           <span id="classStatus" style="font-size:11px;color:var(--text3)">未开始</span>
           <span style="flex:1"></span>
+          <button id="classHistBtn" class="mini-chip">📚 历史</button>
           <span style="font-size:11px;color:var(--text3)" id="classCount">0 句</span>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -383,6 +386,10 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
       </div>
       <div id="subFav" style="flex:1;overflow-y:auto">
         <div class="fav-stats" id="favStats">已收藏 <strong>0</strong> 个单词</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button id="favExport" style="flex:1;padding:8px 0;border-radius:8px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">⬇️ 导出</button>
+          <button id="favImport" style="flex:1;padding:8px 0;border-radius:8px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">⬆️ 导入</button>
+        </div>
         <div id="favList"><div class="empty-state">还没有收藏的单词</div></div>
       </div>
       <div id="subAppSettings" style="display:none;flex:1;overflow-y:auto"><div id="appSettingsContent"></div></div>
@@ -419,6 +426,15 @@ const S={settings:ls('settings',{model:'mymemory',speed:.75,fontSize:16,autoTr:t
 function save(k){ss(k,S[k])}
 const API_BASE=(S.settings.apiBase&&S.settings.apiBase.trim())||(/Android/i.test(navigator.userAgent)?'http://10.0.2.2:8765':'http://localhost:8765');
 
+// ⚡ 统一 API 调用：超时、错误提取、snippet 诊断信息一处收敛（SW 503 的"离线模式"JSON 自然流进 friendlyErr）
+async function apiFetch(path,{method='POST',body,timeout=60000,headers={}}={}){
+  const resp=await fetch(API_BASE+path,{method,headers:Object.assign({'Content-Type':'application/json'},headers),body:body!==undefined?JSON.stringify(body):undefined,signal:AbortSignal.timeout(timeout)});
+  const d=await resp.json().catch(()=>({}));
+  if(!resp.ok)throw new Error(d.error||('HTTP '+resp.status));
+  if(d.error)throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''));
+  return d;
+}
+
 let _tt;
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2200)}
 
@@ -426,6 +442,9 @@ function toast(m){const t=document.getElementById('toast');t.textContent=m;t.cla
 function showTranslate(){hideDict();document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById('sTranslate').classList.add('active');document.querySelector('.nav-btn[data-screen=sTranslate]').classList.add('active');document.getElementById('content').scrollTop=0;updateDictBtnVisibility()}
 function showDict(){document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById('sDict').classList.add('active');document.getElementById('content').scrollTop=0;updateDictBtnVisibility()}
 function hideDict(){updateDictBtnVisibility()}
+// ⚡ 通用切屏/切子页（复用 nav 按钮的既有处理器，一处定义全站生效）
+function showScreen(name){const b=document.querySelector('.nav-btn[data-screen='+name+']');if(b)b.click()}
+function showMoreTab(name){const b=document.querySelector('#sMore .sub-tab[data-more='+name+']');if(b)b.click()}
 function updateDictBtnVisibility(){const inDict=document.getElementById('sDict').classList.contains('active');document.getElementById('btnOpenDict').style.display=inDict?'none':''}
 
 // Nav
@@ -461,10 +480,37 @@ async function translateFree(txt,mid){
     try{return await tryLibre()}catch(e){try{return await tryMyMemory()}catch(e2){throw new Error(e.message||'失败')}}
   }
 }
-async function translateDeepSeek(txt){if(!txt.trim())return null;const resp=await fetch(`${API_BASE}/api/translate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,src:S.langSrc,tgt:S.langTgt,text:txt}),signal:AbortSignal.timeout(20000)});if(!resp.ok){const e=await resp.json().catch(()=>({error:'失败'}));throw new Error(e.error||'代理错误')}const d=await resp.json();if(d.error)throw new Error(d.error);return{text:d.text,det:'DeepSeek'}}
+async function translateDeepSeek(txt){if(!txt.trim())return null;const d=await apiFetch('/api/translate',{body:{key:S.settings.dsKey,src:S.langSrc,tgt:S.langTgt,text:txt},timeout:20000});return{text:d.text,det:'DeepSeek'}}
 function escape(s){return String(s).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]))}
 
-function speak(t,lang,rate){if(!window.speechSynthesis||S.isSpeaking)return;S.isSpeaking=true;const u=new SpeechSynthesisUtterance(t);const m={ru:'ru-RU',en:'en-US','zh-CN':'zh-CN'};u.lang=m[lang]||'zh-CN';u.rate=rate||S.settings.speed;const v=window.speechSynthesis.getVoices().find(v=>v.lang.startsWith(u.lang.split('-')[0]));if(v)u.voice=v;u.onend=()=>S.isSpeaking=false;u.onerror=()=>S.isSpeaking=false;window.speechSynthesis.speak(u)}
+// ⚡ 通用小工具
+const jsStr=s=>String(s).replace(/'/g,"\\'"); // onclick 内联参数转义
+function loadingHTML(hint){return '<div class="lds"><span></span><span></span><span></span></div>'+(hint?'<div style="text-align:center;font-size:12px;color:var(--text3)">'+hint+'</div>':'')}
+function favMatch(f,x){return (f.ru&&f.ru===x)||(f.cn&&f.cn===x)||(f.en&&f.en===x)} // 收藏匹配（任一语言字段命中）
+function isFavWord(x){return S.favs.some(f=>favMatch(f,x))}
+
+// ⚡ 把技术性错误翻译成用户能看懂的话
+function friendlyErr(e){
+  const m=(e&&e.message)||String(e||'');
+  if(/离线/.test(m))return '网络不可用：深度功能需要电脑端代理运行（node proxy.js），请先启动代理';
+  if(/Failed to fetch|fetch failed|NetworkError|network error|ERR_CONNECTION/i.test(m))return '网络不可用，请检查网络连接或代理是否运行';
+  if(/auth|invalid api key|unauthorized|authentication/i.test(m))return 'API Key 无效或已过期，请到「更多 → 设置」重新填写';
+  if(/timed out|超时|abort/i.test(m))return '请求超时，请重试';
+  if(/HTTP 5\d\d|503|502|500|not available/i.test(m))return '服务暂时不可用，请稍后重试';
+  return m;
+}
+
+// ⚡ 引导去设置页填 Key（替代原生 prompt 弹窗，手机/PWA 上体验更好）
+function gotoKeySetup(msg){
+  toast('🔑 '+msg+'：请到「更多 → 设置」填写');
+  showScreen('sMore');
+  showMoreTab('app-settings');
+}
+
+const speakWarned={}; // 每种语言只提示一次语音缺失
+let voicesCache=[]; // 语音列表缓存（onvoiceschanged 时刷新，朗读热路径不重复枚举）
+function refreshVoices(){voicesCache=window.speechSynthesis?window.speechSynthesis.getVoices():[]}
+function speak(t,lang,rate){if(!window.speechSynthesis||S.isSpeaking)return;S.isSpeaking=true;const u=new SpeechSynthesisUtterance(t);const m={ru:'ru-RU',en:'en-US','zh-CN':'zh-CN'};u.lang=m[lang]||'zh-CN';u.rate=rate||S.settings.speed;const v=voicesCache.find(v=>v.lang.startsWith(u.lang.split('-')[0]));if(v){u.voice=v}else if(!speakWarned[lang]&&voicesCache.length){speakWarned[lang]=true;toast(lang==='ru'?'⚠️ 未安装俄语语音包，发音可能不准。装法：设置→时间和语言→添加俄语':'⚠️ 未找到对应语言的语音，发音可能不准')}u.onend=()=>S.isSpeaking=false;u.onerror=()=>S.isSpeaking=false;window.speechSynthesis.speak(u)}
 
 const $trInput=document.getElementById('trInput'),$trResult=document.getElementById('trResult'),$btnTr=document.getElementById('btnTranslate'),$btnSpeak=document.getElementById('btnSpeak');
 
@@ -481,11 +527,7 @@ function cleanRussianWord(txt){
 // ═══ Fetch word analysis (aspect + time conjugation + multi meanings) ═══
 async function fetchWordAnalysis(word){
   try{
-    const resp=await fetch(`${API_BASE}/api/word-analysis`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
-    if(!resp.ok){const e=await resp.json().catch(()=>({error:'HTTP '+resp.status}));throw new Error(e.error||'代理错误')}
-    const d=await resp.json();
-    if(d.error){throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''))}
-    return d;
+    return await apiFetch('/api/word-analysis',{body:{key:S.settings.dsKey,word},timeout:60000});
   }catch(e){return {_error:e.message}}
 }
 
@@ -617,12 +659,10 @@ async function doTranslate(){
   const t=$trInput.value.trim();
   if(!t){toast('请输入内容');return}
   if(S.settings.mode==='deep'&&!S.settings.dsKey){
-    const k=prompt('请输入 DeepSeek API Key（免费获取: platform.deepseek.com）');
-    if(!k||!k.trim()){toast('需要 API Key 才能使用深度翻译');return}
-    S.settings.dsKey=k.trim();save('settings');renderAppSettings()
+    gotoKeySetup('深度翻译需要 API Key');return;
   }
   autoSrcLang(t);
-  $trResult.innerHTML='<div class="lds"><span></span><span></span><span></span></div>';
+  $trResult.innerHTML=loadingHTML();
   $btnTr.disabled=true;
   try{
     const r=S.settings.mode==='deep'?await translateDeepSeek(t):await translateFree(t,S.settings.model);
@@ -632,13 +672,13 @@ async function doTranslate(){
     addHistory(t,r.text);
     $btnSpeak.disabled=false;
   }catch(e){
-    $trResult.innerHTML=`<div class="tr-result"><div class="tr-text" style="color:var(--text3)">翻译失败: ${escape(e.message)}</div></div>`;
+    $trResult.innerHTML=`<div class="tr-result"><div class="tr-text" style="color:var(--text3)">翻译失败: ${escape(friendlyErr(e))}</div></div>`;
     toast('翻译失败')
   }finally{$btnTr.disabled=false}
 }
 
 function renderResult(r,src){
-  const isFav=S.favs.some(f=>f.ru===src||f.cn===src||f.en===src);
+  const isFav=S.favs.some(f=>favMatch(f,src));
   // Show analysis when either source or target is a single Russian word（容忍标点：如"читать。"）
   const ruWord=(S.langSrc==='ru'&&cleanRussianWord(src))||(S.langTgt==='ru'&&cleanRussianWord(r.text))||null;
   const showAnalysis=!!ruWord;
@@ -651,10 +691,10 @@ function renderResult(r,src){
     let _a=null;
     const ensure=async()=>{
       if(_a)return _a;
-      if(!S.settings.dsKey){const k=prompt('查看变位需要 DeepSeek API Key（免费获取: platform.deepseek.com）\n\n输入后自动保存：');if(!k||!k.trim())return null;S.settings.dsKey=k.trim();save('settings');renderAppSettings()}
-      document.getElementById('analysisPanels').innerHTML='<div class="lds"><span></span><span></span><span></span></div>';
+      if(!S.settings.dsKey){gotoKeySetup('查看变位需要 API Key');return null}
+      document.getElementById('analysisPanels').innerHTML=loadingHTML('正在分析变位…首次可能需要 30~60 秒');
       _a=await fetchWordAnalysis(word);
-      if(_a._error){document.getElementById('analysisPanels').innerHTML='<div style="color:var(--red);font-size:13px;padding:8px">❌ '+escape(_a._error)+'</div>';return null}
+      if(_a._error){document.getElementById('analysisPanels').innerHTML='<div style="color:var(--red);font-size:13px;padding:8px">❌ '+escape(friendlyErr(_a._error))+'</div>';return null}
       if(!_a||!_a.aspect){document.getElementById('analysisPanels').innerHTML='<div style="color:var(--text3);font-size:13px;padding:8px">该词暂无变位数据</div>';return null}
       return _a;
     };
@@ -695,9 +735,44 @@ function openHistoryPopup(){$histPopup.classList.add('show');renderHistory()}fun
 document.getElementById('historyTrigger').addEventListener('click',openHistoryPopup);document.getElementById('popupClose').addEventListener('click',closeHistoryPopup);$histPopup.addEventListener('click',e=>{if(e.target===$histPopup)closeHistoryPopup()});document.getElementById('popupClearHistory').addEventListener('click',()=>{S.history=[];save('history');toast('已清空');renderHistory()});
 
 // Favorites
-function toggleFav(orig,trans){const idx=S.favs.findIndex(f=>f.ru===orig||f.cn===orig||f.en===orig);const label=S.langSrc==='ru'?'ru':S.langSrc==='en'?'en':'cn';if(idx>=0){S.favs.splice(idx,1);save('favs');renderFavs()}else{const e={time:Date.now()};e[label]=orig;e.trans=trans;e.lang=S.langSrc;S.favs.unshift(e);save('favs');renderFavs()}const btn=document.getElementById('saveWordBtn');if(btn){const isFav=S.favs.some(f=>f.ru===orig||f.cn===orig||f.en===orig);btn.textContent=isFav?'★ 已收藏':'☆ 收藏'}}
+function toggleFav(orig,trans){const idx=S.favs.findIndex(f=>favMatch(f,orig));const label=S.langSrc==='ru'?'ru':S.langSrc==='en'?'en':'cn';if(idx>=0){S.favs.splice(idx,1);save('favs');renderFavs()}else{const e={time:Date.now()};e[label]=orig;e.trans=trans;e.lang=S.langSrc;S.favs.unshift(e);save('favs');renderFavs()}const btn=document.getElementById('saveWordBtn');if(btn){btn.textContent=S.favs.some(f=>favMatch(f,orig))?'★ 已收藏':'☆ 收藏'}}
 function renderFavs(){const el=document.getElementById('favList');document.getElementById('favStats').innerHTML=`已收藏 <strong>${S.favs.length}</strong> 个单词`;if(!S.favs.length){el.innerHTML='<div class="empty-state">还没有收藏的单词</div>';return}el.innerHTML=S.favs.map((f,i)=>{const w=f.ru||f.en||f.cn||'';const t=f.trans||'';return`<div class="fav-item"><span class="fv-ru">${escape(w)}</span><span class="fv-cn">${escape(t)}</span><button class="fv-act" data-i="${i}">&#9654;</button><button class="fv-act" data-i="${i}" data-del="1">&#10005;</button></div>`}).join('');el.querySelectorAll('.fv-act[data-del]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.favs.splice(parseInt(b.dataset.i),1);save('favs');renderFavs()}));el.querySelectorAll('.fv-act:not([data-del])').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const f=S.favs[parseInt(b.dataset.i)];if(f)speak(f.ru||f.en||f.cn||'',f.lang||'ru',S.settings.speed)}))}
 renderFavs();
+// 收藏导出/导入（JSON 文件，换设备或备份用）
+function favExport(){
+  if(!S.favs.length){toast('没有收藏可导出');return}
+  const blob=new Blob([JSON.stringify(S.favs,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='俄语收藏_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast('已导出 '+S.favs.length+' 条收藏')
+}
+function favImport(){
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='.json,application/json';
+  inp.onchange=()=>{
+    const f=inp.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const arr=JSON.parse(r.result);
+        if(!Array.isArray(arr))throw new Error('bad');
+        const seen=new Set();
+        S.favs.forEach(f=>{if(f.ru)seen.add(f.ru);if(f.cn)seen.add(f.cn);if(f.en)seen.add(f.en)});
+        let added=0;
+        arr.forEach(x=>{if((x.ru&&seen.has(x.ru))||(x.cn&&seen.has(x.cn))||(x.en&&seen.has(x.en)))return;S.favs.push(x);added++;if(x.ru)seen.add(x.ru);if(x.cn)seen.add(x.cn);if(x.en)seen.add(x.en)});
+        save('favs');renderFavs();
+        toast('导入完成: 新增 '+added+' 条')
+      }catch(e){toast('导入失败: 文件格式不正确')}
+    };
+    r.readAsText(f)
+  };
+  inp.click()
+}
+document.getElementById('favExport').addEventListener('click',favExport);
+document.getElementById('favImport').addEventListener('click',favImport);
 
 // ═══════════════════════════════════════════════════════════════
 //  DICTIONARY FUNCTIONALITY
@@ -707,21 +782,13 @@ const $dictInput=document.getElementById('dictInput'),$dictResult=document.getEl
 async function doDictSearch(){
   const word=$dictInput.value.trim();
   if(!word){toast('请输入单词');return}
-  if(S.settings.mode==='deep'&&!S.settings.dsKey){
-    const k=prompt('请输入 DeepSeek API Key');
-    if(!k||!k.trim()){toast('需要 API Key');return}
-    S.settings.dsKey=k.trim();save('settings')
-  }
-  $dictResult.innerHTML='<div class="lds"><span></span><span></span><span></span></div>';
+  if(!S.settings.dsKey){gotoKeySetup('字典查询需要 API Key');return}
+  $dictResult.innerHTML=loadingHTML('正在查询词典…首次查询可能需要 30~60 秒');
   try{
-    // Use deep mode dictionary API
-    const resp=await fetch(`${API_BASE}/api/dictionary`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,word:word}),signal:AbortSignal.timeout(60000)});
-    if(!resp.ok){const e=await resp.json().catch(()=>({error:'失败'}));throw new Error(e.error||'代理错误')}
-    const d=await resp.json();
-    if(d.error){throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''))}
+    const d=await apiFetch('/api/dictionary',{body:{key:S.settings.dsKey,word},timeout:60000});
     renderDictResult(d);
   }catch(e){
-    $dictResult.innerHTML=`<div class="dict-card"><div class="tr-text" style="color:var(--text3)">查询失败: ${escape(e.message)}</div></div>`;
+    $dictResult.innerHTML=`<div class="dict-card"><div class="tr-text" style="color:var(--text3)">查询失败: ${escape(friendlyErr(e))}</div></div>`;
     toast('字典查询失败')
   }
 }
@@ -806,7 +873,7 @@ $dictInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault()
 // ═══════════════════════════════════════════════════════════════
 //  TEXTBOOK DATA - 走遍俄罗斯
 // ═══════════════════════════════════════════════════════════════
-const BOOKS=[{id:1,title:'走遍俄罗斯 1'},{id:2,title:'走遍俄罗斯 2'},{id:3,title:'走遍俄罗斯 3'},{id:4,title:'走遍俄罗斯 4'}];
+const BOOKS=[{id:1,title:'走遍俄罗斯 1'},{id:2,title:'走遍俄罗斯 2'},{id:3,title:'走遍俄罗斯 3'},{id:4,title:'走遍俄罗斯 4'},{id:5,title:'💻 专业俄语'}];
 const VOCAB={
 1:[
 {lesson:1,title:'字母与问候',words:[
@@ -874,6 +941,14 @@ sections:[
 {title:'技术文档常用表达',grammar:'<b>技术写作句型</b>：<br>• <span class="ex">Следует отметить, что...</span> — 需要注意的是…<br>• <span class="ex">В данном случае...</span> — 在这种情况下…<br>• <span class="ex">Как показано выше...</span> — 如上所述…<br>• <span class="ex">Необходимо учитывать...</span> — 必须考虑到…<br>• <span class="ex">В отличие от...</span> — 与…不同<br><br><b>代码注释常用</b>：<br>• входные данные — 输入数据<br>• выходные данные — 输出数据<br>• возвращает — 返回<br>• проверяет — 检查<br>• вызывает — 调用'}
 ]};
 
+const MAJOR_WORDS=CS_RUSSIAN.sections.flatMap(s=>s.words?s.words.map(w=>({...w,book:5})):[]); // 专业俄语词（模块级只算一次）
+// ⚡ 取某本书的单词（课本 1-4 + 专业俄语 5 统一入口，测验/复习共用）
+function bookWords(bid){
+  if(bid===5)return MAJOR_WORDS;
+  const l=VOCAB[bid];if(!l)return[];
+  return l.flatMap(ls=>ls.words.map(w=>({...w,book:bid})));
+}
+
 const CEFR={
 title:'俄语等级考试（基于CEFR标准）',
 desc:'欧洲共同语言参考框架 (CEFR) 将语言能力分为 A1-C2 六个等级。以下内容基于 ТРКИ (Тест по русскому языку как иностранному) 考试标准。',
@@ -893,6 +968,8 @@ let curBook=1,curLearnTab='book',curLesTab=0;
 
 function renderLearn(){
   const el=document.getElementById('learnContent');
+  // tab 高亮同步归 renderLearn 管，程序化切换不会出现"内容变了高亮没动"
+  document.querySelectorAll('#learnTabs .sub-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===curLearnTab));
   if(curLearnTab==='book')renderBook(el);
   else if(curLearnTab==='major')renderMajor(el);
   else if(curLearnTab==='cefr')renderCefr(el);
@@ -904,7 +981,8 @@ function renderBook(el){
   let lessons=VOCAB[curBook]||[];
   if(q){lessons=lessons.map(l=>{const w=l.words.filter(w=>w.ru.toLowerCase().includes(q)||w.cn.includes(q));return w.length?{...l,words:w}:null}).filter(Boolean);if(!lessons.length){el.innerHTML='<div class="empty-state">没有匹配的单词</div>';return}}
   el.innerHTML=`
-    <div class="book-bar">${BOOKS.map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-bid="${b.id}">${b.title}</button>`).join('')}</div>
+    ${S.settings.targetLevel?`<div style="font-size:11px;color:var(--text3);margin-bottom:6px">🎯 备考目标: <b style="color:var(--blue)">${S.settings.targetLevel}</b>（在 学习 → 设置 中修改）</div>`:''}
+    <div class="book-bar">${BOOKS.filter(b=>b.id<=4).map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-bid="${b.id}">${b.title}</button>`).join('')}</div>
     <div class="search-box"><span class="sicon">🔍</span><input type="text" id="tbSearch" placeholder="搜索单词..." value="${escape(q)}"></div>
     <div class="les-scroll">${lessons.map((l,i)=>`
       <div class="les-card${i===0&&!q?' open':''}">
@@ -920,7 +998,7 @@ function renderBook(el){
           </div>
           <div class="les-tab-content" id="lesTab_${l.lesson}_0">
             <div class="vocab-grid"><div class="grid-hdr">俄语</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>
-            ${l.words.map(w=>`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${w.ru.replace(/'/g,"\\'")}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${S.favs.some(f=>f.ru===w.ru)?' saved':''}" onclick="event.stopPropagation();toggleFav('${w.ru.replace(/'/g,"\\'")}','${w.cn}')">${S.favs.some(f=>f.ru===w.ru)?'★':'☆'}</span>`).join('')}
+            ${l.words.map(w=>`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}')">${isFavWord(w)?'★':'☆'}</span>`).join('')}
             </div>
           </div>
           <div class="les-tab-content" id="lesTab_${l.lesson}_1" style="display:none">
@@ -958,7 +1036,7 @@ function renderMajor(el){
   CS_RUSSIAN.sections.forEach(s=>{
     if(s.words){
       html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="vocab-grid"><div class="grid-hdr">俄语</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>`;
-      s.words.forEach(w=>{html+=`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${w.ru.replace(/'/g,"\\'")}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${S.favs.some(f=>f.ru===w.ru)?' saved':''}" onclick="event.stopPropagation();toggleFav('${w.ru.replace(/'/g,"\\'")}','${w.cn}')">${S.favs.some(f=>f.ru===w.ru)?'★':'☆'}</span>`});
+      s.words.forEach(w=>{html+=`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}')">${isFavWord(w)?'★':'☆'}</span>`});
       html+='</div></div></div>';
     }
     if(s.grammar){html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="grammar-mini">${s.grammar}</div></div></div>`}
@@ -990,14 +1068,13 @@ window.answerCefr=function(btn,chosen,ans,cid,qi){
   res.style.display='block';
 };
 
+window.setTargetLevel=function(id){S.settings.targetLevel=id;save('settings');renderLearn();toast('目标等级: '+id)}
+
 function renderLearnSettings(el){
-  el.innerHTML=`<div class="setting-group"><div class="setting-group-title">学习设置</div><div class="setting-card"><div class="s-label">默认课本</div><div class="s-desc">打开课本时默认显示的教材</div><div class="book-bar" style="margin:0">${BOOKS.map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-ls="${b.id}" onclick="curBook=${b.id};renderLearn()">${b.title}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">考试准备</div><div class="setting-card"><div class="s-label">目标等级</div><div class="s-desc">选择备考的目标CEFR等级，课程将优先展示相关内容</div><div class="spd-grid">${CEFR.levels.map(l=>`<button class="spd-chip" onclick="toast('目标等级: ${l.name.split(' ')[0]}')">${l.name.split(' ')[0]}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">数据管理</div><div class="setting-card"><div class="s-label">收藏单词</div><div class="s-desc">已收藏 <strong style="color:var(--blue)">${S.favs.length}</strong> 个单词</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--red);color:#fff;margin-top:6px" onclick="if(confirm('确定清空所有收藏？')){S.favs=[];save('favs');renderFavs();renderLearn();toast('已清空')}">清空收藏</button></div></div><div class="setting-group"><div class="setting-group-title">🔧 系统诊断</div><div class="setting-card"><div class="s-desc">一键检查：代理服务器、翻译引擎、网络状态</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--blue);color:#fff" onclick="runDiagnose(this)">运行诊断</button><div id="diagResult" style="margin-top:8px;font-size:12px;line-height:1.9"></div></div></div>`;
+  el.innerHTML=`<div class="setting-group"><div class="setting-group-title">学习设置</div><div class="setting-card"><div class="s-label">默认课本</div><div class="s-desc">打开课本时默认显示的教材</div><div class="book-bar" style="margin:0">${BOOKS.filter(b=>b.id<=4).map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-ls="${b.id}" onclick="curBook=${b.id};renderLearn()">${b.title}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">考试准备</div><div class="setting-card"><div class="s-label">目标等级</div><div class="s-desc">选择备考的目标 CEFR 等级，学习页顶部会显示备考目标</div><div class="spd-grid">${CEFR.levels.map(l=>`<button class="spd-chip${S.settings.targetLevel===l.id?' active':''}" onclick="setTargetLevel('${l.id}')">${l.name.split(' ')[0]}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">数据管理</div><div class="setting-card"><div class="s-label">收藏单词</div><div class="s-desc">已收藏 <strong style="color:var(--blue)">${S.favs.length}</strong> 个单词</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--red);color:#fff;margin-top:6px" onclick="if(confirm('确定清空所有收藏？')){S.favs=[];save('favs');renderFavs();renderLearn();toast('已清空')}">清空收藏</button></div></div><div class="setting-group"><div class="setting-group-title">🔧 系统诊断</div><div class="setting-card"><div class="s-desc">一键检查：代理服务器、翻译引擎、网络状态</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--blue);color:#fff" onclick="runDiagnose(this)">运行诊断</button><div id="diagResult" style="margin-top:8px;font-size:12px;line-height:1.9"></div></div></div>`;
 }
 
-document.querySelectorAll('#learnTabs .sub-tab').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('#learnTabs .sub-tab').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active');curLearnTab=b.dataset.tab;renderLearn();
-}));
+document.querySelectorAll('#learnTabs .sub-tab').forEach(b=>b.addEventListener('click',()=>{curLearnTab=b.dataset.tab;renderLearn()}));
 
 document.querySelectorAll('.subj-tab.disabled').forEach(b=>b.addEventListener('click',()=>toast('英语功能即将开放')));
 document.querySelectorAll('.subj-tab:not(.disabled)').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.subj-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active')}));
@@ -1006,10 +1083,19 @@ document.querySelectorAll('.subj-tab:not(.disabled)').forEach(b=>b.addEventListe
 //  QUIZ
 // ═══════════════════════════════════════════════════════════════
 let quizState={};
-function renderQuizSetup(){const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="text-align:center;padding:24px 0"><div style="font-size:16px;font-weight:500;margin-bottom:4px">单词测验</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">选择测验范围</div><div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0">${BOOKS.map(b=>`<button class="book-chip selected" data-b="${b.id}">${b.title}</button>`).join('')}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin:8px 0">已选 <strong id="qzTotal">0</strong> 个单词</div><button class="lc-btn" id="qzStart" style="font-size:var(--fs)">开始测验</button></div>`;let selected=new Set([1,2,3,4]);function updateTotal(){let t=0;selected.forEach(bid=>{const l=VOCAB[bid];if(l)l.forEach(ls=>t+=ls.words.length)});document.getElementById('qzTotal').textContent=t}updateTotal();el.querySelectorAll('.book-chip').forEach(b=>b.addEventListener('click',()=>{const id=parseInt(b.dataset.b);b.classList.toggle('selected');if(b.classList.contains('selected'))selected.add(id);else selected.delete(id);if(!selected.size){selected.add(id);b.classList.add('selected')}updateTotal()}));document.getElementById('qzStart').addEventListener('click',()=>{const words=[];selected.forEach(bid=>{const l=VOCAB[bid];if(l)l.forEach(ls=>ls.words.forEach(w=>words.push({...w,book:bid})))});if(words.length<4){toast('至少需要4个单词');return}shuffle(words);quizState={words,idx:0,correct:0,wrong:[]};renderQuizQ()})}
+function renderQuizSetup(){const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="text-align:center;padding:24px 0"><div style="font-size:16px;font-weight:500;margin-bottom:4px">单词测验</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">选择测验范围</div><div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0">${BOOKS.map(b=>`<button class="book-chip selected" data-b="${b.id}">${b.title}</button>`).join('')}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin:8px 0">已选 <strong id="qzTotal">0</strong> 个单词</div><button class="lc-btn" id="qzStart" style="font-size:var(--fs)">开始测验</button></div>`;let selected=new Set(BOOKS.map(b=>String(b.id)));function updateTotal(){let t=0;selected.forEach(bid=>t+=bookWords(parseInt(bid)).length);document.getElementById('qzTotal').textContent=t}updateTotal();el.querySelectorAll('.book-chip').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.b;b.classList.toggle('selected');if(b.classList.contains('selected'))selected.add(id);else selected.delete(id);if(!selected.size){selected.add(id);b.classList.add('selected')}updateTotal()}));document.getElementById('qzStart').addEventListener('click',()=>{const words=[];selected.forEach(bid=>bookWords(parseInt(bid)).forEach(w=>words.push(w)));if(words.length<4){toast('至少需要4个单词');return}shuffle(words);quizState={words,idx:0,correct:0,wrong:[]};renderQuizQ()})}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function renderQuizQ(){const qs=quizState;if(qs.idx>=qs.words.length){renderQuizResult();return}const w=qs.words[qs.idx];let opts=[w.cn];const pool=qs.words.filter(x=>x.cn!==w.cn);shuffle(pool);for(let i=0;i<3&&i<pool.length;i++)opts.push(pool[i].cn);if(opts.length<4){const all=Object.values(VOCAB).flatMap(l=>l.flatMap(ls=>ls.words)).filter(x=>!opts.includes(x.cn));shuffle(all);for(let i=0;opts.length<4&&i<all.length;i++)if(!opts.includes(all[i].cn))opts.push(all[i].cn)}shuffle(opts);const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="padding:24px 16px;text-align:center"><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:10px">${qs.idx+1}/${qs.words.length}</div><div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:20px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${(qs.idx/qs.words.length*100)}%"></div></div><div style="font-size:28px;font-weight:500;color:var(--blue);margin-bottom:16px;line-height:1.4">${w.ru}</div><div style="display:grid;gap:8px" id="qOpts">${opts.map(o=>`<button style="padding:14px 16px;border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:var(--fs);text-align:left;border:1.5px solid var(--border)" data-v="${o}">${o}</button>`).join('')}</div></div>`;let answered=false;el.querySelectorAll('#qOpts button').forEach(btn=>{btn.addEventListener('click',()=>{if(answered)return;answered=true;const val=btn.textContent;const isCorrect=val===w.cn;if(isCorrect){qs.correct++;btn.style.borderColor='var(--green)';btn.style.color='var(--green)';btn.style.background='rgba(34,197,94,.08)'}else{btn.style.borderColor='var(--red)';btn.style.color='var(--red)';qs.wrong.push(w);el.querySelector(`#qOpts button[data-v="${escape(w.cn)}"]`).style.borderColor='var(--blue)';el.querySelector(`#qOpts button[data-v="${escape(w.cn)}"]`).style.color='var(--blue)'}const nb=document.createElement('button');nb.style.cssText='margin-top:16px;padding:11px 28px;border-radius:20px;background:var(--blue);color:#fff;font-weight:600;font-size:var(--fs-sm);border:none;cursor:pointer';nb.textContent=qs.idx+1>=qs.words.length?'查看结果':'下一题';nb.addEventListener('click',()=>{qs.idx++;renderQuizQ()});el.querySelector('.anim-in').appendChild(nb)})})}
-function renderQuizResult(){const qs=quizState;const pct=Math.round(qs.correct/qs.words.length*100);document.getElementById('quizArea').innerHTML=`<div class="anim-in" style="text-align:center;padding:32px 16px"><div style="font-size:48px;font-weight:300;color:var(--blue);margin-bottom:4px">${qs.correct}/${qs.words.length}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">正确率 ${pct}%</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px;line-height:1.8">${qs.wrong.length?`需要复习：${qs.wrong.map(w=>w.ru+'('+w.cn+')').join('、')}`:'全部正确！'}</div><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="renderQuizSetup()">再来一次</button><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="document.querySelector('.nav-btn[data-screen=sLearn]').click()">去复习</button></div>`}
+function renderQuizResult(){const qs=quizState;const pct=Math.round(qs.correct/qs.words.length*100);document.getElementById('quizArea').innerHTML=`<div class="anim-in" style="text-align:center;padding:32px 16px"><div style="font-size:48px;font-weight:300;color:var(--blue);margin-bottom:4px">${qs.correct}/${qs.words.length}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">正确率 ${pct}%</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px;line-height:1.8">${qs.wrong.length?`需要复习（点击单词直接跳转学习）：<br>${qs.wrong.map(w=>`<span style="color:var(--blue);text-decoration:underline;cursor:pointer" onclick="learnShowWord('${jsStr(w.ru)}',${w.book||0})">${w.ru}</span>(${w.cn})`).join('、')}`:'全部正确！'}</div><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="renderQuizSetup()">再来一次</button><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="document.querySelector('.nav-btn[data-screen=sLearn]').click()">去复习</button></div>`}
+// 错词点击 → 跳到学习页对应位置并搜索该词（专业俄语词跳专业 tab）
+function learnShowWord(word,bid){
+  if(bid===5)curLearnTab='major';
+  else if(typeof bid==='number'&&bid>0){curLearnTab='book';curBook=bid}
+  else curLearnTab='book';
+  showScreen('sLearn');
+  renderLearn();
+  if(curLearnTab==='book'){const sb=document.getElementById('tbSearch');if(sb){sb.value=word;sb.dispatchEvent(new Event('input'))}}
+}
 renderQuizSetup();
 
 // ═══════════════════════════════════════════════════════════════
@@ -1055,13 +1141,10 @@ function classRender(){
 async function classTranslate(text){
   if(!S.settings.dsKey){return{original:text,translation:'（需要 DeepSeek Key 才能翻译，请在设置中填写）',note:''}}
   try{
-    const resp=await fetch(`${API_BASE}/api/class-translate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:S.settings.dsKey,text}),signal:AbortSignal.timeout(35000)});
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    const d=await resp.json();
-    if(d.error)throw new Error(d.error);
+    const d=await apiFetch('/api/class-translate',{body:{key:S.settings.dsKey,text},timeout:35000});
     return{original:d.original||text,translation:d.translation||'',note:d.note||''};
   }catch(e){
-    return{original:text,translation:'（翻译失败: '+e.message+'）',note:''};
+    return{original:text,translation:'（翻译失败: '+friendlyErr(e)+'）',note:''};
   }
 }
 
@@ -1130,15 +1213,58 @@ function classSave(){
   const all=ls('class_records',{});
   all[date]=CLASS.items.slice();
   ss('class_records',all);
-  const text=CLASS.items.map((it,i)=>`${i+1}. [${it.time}] ${it.original}\n    ${it.translation}${it.note?' ⚠️'+it.note:''}`).join('\n\n');
+  const text=classItemsToText(CLASS.items);
   try{navigator.clipboard.writeText(text).then(()=>toast('已保存到本地，已复制到剪贴板'))}catch(e){toast('已保存到本地')}
+  if(classHistMode)classHistRender();
 }
 
 function classClear(){
   if(CLASS.items.length&&!confirm('清空当前字幕板？'))return;
   CLASS.items=[];
-  classRender();
+  if(classHistMode)classHistRender();else classRender();
 }
+
+// ═══ 课堂历史记录（按日期回看已保存的课） ═══
+let classHistMode=false;
+function classHistData(){return ls('class_records',{})}
+const CLASS_BACK_BTN='<button id="classBackLive" style="padding:7px 14px;border-radius:16px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">← 返回字幕板</button>';
+function classItemsToText(items){return items.map((it,i)=>`${i+1}. [${it.time}] ${it.original}\n    ${it.translation}${it.note?' ⚠️'+it.note:''}`).join('\n\n')}
+function setClassHist(on){
+  classHistMode=on;
+  document.getElementById('classHistBtn').textContent=on?'← 字幕板':'📚 历史';
+  if(on)classHistRender();else classRender();
+}
+function classHistRender(){
+  const el=document.getElementById('classBoard');
+  const all=classHistData();
+  const days=Object.keys(all).sort().reverse();
+  if(!days.length){
+    el.innerHTML='<div style="padding:6px 0;flex-shrink:0">'+CLASS_BACK_BTN+'</div><div class="empty-state">还没有保存过课堂记录<br>课堂模式里点「💾 保存本课记录」后，这里按日期回看</div>';
+    return;
+  }
+  let html='<div style="padding:6px 0;flex-shrink:0;display:flex;align-items:center;gap:8px">'+CLASS_BACK_BTN+'<span style="font-size:11px;color:var(--text3)">'+days.length+' 天记录</span></div>';
+  days.forEach(d=>{
+    const items=all[d];
+    html+=`<div class="les-card" style="margin-top:6px"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">📅 ${d}</div><div class="les-title">${items.length} 句</div></div><span style="display:flex;gap:6px;align-items:center"><button class="mini-chip" data-day="${d}" data-act="copy">📋 复制</button><button class="mini-chip danger" data-day="${d}" data-act="del">🗑 删除</button><span class="les-arrow" style="margin-left:4px">&#9660;</span></span></div><div class="les-card-body">`+
+    items.map((it,i)=>`<div style="padding:8px 4px;border-bottom:1px solid var(--border2);display:flex;gap:6px;align-items:flex-start"><span style="font-size:10px;color:var(--text3);white-space:nowrap;padding-top:3px">${it.time}</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">${escape(it.original)}</div><div style="font-size:12px;color:var(--blue)">${escape(it.translation)}</div>${it.note?`<div style="font-size:11px;color:var(--yellow)">⚠️ ${escape(it.note)}</div>`:''}</div><button class="mini-chip" data-day="${d}" data-i="${i}" data-act="play">🔊</button></div>`).join('')+
+    '</div></div>';
+  });
+  el.innerHTML=html;
+}
+// 事件委托：课堂历史里的 返回/播放/复制/删除 一次绑定
+document.getElementById('classBoard').addEventListener('click',e=>{
+  const t=e.target.closest('#classBackLive,.mini-chip');
+  if(!t)return;
+  if(t.id==='classBackLive'){setClassHist(false);return}
+  const day=t.dataset.day,act=t.dataset.act;
+  if(!day)return;
+  const all=classHistData();
+  if(act==='play'){const it=all[day]?.[parseInt(t.dataset.i)];if(it)speak(it.original,'ru',.9)}
+  else if(act==='copy'){navigator.clipboard.writeText(classItemsToText(all[day]||[])).then(()=>toast('已复制 '+day+' 的记录')).catch(()=>toast('复制失败'))}
+  else if(act==='del'){if(!confirm('删除 '+day+' 的全部记录？'))return;delete all[day];ss('class_records',all);classHistRender()}
+});
+
+document.getElementById('classHistBtn').addEventListener('click',()=>setClassHist(!classHistMode));
 
 document.getElementById('classStartBtn').addEventListener('click',classStart);
 document.getElementById('classStopBtn').addEventListener('click',classStop);
@@ -1148,7 +1274,7 @@ document.getElementById('classClearBtn').addEventListener('click',classClear);
 // ═══════════════════════════════════════════════════════════════
 //  APP SETTINGS
 // ═══════════════════════════════════════════════════════════════
-function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">代理服务器</div><div class="setting-card"><div class="s-label">服务器地址</div><div class="s-desc">深度翻译/字典/课堂走本地代理。电脑上保持默认；手机端填电脑的局域网 IP（如 http://192.168.x.x:8765）</div><input type="text" id="apiBaseInput" value="${s.apiBase||''}" placeholder="http://localhost:8765" style="margin-top:6px;font-size:var(--fs-sm)"><button id="apiBaseSave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="apiBaseMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">DeepSeek API</div><div class="setting-card"><div class="s-label">API Key</div><div class="s-desc">深度翻译、字典和单词分析共用</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="sk-..." style="margin-top:6px;font-size:var(--fs-sm)"><button id="dsKeySave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v6.0<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek</div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)})}
+function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">代理服务器</div><div class="setting-card"><div class="s-label">服务器地址</div><div class="s-desc">深度翻译/字典/课堂走本地代理。电脑上保持默认；手机端填电脑的局域网 IP（如 http://192.168.x.x:8765）</div><input type="text" id="apiBaseInput" value="${s.apiBase||''}" placeholder="http://localhost:8765" style="margin-top:6px;font-size:var(--fs-sm)"><button id="apiBaseSave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="apiBaseMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">DeepSeek API</div><div class="setting-card"><div class="s-label">API Key</div><div class="s-desc">深度翻译、字典、单词分析、课堂翻译共用。platform.deepseek.com 免费获取</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="sk-..." autocomplete="off" style="margin-top:6px;font-size:var(--fs-sm)"><div style="display:flex;gap:6px;margin-top:8px"><button id="dsKeySave" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">💾 保存</button><button id="dsKeyTest" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">🔍 测试</button>${s.dsKey?'<button id="dsKeyClear" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--red);border:1.5px solid var(--red)">🗑 清除</button>':''}</div><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">❓ 帮助</div><details class="setting-card"><summary style="font-weight:500;cursor:pointer">深度功能提示"网络不可用"怎么办</summary><div class="s-desc" style="margin-top:6px">电脑上运行 <b>node proxy.js</b>（俄语学习目录），再刷新页面。手机端要在「代理服务器」填电脑的局域网 IP。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">朗读俄语没声音 / 发音怪</summary><div class="s-desc" style="margin-top:6px">系统没装俄语语音包：Windows 设置 → 时间和语言 → 添加俄语 → 勾选"语音" → 重启浏览器。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">API Key 怎么获取</summary><div class="s-desc" style="margin-top:6px">platform.deepseek.com 注册 → 创建 API Key → 填到上方并点「🔍 测试」验证。深度翻译、字典、变位、课堂翻译都需要。</div></details></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v6.2<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek</div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)});const kt2=document.getElementById('dsKeyTest');if(kt2)kt2.addEventListener('click',async()=>{const key=(document.getElementById('dsKeyInput').value||S.settings.dsKey||'').trim();if(!key){toast('请先填入 API Key');return}const msg=document.getElementById('dsKeyMsg');msg.textContent='测试中…';try{const d=await apiFetch('/api/balance',{method:'GET',headers:{'x-api-key':key},timeout:12000});const b=d.balance_infos&&d.balance_infos[0];msg.textContent='✅ Key 有效，余额 ¥'+(b?parseFloat(b.total_balance).toFixed(2):'?')+'，'+(d.is_available?'可用':'已用尽');setTimeout(()=>msg.textContent='',6000)}catch(e){msg.textContent='❌ '+friendlyErr(e);setTimeout(()=>msg.textContent='',6000)}});const kc2=document.getElementById('dsKeyClear');if(kc2)kc2.addEventListener('click',()=>{if(!confirm('清除已保存的 API Key？'))return;S.settings.dsKey='';save('settings');renderAppSettings();toast('Key 已清除')})}
 renderAppSettings();
 document.addEventListener('click',e=>{const t=e.target;if(t&&t.id==='apiBaseSave'){S.settings.apiBase=(document.getElementById('apiBaseInput')||{value:''}).value.trim();save('settings');const m=document.getElementById('apiBaseMsg');if(m)m.textContent='已保存';setTimeout(()=>{if(m)m.textContent=''},2000)}});
 document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none'}));
@@ -1170,8 +1296,8 @@ window.runDiagnose=async function(btn){
       lines.push('❌ 代理响应异常: HTTP '+r.status);
     }
   }catch(e){
-    lines.push('❌ 代理服务器不可达: '+escape(e.message));
-    lines.push('   → 电脑上运行: cd russian-app && node proxy.js');
+    lines.push('❌ 代理服务器不可达: '+escape(friendlyErr(e)));
+    lines.push('   → 请确认电脑端已启动代理（俄语学习目录下运行 node proxy.js）');
   }
   // 2. DeepSeek Key
   if(S.settings.dsKey){
@@ -1193,15 +1319,18 @@ window.runDiagnose=async function(btn){
 // ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
-const APP_VERSION='6.0.0';
+const APP_VERSION='6.2.0'; // ⚠️ 发版时同步改:标题 h1 + APP_VERSION + sw.js 的 CACHE 版本号
 
 function init(){
+  // 版本号只写在 APP_VERSION 一处，标题和页头由这里注入
+  document.title='俄语学习 v'+APP_VERSION;
+  const h1=document.querySelector('h1');if(h1)h1.textContent='俄语学习 v'+APP_VERSION;
   applyFont(S.settings.fontSize);
   document.getElementById('autoToggle').classList.toggle('on',S.settings.autoTr);
   updateModeUI();updateLangUI();
   renderLearn();renderHistory();
   updateDictBtnVisibility();
-  if(window.speechSynthesis){window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices()}
+  if(window.speechSynthesis){refreshVoices();window.speechSynthesis.onvoiceschanged=refreshVoices}
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 init();

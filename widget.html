@@ -76,7 +76,9 @@ body{
 </div>
 
 <script>
-const KEY = ''; // 在这里填入你的 DeepSeek API Key
+// Key 优先复用主应用保存的（同源 localhost:8765 下 localStorage 共享），也可直接填在下方
+function getKey(){try{const s=JSON.parse(localStorage.getItem('ru_settings'));return(s&&s.dsKey)||''}catch(e){return''}}
+const KEY = getKey();
 const API = (localStorage.getItem('ru_widget_api') || 'http://localhost:8765') + '/api/balance';
 
 async function fetchBalance(){
