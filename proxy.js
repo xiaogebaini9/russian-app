@@ -360,6 +360,43 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── 语音识别（本地 Whisper，音频→文字）──
+  if (req.method === 'POST' && url === '/api/voice') {
+    const chunks = [];
+    let size = 0;
+    let tooLarge = false;
+    req.on('data', c => {
+      size += c.length;
+      if (size > MAX_BODY) { tooLarge = true; req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', async () => {
+      if (tooLarge) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '音频过大，已拒绝' }));
+        return;
+      }
+      const audio = Buffer.concat(chunks);
+      try {
+        const r = await fetch('http://127.0.0.1:9000/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: audio,
+          signal: AbortSignal.timeout(120000)
+        });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ text: d.text || '', language: d.language || '' }));
+      } catch (e) {
+        log('ERROR', url, e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   // ── 系统自检 ──
   if (req.method === 'GET' && url === '/api/diagnose') {
     (async () => {

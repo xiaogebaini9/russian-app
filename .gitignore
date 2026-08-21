@@ -2,3 +2,5 @@ node_modules/
 *.backup-*
 desk-balance.ps1
 .gitignore.new
+whisper/venv/
+whisper/models/

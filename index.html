@@ -1102,6 +1102,7 @@ renderQuizSetup();
 //  CLASS MODE (课堂语音翻译)
 // ═══════════════════════════════════════════════════════════════
 const CLASS={running:false,rec:null,items:[],pending:''};
+let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0;
 
 function classAddItem(original,translation,note){
   const now=new Date();
@@ -1149,59 +1150,87 @@ async function classTranslate(text){
 }
 
 function classStart(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   const status=document.getElementById('classStatus');
-  if(!SR){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     status.textContent='❌ 浏览器不支持';
-    document.getElementById('classHint').innerHTML='请用 <b>Chrome 或 Edge</b> 打开本页面使用语音识别';
+    document.getElementById('classHint').innerHTML='请用 <b>Chrome 或 Edge</b> 打开本页面（本机 localhost 可直接用麦克风）';
     return;
   }
-  CLASS.running=true;
-  document.getElementById('classStartBtn').disabled=true;
-  document.getElementById('classStopBtn').disabled=false;
-  status.textContent='🎙️ 聆听中…';
-  const rec=new SR();
-  CLASS.rec=rec;
-  const send=async(t)=>{const tt=t.trim();if(!tt||tt===CLASS._lastSent)return;CLASS._lastSent=tt;document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';classTranslate(tt).then(r=>{classAddItem(r.original,r.translation,r.note);document.getElementById('classHint').innerHTML='说俄语 → 自动转文字 → 翻译显示'})};
-  rec.lang='ru-RU';
-  rec.continuous=true;
-  rec.interimResults=true;
-  rec.maxAlternatives=1;
-  rec.onresult=e=>{
-    let finalText='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(e.results[i].isFinal)finalText+=e.results[i][0].transcript+' ';
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    classStream=stream;
+    classAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const srcNode=classAudioCtx.createMediaStreamSource(stream);
+    classAnalyser=classAudioCtx.createAnalyser();
+    classAnalyser.fftSize=1024;
+    srcNode.connect(classAnalyser);
+    classMime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
+    classRecorder=new MediaRecorder(stream,{mimeType:classMime});
+    classChunks=[];
+    classRecorder.ondataavailable=e=>{if(e.data&&e.data.size)classChunks.push(e.data)};
+    classRecorder.onstop=()=>{
+      if(classChunks.length){const blob=new Blob(classChunks,{type:classMime});classChunks=[];classRecognize(blob)}
+      if(CLASS.running){try{classRecorder.start(200)}catch(e){}}
+    };
+    classRecorder.start(200);
+    CLASS.running=true;classSilenceMs=0;
+    document.getElementById('classStartBtn').disabled=true;
+    document.getElementById('classStopBtn').disabled=false;
+    status.textContent='🎙️ 聆听中…';
+    document.getElementById('classHint').innerHTML='说俄语 → 自动识别 → 翻译显示';
+    classSilenceTick();
+  }).catch(()=>{
+    status.textContent='❌ 麦克风被拒绝';
+    document.getElementById('classHint').innerHTML='浏览器地址栏 🔒 → 网站设置 → 允许麦克风（手机需 HTTPS 或 localhost）';
+  });
+}
+
+async function classRecognize(blob){
+  try{
+    const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:blob,signal:AbortSignal.timeout(120000)});
+    const d=await r.json().catch(()=>({}));
+    if(d.error)throw new Error(d.error);
+    classSendText(d.text||'');
+  }catch(e){
+    console.error('语音识别失败',e.message||e);
+  }
+}
+
+async function classSendText(t){
+  const tt=(t||'').trim();
+  if(!tt||tt===CLASS._lastSent)return;
+  CLASS._lastSent=tt;
+  document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';
+  classTranslate(tt).then(r=>{
+    classAddItem(r.original,r.translation,r.note);
+    document.getElementById('classHint').innerHTML='说俄语 → 自动识别 → 翻译显示';
+  });
+}
+
+function classSilenceTick(){
+  if(!CLASS.running)return;
+  const buf=new Uint8Array(classAnalyser.fftSize);
+  classAnalyser.getByteTimeDomainData(buf);
+  let sum=0;
+  for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v}
+  const rms=Math.sqrt(sum/buf.length);
+  if(rms<0.015){
+    classSilenceMs+=200;
+    if(classSilenceMs>=1200&&classRecorder&&classRecorder.state==='recording'){
+      classSilenceMs=0;
+      try{classRecorder.stop()}catch(e){} // onstop 里识别并自动重开
     }
-    // 显示临时识别文字
-    let interim='';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      if(!e.results[i].isFinal)interim+=e.results[i][0].transcript;
-    }
-    document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">'+(interim?'正在识别: '+escape(interim):'聆听中…')+'</span>';
-    // 句子结束 → 翻译
-    if(finalText.trim()){
-      send(finalText);
-    }else if(interim.trim()){
-      clearTimeout(CLASS._interimT);
-      CLASS._interimT=setTimeout(()=>send(interim),1500);
-    }
-  };
-  rec.onerror=e=>{
-    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-      status.textContent='❌ 麦克风被拒绝';
-      document.getElementById('classHint').innerHTML='浏览器地址栏 🔒 → 网站设置 → 允许麦克风';
-    }else if(e.error==='no-speech'){status.textContent='🎙️ 未检测到语音，请再试一次';}else if(e.error==='network'){
-      status.textContent='⚠️ 识别服务连不上（网络）';
-      document.getElementById('classHint').innerHTML='Web Speech API 依赖云端服务。Whisper 本地方案接入后不再依赖网络';
-    }
-  };
-  rec.onend=()=>{if(CLASS.running){try{rec.start()}catch(e){}}}; // 自动续听
-  try{rec.start()}catch(e){}
+  }else{
+    classSilenceMs=0;
+  }
+  setTimeout(classSilenceTick,200);
 }
 
 function classStop(){
-  CLASS.running=false;clearTimeout(CLASS._interimT);CLASS._lastSent='';
-  if(CLASS.rec){CLASS.rec.onend=null;try{CLASS.rec.stop()}catch(e){}CLASS.rec=null}
+  CLASS.running=false;CLASS._lastSent='';classSilenceMs=0;
+  if(classRecorder){try{classRecorder.stop()}catch(e){}classRecorder=null}
+  if(classStream){classStream.getTracks().forEach(t=>t.stop());classStream=null}
+  if(classAudioCtx){try{classAudioCtx.close()}catch(e){}classAudioCtx=null}
+  classAnalyser=null;
   document.getElementById('classStartBtn').disabled=false;
   document.getElementById('classStopBtn').disabled=true;
   document.getElementById('classStatus').textContent='已停止';
