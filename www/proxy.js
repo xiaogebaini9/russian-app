@@ -13,6 +13,36 @@ const ROOT = __dirname; // russian-app 目录
 // ⚡ 单词分析内存缓存（同词二次查询秒回）
 const analysisCache = new Map();
 
+// 请求体上限 1MB，防止超大请求滥用
+const MAX_BODY = 1000000;
+
+// 统一日志：控制台输出带时间戳，方便排查问题
+function log(...args) {
+  const t = new Date().toLocaleString('zh-CN', { hour12: false });
+  console.log(`[${t}]`, ...args);
+}
+
+// 读取请求体，超过上限返回 null（用于拦截超大请求）
+function readBody(req) {
+  return new Promise((resolve) => {
+    let body = '';
+    let size = 0;
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    req.on('data', (chunk) => {
+      if (settled) return;
+      size += chunk.length;
+      if (size > MAX_BODY) {
+        done(null);
+        return;
+      }
+      body += chunk;
+    });
+    req.on('end', () => done(body));
+    req.on('error', () => done(null));
+  });
+}
+
 // ⚡ DeepSeek 调用（模型回退：第一个模型失败时自动试下一个）
 async function callDeepSeek(key, messages, maxTokens, timeoutMs, models, useJsonMode) {
   const list = models || ['deepseek-v4-flash', 'deepseek-chat'];
@@ -108,6 +138,7 @@ const MIME = {
 
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
+  if (url.startsWith('/api/')) log(req.method, url, 'from', req.socket.remoteAddress || '-');
 
   // ── CORS: 允许页面从任意来源(file://、局域网 IP、开发端口)调用 API ──
   const corsHeaders = {
@@ -141,9 +172,12 @@ const server = http.createServer((req, res) => {
 
   // ── 翻译代理 ──
   if (req.method === 'POST' && url === '/api/translate') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
       try {
         const { key, src, tgt, text } = JSON.parse(body);
         const NAMES={ru:'俄语',en:'英语','zh-CN':'中文'};
@@ -165,6 +199,7 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ text: translated, det: d.model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat', model: d.model }));
       } catch (e) {
+        log('ERROR', url, e.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
       }
@@ -174,9 +209,12 @@ const server = http.createServer((req, res) => {
 
   // ── 字典查询 ──
   if (req.method === 'POST' && url === '/api/dictionary') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
       try {
         const { key, word } = JSON.parse(body);
         const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
@@ -217,6 +255,7 @@ const server = http.createServer((req, res) => {
           res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'JSON解析失败，返回原始内容' }));
         }
       } catch (e) {
+        log('ERROR', url, e.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
       }
@@ -226,9 +265,12 @@ const server = http.createServer((req, res) => {
 
   // ── 单词详细分析（体的变位 + 时态变位 + 一词多译）──
   if (req.method === 'POST' && url === '/api/word-analysis') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
       try {
         const { key, word } = JSON.parse(body);
         // ⚡ 内存缓存：同一单词第二次查询秒回
@@ -260,6 +302,7 @@ const server = http.createServer((req, res) => {
           res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'JSON解析失败' }));
         }
       } catch (e) {
+        log('ERROR', url, e.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
       }
@@ -269,9 +312,12 @@ const server = http.createServer((req, res) => {
 
   // ── 课堂翻译（口语规整 + 学术翻译，一次调用）──
   if (req.method === 'POST' && url === '/api/class-translate') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
       try {
         const { key, text } = JSON.parse(body);
         if (!text || !text.trim()) {
@@ -306,6 +352,44 @@ const server = http.createServer((req, res) => {
           res.end(JSON.stringify({ original: text.trim(), translation: raw, note: '规整失败，直译' }));
         }
       } catch (e) {
+        log('ERROR', url, e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── 语音识别（本地 Whisper，音频→文字）──
+  if (req.method === 'POST' && url === '/api/voice') {
+    const chunks = [];
+    let size = 0;
+    let tooLarge = false;
+    req.on('data', c => {
+      size += c.length;
+      if (size > MAX_BODY) { tooLarge = true; req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', async () => {
+      if (tooLarge) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '音频过大，已拒绝' }));
+        return;
+      }
+      const audio = Buffer.concat(chunks);
+      try {
+        const r = await fetch('http://127.0.0.1:9000/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: audio,
+          signal: AbortSignal.timeout(120000)
+        });
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ text: d.text || '', language: d.language || '', confidence: d.confidence }));
+      } catch (e) {
+        log('ERROR', url, e.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: e.message }));
       }
