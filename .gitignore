@@ -6,3 +6,5 @@ whisper/venv/
 whisper/models/
 
 whisper/__pycache__/
+
+proxy-startup.log
