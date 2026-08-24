@@ -387,7 +387,7 @@ const server = http.createServer((req, res) => {
         const d = await r.json();
         if (d.error) throw new Error(d.error);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ text: d.text || '', language: d.language || '' }));
+        res.end(JSON.stringify({ text: d.text || '', language: d.language || '', confidence: d.confidence }));
       } catch (e) {
         log('ERROR', url, e.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });

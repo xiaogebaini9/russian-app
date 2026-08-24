@@ -29,8 +29,11 @@ def transcribe(data, lang=LANG):
         f.write(data)
     try:
         segments, info = model.transcribe(path, language=lang, beam_size=5, vad_filter=True)
-        text = ''.join(s.text for s in segments).strip()
-        return {'text': text, 'language': info.language, 'prob': round(info.language_probability, 3)}
+        segs = list(segments)
+        text = ''.join(s.text for s in segs).strip()
+        probs = [s.avg_logprob for s in segs if getattr(s, 'avg_logprob', None) is not None]
+        confidence = round(sum(probs) / len(probs), 4) if probs else None
+        return {'text': text, 'language': info.language, 'confidence': confidence}
     finally:
         try:
             os.remove(path)

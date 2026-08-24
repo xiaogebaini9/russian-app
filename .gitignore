@@ -4,3 +4,5 @@ desk-balance.ps1
 .gitignore.new
 whisper/venv/
 whisper/models/
+
+whisper/__pycache__/

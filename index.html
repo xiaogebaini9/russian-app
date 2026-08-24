@@ -373,7 +373,7 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
         <div class="empty-state" id="classEmpty">点击"开始录音"，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div>
       </div>
       <div style="display:flex;gap:8px;flex-shrink:0;padding-bottom:8px">
-        <button id="classSaveBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">💾 保存本课记录</button>
+        <button id="classSaveBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">💾 复制本课记录</button>
         <button id="classClearBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">🧹 清空</button>
       </div>
     </div>
@@ -1101,14 +1101,65 @@ renderQuizSetup();
 // ═══════════════════════════════════════════════════════════════
 //  CLASS MODE (课堂语音翻译)
 // ═══════════════════════════════════════════════════════════════
-const CLASS={running:false,rec:null,items:[],pending:''};
+// ═══ IndexedDB 封装（零依赖，Promise 风格，异步不阻塞 UI）═══
+window.idbStore=(function(){
+  const DB='russian_app',VER=1;
+  let _db=null;
+  function open(){
+    if(_db)return Promise.resolve(_db);
+    return new Promise((res,rej)=>{
+      const rq=indexedDB.open(DB,VER);
+      rq.onupgradeneeded=e=>{
+        const db=e.target.result;
+        if(!db.objectStoreNames.contains('sessions'))db.createObjectStore('sessions',{keyPath:'id'});
+        if(!db.objectStoreNames.contains('transcripts')){
+          const st=db.createObjectStore('transcripts',{keyPath:'id'});
+          st.createIndex('sessionId','sessionId',{unique:false});
+        }
+      };
+      rq.onsuccess=()=>{_db=rq.result;res(_db)};
+      rq.onerror=()=>rej(rq.error);
+    });
+  }
+  function run(store,mode,fn){
+    return open().then(db=>new Promise((res,rej)=>{
+      const t=db.transaction(store,mode);
+      const os=t.objectStore(store);
+      let result;
+      t.oncomplete=()=>res(result);
+      t.onerror=()=>rej(t.error);
+      t.onabort=()=>rej(t.error);
+      let r;
+      try{r=fn(os)}catch(e){rej(e);return}
+      r.onsuccess=()=>{result=r.result};
+      r.onerror=()=>rej(r.error);
+    }));
+  }
+  return {
+    put:(store,val)=>run(store,'readwrite',os=>os.put(val)),
+    get:(store,key)=>run(store,'readonly',os=>os.get(key)),
+    getAll:(store)=>run(store,'readonly',os=>os.getAll()),
+    del:(store,key)=>run(store,'readwrite',os=>os.delete(key)),
+    byIndex:(store,idx,key)=>run(store,'readonly',os=>os.index(idx).getAll(key)),
+  };
+})();
+function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
+
+const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null};
 let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0;
 
-function classAddItem(original,translation,note){
+function classAddItem(original,translation,note,confidence){
   const now=new Date();
-  const time=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
-  CLASS.items.push({time,original,translation,note:note||''});
+  const time=fmtTimeShort(now.getTime());
+  const item={_id:genId(),_ts:now.getTime(),time,original,translation,note:note||'',confidence:(confidence===null||confidence===undefined)?null:confidence};
+  CLASS.items.push(item);
   if(CLASS.items.length>200)CLASS.items.shift();
+  // 异步写入 IndexedDB，不阻塞字幕渲染
+  if(CLASS.sessionId){
+    idbStore.put('transcripts',{id:item._id,sessionId:CLASS.sessionId,timestamp:item._ts,original,translation,note:note||'',confidence:item.confidence}).catch(()=>{});
+  }
   classRender();
   const board=document.getElementById('classBoard');
   board.scrollTop=board.scrollHeight;
@@ -1127,7 +1178,7 @@ function classRender(){
           <span class="class-play" data-i="${i}" data-lang="zh" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊译文</span>
         </span>
       </div>
-      <div style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px">${escape(it.original)}</div>
+      <div data-edit="${i}" title="点击编辑原文" style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px;cursor:pointer">${escape(it.original)}${it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-weight:400;font-size:13px">⚠️ 识别不准</span>':''}</div>
       <div style="font-size:14px;color:var(--blue);line-height:1.5">${escape(it.translation)}</div>
       ${it.note?`<div style="font-size:11px;color:var(--yellow);margin-top:3px">⚠️ ${escape(it.note)}</div>`:''}
     </div>`).join('');
@@ -1137,6 +1188,44 @@ function classRender(){
       if(it)speak(b.dataset.lang==='ru'?it.original:it.translation,b.dataset.lang==='ru'?'ru':'zh-CN',.9);
     });
   });
+  el.querySelectorAll('[data-edit]').forEach(b=>{
+    b.addEventListener('click',()=>classEditItem(parseInt(b.dataset.edit)));
+  });
+}
+
+function classEditItem(i){
+  const it=CLASS.items[i];
+  if(!it)return;
+  const el=document.querySelector(`[data-edit="${i}"]`);
+  if(!el)return;
+  const ta=document.createElement('textarea');
+  ta.value=it.original;
+  ta.style.cssText='width:100%;min-height:64px;font-size:16px;font-weight:600;color:var(--text);background:var(--input);border:1.5px solid var(--blue);border-radius:8px;padding:8px;line-height:1.4;resize:vertical;font-family:inherit;box-sizing:border-box';
+  el.replaceWith(ta);
+  ta.focus();
+  let done=false;
+  const finish=async save=>{
+    if(done)return;done=true;
+    const newText=ta.value.trim();
+    if(save&&newText&&newText!==it.original){
+      ta.disabled=true;
+      ta.style.opacity='.6';
+      const r=await classTranslate(newText);
+      it.original=r.original||newText;
+      it.translation=r.translation||'';
+      it.note=r.note||'';
+      it.confidence=null; // 手动修正后清除低置信标记
+      if(it._id&&CLASS.sessionId){
+        idbStore.put('transcripts',{id:it._id,sessionId:CLASS.sessionId,timestamp:it._ts,original:it.original,translation:it.translation,note:it.note,confidence:null}).catch(()=>{});
+      }
+    }
+    classRender();
+  };
+  ta.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();finish(true)}
+    else if(e.key==='Escape'){finish(false)}
+  });
+  ta.addEventListener('blur',()=>finish(false));
 }
 
 async function classTranslate(text){
@@ -1158,6 +1247,10 @@ function classStart(){
   }
   navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
     classStream=stream;
+    // 每次开始录音新建一个课堂会话，句子自动存入该会话
+    CLASS.sessionId=genId();
+    CLASS._sessionStart=Date.now();
+    idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:null,courseName:''}).catch(()=>{});
     classAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
     const srcNode=classAudioCtx.createMediaStreamSource(stream);
     classAnalyser=classAudioCtx.createAnalyser();
@@ -1189,19 +1282,19 @@ async function classRecognize(blob){
     const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:blob,signal:AbortSignal.timeout(120000)});
     const d=await r.json().catch(()=>({}));
     if(d.error)throw new Error(d.error);
-    classSendText(d.text||'');
+    classSendText(d.text||'', d.confidence);
   }catch(e){
     console.error('语音识别失败',e.message||e);
   }
 }
 
-async function classSendText(t){
+async function classSendText(t,confidence){
   const tt=(t||'').trim();
   if(!tt||tt===CLASS._lastSent)return;
   CLASS._lastSent=tt;
   document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';
   classTranslate(tt).then(r=>{
-    classAddItem(r.original,r.translation,r.note);
+    classAddItem(r.original,r.translation,r.note,confidence);
     document.getElementById('classHint').innerHTML='说俄语 → 自动识别 → 翻译显示';
   });
 }
@@ -1227,6 +1320,12 @@ function classSilenceTick(){
 
 function classStop(){
   CLASS.running=false;CLASS._lastSent='';classSilenceMs=0;
+  // 结束会话：写入结束时间
+  if(CLASS.sessionId){
+    idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:Date.now(),courseName:''}).catch(()=>{});
+    CLASS.sessionId=null;
+    CLASS._sessionStart=null;
+  }
   if(classRecorder){try{classRecorder.stop()}catch(e){}classRecorder=null}
   if(classStream){classStream.getTracks().forEach(t=>t.stop());classStream=null}
   if(classAudioCtx){try{classAudioCtx.close()}catch(e){}classAudioCtx=null}
@@ -1237,14 +1336,10 @@ function classStop(){
 }
 
 function classSave(){
+  // 记录已自动存入 IndexedDB，这里只把当前字幕板复制到剪贴板
   if(!CLASS.items.length){toast('还没有记录');return}
-  const date=new Date().toISOString().slice(0,10);
-  const all=ls('class_records',{});
-  all[date]=CLASS.items.slice();
-  ss('class_records',all);
   const text=classItemsToText(CLASS.items);
-  try{navigator.clipboard.writeText(text).then(()=>toast('已保存到本地，已复制到剪贴板'))}catch(e){toast('已保存到本地')}
-  if(classHistMode)classHistRender();
+  navigator.clipboard.writeText(text).then(()=>toast('已复制到剪贴板')).catch(()=>toast('复制失败'));
 }
 
 function classClear(){
@@ -1253,44 +1348,83 @@ function classClear(){
   if(classHistMode)classHistRender();else classRender();
 }
 
-// ═══ 课堂历史记录（按日期回看已保存的课） ═══
+// ═══ 课堂历史记录（IndexedDB，按会话回看） ═══
 let classHistMode=false;
-function classHistData(){return ls('class_records',{})}
 const CLASS_BACK_BTN='<button id="classBackLive" style="padding:7px 14px;border-radius:16px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">← 返回字幕板</button>';
-function classItemsToText(items){return items.map((it,i)=>`${i+1}. [${it.time}] ${it.original}\n    ${it.translation}${it.note?' ⚠️'+it.note:''}`).join('\n\n')}
+function classItemsToText(items){return items.map((it,i)=>`${i+1}. [${it.time||fmtTimeShort(it.timestamp)}] ${it.original}\n    ${it.translation}${it.note?' ⚠️'+it.note:''}${it.confidence!==null&&it.confidence<-0.8?' ⚠️识别不准':''}`).join('\n\n')}
+function classItemsToMarkdown(session,items){
+  const head=['# 课堂记录','','- 日期：'+fmtTime(session.startTime),'- 时长：'+(session.endTime?Math.round((session.endTime-session.startTime)/1000)+' 秒':'进行中'),'- 句数：'+items.length,'','---',''];
+  const body=items.map((it,i)=>{
+    let line='### '+(i+1)+'. '+it.original;
+    line+='\n\n> '+it.translation;
+    if(it.note)line+='\n\n⚠️ '+it.note;
+    if(it.confidence!==null&&it.confidence<-0.8)line+='\n\n⚠️ 识别不准';
+    line+='\n\n<small>'+(it.time||fmtTimeShort(it.timestamp))+'</small>';
+    return line;
+  });
+  return head.join('\n')+body.join('\n\n');
+}
+function downloadMd(filename,content){
+  const blob=new Blob(['﻿'+content],{type:'text/markdown;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+async function classHistData(){
+  const sessions=await idbStore.getAll('sessions');
+  const transcripts=await idbStore.getAll('transcripts');
+  sessions.sort((a,b)=>(b.startTime||0)-(a.startTime||0));
+  const byS={};
+  transcripts.forEach(t=>{(byS[t.sessionId]=byS[t.sessionId]||[]).push(t)});
+  Object.values(byS).forEach(arr=>arr.sort((a,b)=>(a.timestamp||0)-(b.timestamp||0)));
+  return {sessions,byS};
+}
 function setClassHist(on){
   classHistMode=on;
   document.getElementById('classHistBtn').textContent=on?'← 字幕板':'📚 历史';
   if(on)classHistRender();else classRender();
 }
-function classHistRender(){
+async function classHistRender(){
   const el=document.getElementById('classBoard');
-  const all=classHistData();
-  const days=Object.keys(all).sort().reverse();
-  if(!days.length){
-    el.innerHTML='<div style="padding:6px 0;flex-shrink:0">'+CLASS_BACK_BTN+'</div><div class="empty-state">还没有保存过课堂记录<br>课堂模式里点「💾 保存本课记录」后，这里按日期回看</div>';
+  const {sessions,byS}=await classHistData();
+  const filled=sessions.filter(s=>(byS[s.id]||[]).length>0);
+  if(!filled.length){
+    el.innerHTML='<div style="padding:6px 0;flex-shrink:0">'+CLASS_BACK_BTN+'</div><div class="empty-state">还没有课堂记录<br>课堂模式里点「开始录音」，每句译文自动保存<br>点「💾」可复制当前字幕板</div>';
     return;
   }
-  let html='<div style="padding:6px 0;flex-shrink:0;display:flex;align-items:center;gap:8px">'+CLASS_BACK_BTN+'<span style="font-size:11px;color:var(--text3)">'+days.length+' 天记录</span></div>';
-  days.forEach(d=>{
-    const items=all[d];
-    html+=`<div class="les-card" style="margin-top:6px"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">📅 ${d}</div><div class="les-title">${items.length} 句</div></div><span style="display:flex;gap:6px;align-items:center"><button class="mini-chip" data-day="${d}" data-act="copy">📋 复制</button><button class="mini-chip danger" data-day="${d}" data-act="del">🗑 删除</button><span class="les-arrow" style="margin-left:4px">&#9660;</span></span></div><div class="les-card-body">`+
-    items.map((it,i)=>`<div style="padding:8px 4px;border-bottom:1px solid var(--border2);display:flex;gap:6px;align-items:flex-start"><span style="font-size:10px;color:var(--text3);white-space:nowrap;padding-top:3px">${it.time}</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">${escape(it.original)}</div><div style="font-size:12px;color:var(--blue)">${escape(it.translation)}</div>${it.note?`<div style="font-size:11px;color:var(--yellow)">⚠️ ${escape(it.note)}</div>`:''}</div><button class="mini-chip" data-day="${d}" data-i="${i}" data-act="play">🔊</button></div>`).join('')+
+  let html='<div style="padding:6px 0;flex-shrink:0;display:flex;align-items:center;gap:8px">'+CLASS_BACK_BTN+'<span style="font-size:11px;color:var(--text3)">'+filled.length+' 节课</span></div>';
+  filled.forEach(s=>{
+    const items=byS[s.id]||[];
+    const dur=s.endTime?Math.round((s.endTime-s.startTime)/1000)+' 秒':'进行中';
+    html+=`<div class="les-card" style="margin-top:6px"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">📅 ${fmtTime(s.startTime)}</div><div class="les-title">${items.length} 句 · ${dur}</div></div><span style="display:flex;gap:6px;align-items:center"><button class="mini-chip" data-sid="${s.id}" data-act="copy">📋 复制</button><button class="mini-chip" data-sid="${s.id}" data-act="md">⬇️ 导出</button><button class="mini-chip danger" data-sid="${s.id}" data-act="del">🗑 删除</button><span class="les-arrow" style="margin-left:4px">&#9660;</span></span></div><div class="les-card-body">`+
+    items.map((it,i)=>`<div style="padding:8px 4px;border-bottom:1px solid var(--border2);display:flex;gap:6px;align-items:flex-start"><span style="font-size:10px;color:var(--text3);white-space:nowrap;padding-top:3px">${it.time||fmtTimeShort(it.timestamp)}</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">${escape(it.original)}${it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-size:11px">⚠️</span>':''}</div><div style="font-size:12px;color:var(--blue)">${escape(it.translation)}</div>${it.note?`<div style="font-size:11px;color:var(--yellow)">⚠️ ${escape(it.note)}</div>`:''}</div><button class="mini-chip" data-sid="${s.id}" data-i="${i}" data-act="play">🔊</button></div>`).join('')+
     '</div></div>';
   });
   el.innerHTML=html;
 }
-// 事件委托：课堂历史里的 返回/播放/复制/删除 一次绑定
-document.getElementById('classBoard').addEventListener('click',e=>{
+// 事件委托：课堂历史里的 返回/播放/复制/导出/删除 一次绑定
+document.getElementById('classBoard').addEventListener('click',async e=>{
   const t=e.target.closest('#classBackLive,.mini-chip');
   if(!t)return;
   if(t.id==='classBackLive'){setClassHist(false);return}
-  const day=t.dataset.day,act=t.dataset.act;
-  if(!day)return;
-  const all=classHistData();
-  if(act==='play'){const it=all[day]?.[parseInt(t.dataset.i)];if(it)speak(it.original,'ru',.9)}
-  else if(act==='copy'){navigator.clipboard.writeText(classItemsToText(all[day]||[])).then(()=>toast('已复制 '+day+' 的记录')).catch(()=>toast('复制失败'))}
-  else if(act==='del'){if(!confirm('删除 '+day+' 的全部记录？'))return;delete all[day];ss('class_records',all);classHistRender()}
+  const sid=t.dataset.sid,act=t.dataset.act;
+  if(!sid)return;
+  const {sessions,byS}=await classHistData();
+  const session=sessions.find(s=>s.id===sid);
+  const items=byS[sid]||[];
+  if(act==='play'){const it=items[parseInt(t.dataset.i)];if(it)speak(it.original,'ru',.9)}
+  else if(act==='copy'){navigator.clipboard.writeText(classItemsToText(items)).then(()=>toast('已复制')).catch(()=>toast('复制失败'))}
+  else if(act==='md'){downloadMd('课堂记录_'+fmtTime(session.startTime).replace(/[: ]/g,'-')+'.md',classItemsToMarkdown(session,items));toast('已导出 Markdown')}
+  else if(act==='del'){
+    if(!confirm('删除这节课的全部记录？'))return;
+    await idbStore.del('sessions',sid).catch(()=>{});
+    await Promise.all(items.map(it=>idbStore.del('transcripts',it.id).catch(()=>{})));
+    classHistRender();
+  }
 });
 
 document.getElementById('classHistBtn').addEventListener('click',()=>setClassHist(!classHistMode));
