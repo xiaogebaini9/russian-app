@@ -6,8 +6,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8765;
-const DEEPSEEK = 'https://api.deepseek.com';
+const PORT = Number(process.env.PORT) || 8765;
+// 默认官方地址，可用环境变量覆盖（指向 opencode 等中转）；结尾带 /v1 的也兼容，统一去掉后代码里再拼
+const DEEPSEEK = (process.env.DS_BASE_URL || 'https://api.deepseek.com').replace(/\/v1\/?$/, '');
 const ROOT = __dirname; // russian-app 目录
 
 // ⚡ 单词分析内存缓存（同词二次查询秒回）
@@ -63,7 +64,8 @@ async function callDeepSeek(key, messages, maxTokens, timeoutMs, models, useJson
       });
       const d = await resp.json();
       if (d.error) {
-        const msg = d.error.message || 'API错误';
+        // 兼容各家上游：error 可能是字符串，也可能是 {message, type} 对象
+        const msg = typeof d.error === 'string' ? d.error : (d.error.message || JSON.stringify(d.error));
         // 认证错误：key 本身无效，再试其他模型也没用 → 直接抛出
         if (/auth|invalid api key|authentication/i.test(msg)) throw new Error(msg);
         // 其他错误（如模型不存在、限流）→ 记录后尝试下一个模型
@@ -154,13 +156,56 @@ const server = http.createServer((req, res) => {
   const _writeHead = res.writeHead.bind(res);
   res.writeHead = (code, headers) => _writeHead(code, Object.assign({}, headers, corsHeaders));
 
-  // ── 余额查询 ──
+  // ── 余额查询（仅 DeepSeek 官方地址支持，中转一般没有此接口）──
   if (req.method === 'GET' && url === '/api/balance') {
+    if (DEEPSEEK !== 'https://api.deepseek.com') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ note: '当前 API 地址不支持余额查询，请改用「🔍 测试」验证连通性' }));
+      return;
+    }
     const key = req.headers['x-api-key'] || '';
     fetch(`${DEEPSEEK}/user/balance`, {
       headers: { 'Authorization': `Bearer ${key}` },
       signal: AbortSignal.timeout(10000)
     }).then(r => r.json()).then(d => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(d));
+    }).catch(e => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+    return;
+  }
+
+  // ── 前端配置（告诉页面 API 地址是不是官方，决定测试按钮测什么）──
+  if (req.method === 'GET' && url === '/api/config') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ isOfficial: DEEPSEEK === 'https://api.deepseek.com' }));
+    return;
+  }
+
+  // ── Key 测试（转发给上游真实接口，成功/失败原文透传，前端据此显示）──
+  if (req.method === 'GET' && url === '/api/testkey') {
+    const key = req.headers['x-api-key'] || '';
+    fetch(`${DEEPSEEK}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify({ model: 'deepseek-v4-flash', max_tokens: 1, messages: [{ role: 'user', content: 'ping' }] }),
+      signal: AbortSignal.timeout(15000)
+    }).then(r => r.json()).then(d => {
+      const rawError = d.error;
+      if (rawError) {
+        // 转成 {error: 字符串}，前端友好显示
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: typeof rawError === 'string' ? rawError : (rawError.message || JSON.stringify(rawError)) }));
+        return;
+      }
+      if (d.choices && d.choices[0]) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, model: d.model || 'unknown' }));
+        return;
+      }
+      // 上游返回了意料之外的格式，原样透传供排查
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(d));
     }).catch(e => {
