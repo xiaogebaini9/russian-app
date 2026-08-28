@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>隐私政策 · 俄语学习</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* 隐私政策页：继承主题背景渐变，但允许滚动 */
+  html,body{height:auto;overflow:auto;min-height:100%;background:linear-gradient(168deg,var(--bg-a) 0%,var(--bg-b) 100%)}
+  body{padding:24px 16px 48px}
+  .pp{max-width:640px;margin:0 auto;background:var(--glass-strong);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px 24px}
+  .pp h1{font-family:var(--serif);font-size:22px;color:var(--blue);margin-bottom:6px}
+  .pp .date{font-size:12px;color:var(--text3);margin-bottom:20px}
+  .pp h2{font-size:15px;color:var(--blue);margin:22px 0 8px;font-weight:600}
+  .pp p,.pp li{font-size:13px;line-height:1.9;color:var(--text2)}
+  .pp ul{padding-left:18px}
+  .pp a{color:var(--blue);text-decoration:none}
+  .pp .back{display:inline-block;margin-bottom:16px;font-size:13px;color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="pp">
+  <a class="back" href="index.html">← 返回应用</a>
+  <h1>隐私政策</h1>
+  <div class="date">俄语翻译学习 · 生效日期：2026 年 8 月 28 日</div>
+  <p>本隐私政策说明「俄语翻译学习」（走遍俄罗斯，以下简称「本应用」）如何收集、使用和存储您的信息。本应用由个人开发者维护，坚持<b>本地优先、最小收集</b>：不建账号、不设跟踪、不放广告。</p>
+
+  <h2>一、我们收集哪些信息</h2>
+  <ul>
+    <li><b>本地存储的数据</b>（仅存于您的设备）：收藏的单词、学习设置（课本、目标等级、朗读速度等）、翻译与变位分析缓存。这些保存在您设备的浏览器本地存储中，不会上传。</li>
+    <li><b>翻译内容</b>：您在翻译、词典、变位分析、课堂翻译中输入或选择的文本，会被发送到翻译服务提供商进行处理，以返回翻译或分析结果。</li>
+    <li><b>课堂语音</b>：使用「课堂语音翻译」时，需要麦克风权限，用于实时识别课堂语音。识别优先在本机完成（本地 Whisper 模型，语音不出设备）；在本地识别不可用时，可能回退到浏览器自带的语音识别能力。</li>
+    <li><b>API Key</b>：您在设置中填写的 API Key 仅保存在本地浏览器，用于向服务商发起请求，本应用不会收集或上传它。</li>
+  </ul>
+
+  <h2>二、信息去向</h2>
+  <ul>
+    <li>翻译内容会发送给您配置的翻译服务商（默认 <a href="https://platform.deepseek.com" target="_blank" rel="noopener">DeepSeek</a>，部分场景回退到 MyMemory / LibreTranslate 等免费服务），由它们处理请求。请参阅各服务商的隐私政策了解其数据处理方式。</li>
+    <li>本应用的本地代理服务（proxy.js）会记录请求日志，仅用于排查运行问题，日志中不包含您的 API Key。</li>
+  </ul>
+
+  <h2>三、我们不做什么</h2>
+  <ul>
+    <li>不要求注册账号，不收集您的姓名、手机号、邮箱等身份信息。</li>
+    <li>不进行任何形式的广告、数据分析、用户画像或跨网站跟踪。</li>
+    <li>不将您的数据出售、出租或用于本隐私政策之外的用途。</li>
+  </ul>
+
+  <h2>四、数据存储与删除</h2>
+  <ul>
+    <li>本地数据可随时自行清除：在应用「更多 → 设置 → 数据管理」中清空收藏；或清除浏览器对该站点的存储数据（全部本地数据随之删除）。</li>
+    <li>由于采用本地优先、无账号体系，我们不持有您的云端个人数据。</li>
+  </ul>
+
+  <h2>五、未成年人</h2>
+  <p>本应用不面向未成年人定向提供服务，也不会有意收集未成年人信息。如您是家长并认为孩子向我们提供了个人信息，可联系我们删除。</p>
+
+  <h2>六、政策更新</h2>
+  <p>本政策可能随应用功能调整而更新，更新后会在本页面公布并标注新的生效日期。重大变化会通过应用内提示告知。</p>
+
+  <h2>七、联系我们</h2>
+  <p>如有隐私相关问题，可通过本应用的 GitHub 仓库 <a href="https://github.com/xiaogebaini9/russian-app" target="_blank" rel="noopener">xiaogebaini9/russian-app</a> 提交 Issue 与我们联系。</p>
+</div>
+</body>
+</html>

@@ -13,12 +13,14 @@ copy /y index.html www\ >nul
 copy /y style.css www\ >nul
 copy /y sw.js www\ >nul
 copy /y manifest.json www\ >nul
+copy /y privacy.html www\ >nul
 
 rem 3. 同步 APK 资产（assets 里不需要 proxy.js）
 copy /y index.html android\app\src\main\assets\public\ >nul
 copy /y style.css android\app\src\main\assets\public\ >nul
 copy /y sw.js android\app\src\main\assets\public\ >nul
 copy /y manifest.json android\app\src\main\assets\public\ >nul
+copy /y privacy.html android\app\src\main\assets\public\ >nul
 
 echo 三份同步完成，需要 APK 的话再跑 build-apk.bat
 pause
