@@ -2,7 +2,7 @@
   "name": "俄语翻译学习",
   "short_name": "俄语学习",
   "description": "俄语翻译与走遍俄罗斯学习助手",
-  "start_url": "index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#0f0f1a",
   "theme_color": "#1a1a2e",

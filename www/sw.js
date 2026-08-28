@@ -1,5 +1,5 @@
 // Service Worker for offline caching
-const CACHE = 'russian-app-v8';
+const CACHE = 'russian-app-v9';
 const URLS = ['index.html', 'style.css', 'manifest.json'];
 
 self.addEventListener('install', e => {
