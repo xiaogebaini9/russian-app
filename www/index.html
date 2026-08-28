@@ -113,7 +113,7 @@
           <button id="classStopBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--input);color:var(--text2);border:1.5px solid var(--border)" disabled>⏹ 停止</button>
         </div>
         <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:6px" id="classHint">
-          说俄语 → 自动转文字 → 翻译显示。识别引擎：<b id="classEngine">Web Speech API</b>（Whisper 接入后自动升级）
+          说俄语 → 自动转文字 → 翻译显示。识别引擎：<b id="classEngine">检测中…</b>
         </div>
       </div>
       <div id="classBoard" style="flex:1;overflow-y:auto;min-height:0;padding-bottom:10px">
@@ -275,8 +275,13 @@ function cleanRussianWord(txt){
 
 // ═══ Fetch word analysis (aspect + time conjugation + multi meanings) ═══
 async function fetchWordAnalysis(word){
+  const key='wa_'+word.toLowerCase().trim();
   try{
-    return await apiFetch('/api/word-analysis',{body:{key:S.settings.dsKey,word},timeout:60000});
+    const hit=ls(key);
+    if(hit&&hit.data&&Date.now()-hit.t<30*24*3600*1000)return hit.data; // 词形变化是语言事实，localStorage 缓存30天，重启不丢
+    const r=await apiFetch('/api/word-analysis',{body:{key:S.settings.dsKey,word},timeout:60000});
+    if(r&&!r._error)ss(key,{t:Date.now(),data:r});
+    return r;
   }catch(e){return {_error:e.message}}
 }
 
@@ -1037,6 +1042,15 @@ async function classRecognize(blob){
   }
 }
 
+// 识别引擎状态：探测 proxy 的 /api/voice-health → 本地 Whisper (GPU) 是否在跑
+async function updateClassEngine(){
+  const el=document.getElementById('classEngine');if(!el)return;
+  try{
+    const d=await apiFetch('/api/voice-health',{method:'GET',timeout:5000});
+    el.textContent=d.stt?('本地 Whisper'+(d.model?' · '+d.model:''))+'（GPU）':'Web Speech API（Whisper 未启动）';
+  }catch(e){el.textContent='Web Speech API（代理未连接）'}
+}
+
 async function classSendText(t,confidence){
   const tt=(t||'').trim();
   if(!tt||tt===CLASS._lastSent)return;
@@ -1244,6 +1258,7 @@ function init(){
   updateDictBtnVisibility();
   if(window.speechSynthesis){refreshVoices();window.speechSynthesis.onvoiceschanged=refreshVoices}
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+  updateClassEngine(); // 探测识别引擎状态（本地 Whisper GPU / Web Speech 兜底）
 }
 init();
 </script>

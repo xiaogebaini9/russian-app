@@ -405,6 +405,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── 语音识别引擎健康探测（前端据此显示识别引擎状态）──
+  if (req.method === 'GET' && url === '/api/voice-health') {
+    fetch('http://127.0.0.1:9000/health', { signal: AbortSignal.timeout(3000) })
+      .then(r => r.json().catch(() => ({})))
+      .then(d => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, stt: d.status === 'ok', model: d.model || '', device: d.device || '' }));
+      })
+      .catch(() => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, stt: false }));
+      });
+    return;
+  }
+
   // ── 语音识别（本地 Whisper，音频→文字）──
   if (req.method === 'POST' && url === '/api/voice') {
     const chunks = [];
