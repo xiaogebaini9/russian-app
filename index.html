@@ -129,6 +129,7 @@
     <div class="screen" id="sMore">
       <div class="sub-tabs" style="margin-bottom:10px">
         <button class="sub-tab active" data-more="fav">收藏</button>
+        <button class="sub-tab" data-more="res">📖 资料</button>
         <button class="sub-tab" data-more="app-settings">设置</button>
       </div>
       <div id="subFav" style="flex:1;overflow-y:auto">
@@ -139,6 +140,7 @@
         </div>
         <div id="favList"><div class="empty-state">还没有收藏的单词</div></div>
       </div>
+      <div id="subRes" style="display:none;flex:1;overflow-y:auto"><div id="resContent"></div></div>
       <div id="subAppSettings" style="display:none;flex:1;overflow-y:auto"><div id="appSettingsContent"></div></div>
     </div>
   </div>
@@ -489,7 +491,7 @@ function openHistoryPopup(){$histPopup.classList.add('show');renderHistory()}fun
 document.getElementById('historyTrigger').addEventListener('click',openHistoryPopup);document.getElementById('popupClose').addEventListener('click',closeHistoryPopup);$histPopup.addEventListener('click',e=>{if(e.target===$histPopup)closeHistoryPopup()});document.getElementById('popupClearHistory').addEventListener('click',()=>{S.history=[];save('history');toast('已清空');renderHistory()});
 
 // Favorites
-function toggleFav(orig,trans){const idx=S.favs.findIndex(f=>favMatch(f,orig));const label=S.langSrc==='ru'?'ru':S.langSrc==='en'?'en':'cn';if(idx>=0){S.favs.splice(idx,1);save('favs');renderFavs()}else{const e={time:Date.now()};e[label]=orig;e.trans=trans;e.lang=S.langSrc;S.favs.unshift(e);save('favs');renderFavs()}const btn=document.getElementById('saveWordBtn');if(btn){btn.textContent=S.favs.some(f=>favMatch(f,orig))?'★ 已收藏':'☆ 收藏'}}
+function toggleFav(orig,trans,el){const idx=S.favs.findIndex(f=>favMatch(f,orig));const label=S.langSrc==='ru'?'ru':S.langSrc==='en'?'en':'cn';if(idx>=0){S.favs.splice(idx,1);save('favs');renderFavs()}else{const e={time:Date.now()};e[label]=orig;e.trans=trans;e.lang=S.langSrc;S.favs.unshift(e);save('favs');renderFavs()}const nowFav=S.favs.some(f=>favMatch(f,orig));const btn=document.getElementById('saveWordBtn');if(btn){btn.textContent=nowFav?'★ 已收藏':'☆ 收藏'}if(el){el.textContent=nowFav?'★':'☆';el.classList.toggle('saved',nowFav)}}
 function renderFavs(){const el=document.getElementById('favList');document.getElementById('favStats').innerHTML=`已收藏 <strong>${S.favs.length}</strong> 个单词`;if(!S.favs.length){el.innerHTML='<div class="empty-state">还没有收藏的单词</div>';return}el.innerHTML=S.favs.map((f,i)=>{const w=f.ru||f.en||f.cn||'';const t=f.trans||'';return`<div class="fav-item"><span class="fv-ru">${escape(w)}</span><span class="fv-cn">${escape(t)}</span><button class="fv-act" data-i="${i}">&#9654;</button><button class="fv-act" data-i="${i}" data-del="1">&#10005;</button></div>`}).join('');el.querySelectorAll('.fv-act[data-del]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.favs.splice(parseInt(b.dataset.i),1);save('favs');renderFavs()}));el.querySelectorAll('.fv-act:not([data-del])').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const f=S.favs[parseInt(b.dataset.i)];if(f)speak(f.ru||f.en||f.cn||'',f.lang||'ru',S.settings.speed)}))}
 renderFavs();
 // 收藏导出/导入（JSON 文件，换设备或备份用）
@@ -752,7 +754,7 @@ function renderBook(el){
           </div>
           <div class="les-tab-content" id="lesTab_${l.lesson}_0">
             <div class="vocab-grid"><div class="grid-hdr">俄语</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>
-            ${l.words.map(w=>`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}')">${isFavWord(w)?'★':'☆'}</span>`).join('')}
+            ${l.words.map(w=>`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}',this)">${isFavWord(w)?'★':'☆'}</span>`).join('')}
             </div>
           </div>
           <div class="les-tab-content" id="lesTab_${l.lesson}_1" style="display:none">
@@ -790,7 +792,7 @@ function renderMajor(el){
   CS_RUSSIAN.sections.forEach(s=>{
     if(s.words){
       html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="vocab-grid"><div class="grid-hdr">俄语</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>`;
-      s.words.forEach(w=>{html+=`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}')">${isFavWord(w)?'★':'☆'}</span>`});
+      s.words.forEach(w=>{html+=`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}',this)">${isFavWord(w)?'★':'☆'}</span>`});
       html+='</div></div></div>';
     }
     if(s.grammar){html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="grammar-mini">${s.grammar}</div></div></div>`}
@@ -837,7 +839,7 @@ document.querySelectorAll('.subj-tab:not(.disabled)').forEach(b=>b.addEventListe
 //  QUIZ
 // ═══════════════════════════════════════════════════════════════
 let quizState={};
-function renderQuizSetup(){const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="text-align:center;padding:24px 0"><div style="font-size:16px;font-weight:500;margin-bottom:4px">单词测验</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">选择测验范围</div><div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0">${BOOKS.map(b=>`<button class="book-chip selected" data-b="${b.id}">${b.title}</button>`).join('')}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin:8px 0">已选 <strong id="qzTotal">0</strong> 个单词</div><button class="lc-btn" id="qzStart" style="font-size:var(--fs)">开始测验</button></div>`;let selected=new Set(BOOKS.map(b=>String(b.id)));function updateTotal(){let t=0;selected.forEach(bid=>t+=bookWords(parseInt(bid)).length);document.getElementById('qzTotal').textContent=t}updateTotal();el.querySelectorAll('.book-chip').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.b;b.classList.toggle('selected');if(b.classList.contains('selected'))selected.add(id);else selected.delete(id);if(!selected.size){selected.add(id);b.classList.add('selected')}updateTotal()}));document.getElementById('qzStart').addEventListener('click',()=>{const words=[];selected.forEach(bid=>bookWords(parseInt(bid)).forEach(w=>words.push(w)));if(words.length<4){toast('至少需要4个单词');return}shuffle(words);quizState={words,idx:0,correct:0,wrong:[]};renderQuizQ()})}
+function renderQuizSetup(){const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="text-align:center;padding:24px 0"><div style="font-size:16px;font-weight:500;margin-bottom:4px">单词测验</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">选择测验范围</div><div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:12px 0">${BOOKS.map(b=>`<button class="book-chip selected" data-b="${b.id}">${b.title}</button>`).join('')}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin:8px 0">已选 <strong id="qzTotal">0</strong> 个单词</div><button class="lc-btn" id="qzStart" style="font-size:var(--fs)">开始测验</button></div>`;let selected=new Set([String(curBook||1)]);function updateTotal(){let t=0;selected.forEach(bid=>t+=bookWords(parseInt(bid)).length);document.getElementById('qzTotal').textContent=t}updateTotal();el.querySelectorAll('.book-chip').forEach(b=>{if(!selected.has(b.dataset.b))b.classList.remove('selected')});el.querySelectorAll('.book-chip').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.b;b.classList.toggle('selected');if(b.classList.contains('selected'))selected.add(id);else selected.delete(id);if(!selected.size){selected.add(id);b.classList.add('selected')}updateTotal()}));document.getElementById('qzStart').addEventListener('click',()=>{const words=[];selected.forEach(bid=>bookWords(parseInt(bid)).forEach(w=>words.push(w)));if(words.length<4){toast('至少需要4个单词');return}shuffle(words);quizState={words,idx:0,correct:0,wrong:[]};renderQuizQ()})}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function renderQuizQ(){const qs=quizState;if(qs.idx>=qs.words.length){renderQuizResult();return}const w=qs.words[qs.idx];let opts=[w.cn];const pool=qs.words.filter(x=>x.cn!==w.cn);shuffle(pool);for(let i=0;i<3&&i<pool.length;i++)opts.push(pool[i].cn);if(opts.length<4){const all=Object.values(VOCAB).flatMap(l=>l.flatMap(ls=>ls.words)).filter(x=>!opts.includes(x.cn));shuffle(all);for(let i=0;opts.length<4&&i<all.length;i++)if(!opts.includes(all[i].cn))opts.push(all[i].cn)}shuffle(opts);const el=document.getElementById('quizArea');el.innerHTML=`<div class="anim-in" style="padding:24px 16px;text-align:center"><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:10px">${qs.idx+1}/${qs.words.length}</div><div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:20px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${(qs.idx/qs.words.length*100)}%"></div></div><div style="font-size:28px;font-weight:500;color:var(--blue);margin-bottom:16px;line-height:1.4">${w.ru}</div><div style="display:grid;gap:8px" id="qOpts">${opts.map(o=>`<button style="padding:14px 16px;border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:var(--fs);text-align:left;border:1.5px solid var(--border)" data-v="${o}">${o}</button>`).join('')}</div></div>`;let answered=false;el.querySelectorAll('#qOpts button').forEach(btn=>{btn.addEventListener('click',()=>{if(answered)return;answered=true;const val=btn.textContent;const isCorrect=val===w.cn;if(isCorrect){qs.correct++;btn.style.borderColor='var(--green)';btn.style.color='var(--green)';btn.style.background='rgba(34,197,94,.08)'}else{btn.style.borderColor='var(--red)';btn.style.color='var(--red)';qs.wrong.push(w);el.querySelector(`#qOpts button[data-v="${escape(w.cn)}"]`).style.borderColor='var(--blue)';el.querySelector(`#qOpts button[data-v="${escape(w.cn)}"]`).style.color='var(--blue)'}const nb=document.createElement('button');nb.style.cssText='margin-top:16px;padding:11px 28px;border-radius:20px;background:var(--blue);color:#fff;font-weight:600;font-size:var(--fs-sm);border:none;cursor:pointer';nb.textContent=qs.idx+1>=qs.words.length?'查看结果':'下一题';nb.addEventListener('click',()=>{qs.idx++;renderQuizQ()});el.querySelector('.anim-in').appendChild(nb)})})}
 function renderQuizResult(){const qs=quizState;const pct=Math.round(qs.correct/qs.words.length*100);document.getElementById('quizArea').innerHTML=`<div class="anim-in" style="text-align:center;padding:32px 16px"><div style="font-size:48px;font-weight:300;color:var(--blue);margin-bottom:4px">${qs.correct}/${qs.words.length}</div><div style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:14px">正确率 ${pct}%</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:20px;line-height:1.8">${qs.wrong.length?`需要复习（点击单词直接跳转学习）：<br>${qs.wrong.map(w=>`<span style="color:var(--blue);text-decoration:underline;cursor:pointer" onclick="learnShowWord('${jsStr(w.ru)}',${w.book||0})">${w.ru}</span>(${w.cn})`).join('、')}`:'全部正确！'}</div><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="renderQuizSetup()">再来一次</button><button style="padding:11px 24px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);margin:4px;cursor:pointer" onclick="document.querySelector('.nav-btn[data-screen=sLearn]').click()">去复习</button></div>`}
@@ -929,7 +931,7 @@ function classRender(){
         <span style="font-size:10px;color:var(--text3)">${it.time}</span>
         <span style="display:flex;gap:6px">
           <span class="class-play" data-i="${i}" data-lang="ru" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊原文</span>
-          <span class="class-play" data-i="${i}" data-lang="zh" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊译文</span>
+          <span class="class-play" data-i="${i}" data-lang="zh" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊译文</span> <span class="class-del" data-i="${i}" style="font-size:12px;color:var(--red);padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">🗑</span>
         </span>
       </div>
       <div data-edit="${i}" title="点击编辑原文" style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px;cursor:pointer">${escape(it.original)}${it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-weight:400;font-size:13px">⚠️ 识别不准</span>':''}</div>
@@ -944,6 +946,18 @@ function classRender(){
   });
   el.querySelectorAll('[data-edit]').forEach(b=>{
     b.addEventListener('click',()=>classEditItem(parseInt(b.dataset.edit)));
+  });
+  el.querySelectorAll('.class-del').forEach(b=>{
+    b.addEventListener('click',e=>{
+      e.stopPropagation();
+      const idx=parseInt(b.dataset.i);
+      const it=CLASS.items[idx];
+      if(!it)return;
+      if(!confirm('删除这条字幕？'))return;
+      CLASS.items.splice(idx,1);
+      if(CLASS.sessionId)idbStore.del('transcripts',it._id).catch(()=>{});
+      classRender();
+    });
   });
 }
 
