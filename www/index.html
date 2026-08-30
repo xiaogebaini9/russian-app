@@ -469,7 +469,7 @@ function renderResult(r,src){
   // Show analysis when either source or target is a single Russian word（容忍标点：如"читать。"）
   const ruWord=(S.langSrc==='ru'&&cleanRussianWord(src))||(S.langTgt==='ru'&&cleanRussianWord(r.text))||null;
   const showAnalysis=!!ruWord;
-  $trResult.innerHTML=`<div class="tr-result"><div class="tr-source">${LANGS[S.langSrc]}: ${escape(src)}</div><div class="tr-text">${escape(r.text)}</div>${r.det?`<div class="tr-phonetic">${r.det}</div>`:''}<button class="tr-save" id="saveWordBtn">${isFav?'★ 已收藏':'☆ 收藏'}</button><button class="tr-copy" id="copyBtn">📋 复制</button>${showAnalysis?`<div class="tr-analysis-btns"><button class="tr-analysis-btn" id="btnAspect">🔄 完成体 / 未完成体</button><button class="tr-analysis-btn" id="btnTense">⏳ 时态变位</button></div><div id="analysisPanels"></div>`:''}${S.langSrc==='ru'&&!showAnalysis?`<div class="tr-analysis-btns"><button class="tr-analysis-btn" id="btnSent">📐 句子解析</button></div><div id="sentPanel"></div>`:''}</div>`;
+  $trResult.innerHTML=`<div class="tr-result"><div class="tr-source">${LANGS[S.langSrc]}: ${escape(src)}</div><div class="tr-text">${escape(r.text)}</div>${r.det?`<div class="tr-phonetic">${r.det}</div>`:''}<button class="tr-save" id="saveWordBtn">${isFav?'★ 已收藏':'☆ 收藏'}</button><button class="tr-copy" id="copyBtn">📋 复制</button>${showAnalysis?`<div class="tr-analysis-btns"><button class="tr-analysis-btn" id="btnAspect">🔄 完成体 / 未完成体</button><button class="tr-analysis-btn" id="btnTense">⏳ 时态变位</button></div><div id="analysisPanels"></div>`:''}${!showAnalysis?`<div class="tr-analysis-btns"><button class="tr-analysis-btn" id="btnSent">📐 句子解析</button></div><div id="sentPanel"></div>`:''}</div>`;
   document.getElementById('saveWordBtn').addEventListener('click',()=>{toggleFav(src,r.text)});
   document.getElementById('copyBtn').addEventListener('click',()=>{navigator.clipboard.writeText(r.text).then(()=>{const b=document.getElementById('copyBtn');b.textContent='✓ 已复制';b.classList.add('copied');setTimeout(()=>{b.textContent='📋 复制';b.classList.remove('copied')},1500)}).catch(()=>toast('复制失败'))});
   // Analysis buttons — use ruWord (the Russian word to analyze)
@@ -498,13 +498,14 @@ function renderResult(r,src){
       document.getElementById('analysisPanels').innerHTML=tag+(a.meanings?renderMultiMeanings(a):'')+renderTensePanel(a)+renderDeclensionPanel(a);
     });
   }
-  if((S.langSrc==='ru'||S.langSrc==='en')&&!showAnalysis){
+  if(!showAnalysis){
     document.getElementById('btnSent').addEventListener('click',async()=>{
       document.getElementById('btnSent').style.background='var(--blue-bg)';
       const el=document.getElementById('sentPanel');
       if(!S.settings.dsKey){gotoKeySetup('句子解析需要接入码');return}
+      const analText=S.langSrc!=='zh-CN'?src:r.text, analLang=S.langSrc!=='zh-CN'?S.langSrc:S.langTgt;
       el.innerHTML=loadingHTML('正在解析句子…约需 10~30 秒');
-      const d=await fetchSentAnalysis(src,S.langSrc);
+      const d=await fetchSentAnalysis(analText,analLang);
       if(d._error){el.innerHTML='<div style="color:var(--red);font-size:13px;padding:8px">❌ '+escape(friendlyErr(d._error))+'</div>';return}
       el.innerHTML=(d._model?`<div style="font-size:11px;color:var(--text3);margin:8px 0 2px;text-align:right">🤖 ${escape(d._model)}</div>`:'')+renderSentAnalysisHTML(d);
     });
