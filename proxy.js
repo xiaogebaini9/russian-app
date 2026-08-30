@@ -511,6 +511,51 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── AI 出题（DeepSeek 按级别/主题生成四选一练习，接入码计费）──
+  if (req.method === 'POST' && url === '/api/ai-quiz') {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
+      try {
+        const reqBody = JSON.parse(body);
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const lang = reqBody.lang === 'en' ? 'en' : 'ru';
+        const level = String(reqBody.level || 'A2').slice(0, 4);
+        const count = Math.min(10, Math.max(5, parseInt(reqBody.count) || 10));
+        const topic = String(reqBody.topic || '').slice(0, 120) || '综合复习';
+        const langName = lang === 'en' ? '英语' : '俄语';
+        const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
+          { role: 'system', content: `你是面向中文学习者的${langName}出题专家。根据级别与主题出四选一练习题，只返回纯JSON（不要markdown代码块）：
+{"questions":[{"tag":"语法或词汇或情景交际","q":"题干（${langName}）","opts":["选项A","选项B","选项C","选项D"],"ans":0,"explain":"一句话解析（中文）"}]}
+规则：恰好 ${count} 道题；ans 是正确选项下标（0-3），各题分布随机；每题四个选项只有一个正确；难度贴合 ${level} 级；题目围绕给定主题；解析用中文。` },
+          { role: 'user', content: `级别：${level}\n主题/难点：${topic}\n出题数量：${count}` }
+        ], 3000, 120000);
+        let qs = (parsed && Array.isArray(parsed.questions)) ? parsed.questions : [];
+        qs = qs.filter(q => q && q.q && Array.isArray(q.opts) && q.opts.length === 4 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < 4)
+               .map(q => ({ tag: ['语法','词汇','情景交际'].includes(q.tag) ? q.tag : '语法', q: String(q.q), opts: q.opts.map(String), ans: q.ans, explain: String(q.explain || '') }));
+        if (qs.length) {
+          log('AI-QUIZ', level, topic, '->', qs.length, '题 by', model);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ questions: qs, _model: model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat' }));
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'AI 出题解析失败，请重试' }));
+        }
+      } catch (e) {
+        log('ERROR', url, e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   if (req.method === 'POST' && url === '/api/class-translate') {
     readBody(req).then(async (body) => {
       if (body === null) {

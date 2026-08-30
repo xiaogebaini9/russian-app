@@ -937,7 +937,7 @@ window.setTargetLevel=function(id){S.settings.targetLevel=id;save('settings');re
 window.setProg=function(bid,v){const p=ls('prog',{});if(v)p[bid]=parseInt(v);else delete p[bid];ss('prog',p);toast('进度已保存')}
 
 function renderLearnSettings(el){
-  el.innerHTML=`<div class="setting-group"><div class="setting-group-title">学习进度</div><div class="setting-card"><div class="s-label">每本书学到第几课</div><div class="s-desc">单词测验的「只测已学课程」按这个算；课本里 🎯 标记你的进度课</div><div id="progRows">${(pzLang()==='en'?[101,102,103,104]:[1,2,3,4]).map(bid=>{const lss=(pzLang()==='en'?VOCAB_EN:VOCAB)[bid]||[];const cur=ls('prog',{})[bid];return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0"><span style="font-size:var(--fs-sm)">${((pzLang()==='en'?BOOKS_EN:BOOKS).find(x=>x.id===bid)||{}).title}</span><select onchange="setProg(${bid},this.value)" style="padding:5px 10px;border-radius:8px;font-size:12px;background:var(--input);border:1.5px solid var(--border);color:var(--text)"><option value="">未设置</option>${lss.map(l=>`<option value="${l.lesson}"${cur===l.lesson?' selected':''}>${pzLang()==='en'?'Lesson':'Урок'} ${l.lesson}</option>`).join('')}</select></div>`}).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">考试准备</div><div class="setting-card"><div class="s-label">目标等级</div><div class="s-desc">选择备考的目标 CEFR 等级，学习页顶部会显示备考目标</div><div class="spd-grid">${CEFR.levels.map(l=>`<button class="spd-chip${S.settings.targetLevel===l.id?' active':''}" onclick="setTargetLevel('${l.id}')">${l.name.split(' ')[0]}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">数据管理</div><div class="setting-card"><div class="s-label">收藏单词</div><div class="s-desc">已收藏 <strong style="color:var(--blue)">${S.favs.length}</strong> 个单词</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--red);color:#fff;margin-top:6px" onclick="if(confirm('确定清空所有收藏？')){S.favs=[];save('favs');renderFavs();renderLearn();toast('已清空')}">清空收藏</button></div></div><div class="setting-group"><div class="setting-group-title">🔧 系统诊断</div><div class="setting-card"><div class="s-desc">一键检查：代理服务器、翻译引擎、网络状态</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--blue);color:#fff" onclick="runDiagnose(this)">运行诊断</button><div id="diagResult" style="margin-top:8px;font-size:12px;line-height:1.9"></div></div></div>`;
+  el.innerHTML=`<div class="setting-group"><div class="setting-group-title">学习进度</div><div class="setting-card"><div class="s-label">每本书学到第几课</div><div class="s-desc">单词测验的「只测已学课程」按这个算；课本里 🎯 标记你的进度课</div><div id="progRows">${(pzLang()==='en'?[101,102,103,104]:[1,2,3,4]).map(bid=>{const lss=(pzLang()==='en'?VOCAB_EN:VOCAB)[bid]||[];const cur=ls('prog',{})[bid];return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0"><span style="font-size:var(--fs-sm)">${((pzLang()==='en'?BOOKS_EN:BOOKS).find(x=>x.id===bid)||{}).title}</span><select onchange="setProg(${bid},this.value)" style="padding:5px 10px;border-radius:8px;font-size:12px;background:var(--input);border:1.5px solid var(--border);color:var(--text)"><option value="">未设置</option>${lss.map(l=>`<option value="${l.lesson}"${cur===l.lesson?' selected':''}>${pzLang()==='en'?'Lesson':'Урок'} ${l.lesson}</option>`).join('')}</select></div>`}).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">考试准备</div><div class="setting-card"><div class="s-label">目标等级</div><div class="s-desc">选择备考的目标 CEFR 等级，学习页顶部会显示备考目标</div><div class="spd-grid">${CEFR.levels.map(l=>`<button class="spd-chip${S.settings.targetLevel===l.id?' active':''}" onclick="setTargetLevel('${l.id}')">${l.name.split(' ')[0]}</button>`).join('')}</div></div></div><div class="setting-group"><div class="setting-group-title">数据管理</div><div class="setting-card"><div class="s-label">收藏单词</div><div class="s-desc">已收藏 <strong style="color:var(--blue)">${S.favs.length}</strong> 个单词</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--red);color:#fff;margin-top:6px" onclick="if(confirm('确定清空所有收藏？')){S.favs=[];save('favs');renderFavs();renderLearn();toast('已清空')}">清空收藏</button><div style="display:flex;gap:6px;margin-top:10px"><button style="flex:1;padding:8px 0;border-radius:8px;font-size:12px;background:var(--blue);color:#fff;border:none;cursor:pointer" onclick="pzBackupExport()">⬇️ 导出备份</button><button style="flex:1;padding:8px 0;border-radius:8px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border);cursor:pointer" onclick="document.getElementById('pzBackupFile').click()">⬆️ 导入备份</button><input type="file" id="pzBackupFile" accept=".json" style="display:none" onchange="pzBackupImport(this)"></div><div class="s-desc" style="margin-top:4px">备份含收藏/进度/错题本/统计（不含接入码），换设备导入即恢复</div></div></div><div class="setting-group"><div class="setting-group-title">🔧 系统诊断</div><div class="setting-card"><div class="s-desc">一键检查：代理服务器、翻译引擎、网络状态</div><button style="padding:8px 16px;border-radius:8px;font-size:12px;background:var(--blue);color:#fff" onclick="runDiagnose(this)">运行诊断</button><div id="diagResult" style="margin-top:8px;font-size:12px;line-height:1.9"></div></div></div>`;
 }
 
 document.querySelectorAll('#learnTabs .sub-tab').forEach(b=>b.addEventListener('click',()=>{curLearnTab=b.dataset.tab;renderLearn()}));
@@ -1380,6 +1380,24 @@ C2:[
 {q:'What does the coffin metaphor refer to?',opts:['The packaging, not the novel itself','The printing press','The reader','The library'],ans:0,explain:'棺材=外壳包装，小说本体不死'}]}
 ]};
 
+// ═══ 英语听力题库（TTS 朗读，英文语音本机自带）═══
+const PZ_LISTEN_EN={
+A2:[
+{type:'listening',audio:'Excuse me, where is the bus stop?',q:'🔊 你听到的是在问什么？',opts:['公交车站在哪','火车站在哪','机场怎么走','酒店在哪'],ans:0,explain:'bus stop = 公交车站'},
+{type:'listening',audio:'I would like a cup of coffee, please.',q:'🔊 他点了什么？',opts:['一杯咖啡','一杯茶','一杯牛奶','一杯果汁'],ans:0,explain:'a cup of coffee = 一杯咖啡'},
+{type:'listening',audio:'The meeting starts at nine o’clock.',q:'🔊 会议几点开始？',opts:['九点','七点','八点','十点'],ans:0,explain:'nine o’clock = 九点'}
+],
+B1:[
+{type:'listening',audio:'I have worked here for three years, and I really enjoy the team.',q:'🔊 说话者在这里工作多久了？',opts:['三年','两年','三个月','十三年'],ans:0,explain:'for three years = 三年'},
+{type:'listening',audio:'Could you send me the report before Friday?',q:'🔊 对方要求什么时候之前发送报告？',opts:['周五之前','周一之前','今天之内','下个月'],ans:0,explain:'before Friday = 周五之前'},
+{type:'listening',audio:'I am afraid the flight has been delayed because of the weather.',q:'🔊 航班为什么延误？',opts:['因为天气','因为故障','因为乘客','因为管制'],ans:0,explain:'because of the weather = 因为天气'}
+],
+B2:[
+{type:'listening',audio:'The committee has decided to postpone the launch until the security review is complete.',q:'🔊 委员会的决定是？',opts:['安全审查完成后再发布','立即发布','取消项目','更换负责人'],ans:0,explain:'postpone until = 推迟到…'},
+{type:'listening',audio:'Had we invested in renewable energy earlier, our costs would be far lower now.',q:'🔊 说话者的观点是？',opts:['早投资新能源成本会更低','新能源成本太高','投资已经失败','成本没有变化'],ans:0,explain:'Had we invested 虚拟过去 = 早投资的话…'},
+{type:'listening',audio:'Please bear in mind that the deadline is negotiable only in exceptional cases.',q:'🔊 截止日期可以随便改吗？',opts:['只有特殊情况可协商','完全可以改','绝对不能再提','每周都会改'],ans:0,explain:'only in exceptional cases = 仅限特殊情况'}
+]};
+
 // ═══ 等级考卷定义（每级3套：试卷一动词/试卷二变格支配/试卷三综合；对标官方机改部分）═══
 const PZ_PAPERS={
 A1:[
@@ -1388,18 +1406,18 @@ A1:[
 {id:'A1P3',label:'A1·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：语法+词汇+情景+阅读',sections:{grammar:8,vocab:3,situational:4,reading:4,pairing:2},time:35}
 ],
 A2:[
-{id:'A2P1',label:'A2·试卷一',name:'试卷一 · 动词的体与时间',focus:'f1',desc:'完成体/未完成体、定向不定向、将来时',sections:{grammar:8,vocab:4,situational:3,reading:3,pairing:4},time:35},
-{id:'A2P2',label:'A2·试卷二',name:'试卷二 · 变格与支配',focus:'f2',desc:'六格强化、动词支配关系、数量词搭配',sections:{grammar:8,vocab:4,situational:3,reading:3,pairing:4},time:35},
+{id:'A2P1',label:'A2·试卷一',name:'试卷一 · 动词的体与时间',focus:'f1',desc:'完成体/未完成体、定向不定向、将来时',sections:{grammar:8,vocab:4,situational:3,reading:3,listening:3,pairing:4},time:35},
+{id:'A2P2',label:'A2·试卷二',name:'试卷二 · 变格与支配',focus:'f2',desc:'六格强化、动词支配关系、数量词搭配',sections:{grammar:8,vocab:4,situational:3,reading:3,listening:3,pairing:4},time:35},
 {id:'A2P3',label:'A2·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：语法+词汇+情景+阅读',sections:{grammar:8,vocab:4,situational:4,reading:4,pairing:4},time:40}
 ],
 B1:[
-{id:'B1P1',label:'B1·试卷一',name:'试卷一 · 动词的体与时间',focus:'f1',desc:'体深入、过去时视角、命令式、Чем…тем 结构',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:40},
-{id:'B1P2',label:'B1·试卷二',name:'试卷二 · 变格与支配',focus:'f2',desc:'动词支配关系、形动词初步、间接引语',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:40},
+{id:'B1P1',label:'B1·试卷一',name:'试卷一 · 动词的体与时间',focus:'f1',desc:'体深入、过去时视角、命令式、Чем…тем 结构',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40},
+{id:'B1P2',label:'B1·试卷二',name:'试卷二 · 变格与支配',focus:'f2',desc:'动词支配关系、形动词初步、间接引语',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40},
 {id:'B1P3',label:'B1·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：对标 ТРКИ-1 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:45}
 ],
 B2:[
-{id:'B2P1',label:'B2·试卷一',name:'试卷一 · 动词与句法',focus:'f1',desc:'体精细辨析、被动形动词、副动词完成体',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:45},
-{id:'B2P2',label:'B2·试卷二',name:'试卷二 · 支配与语体',focus:'f2',desc:'复杂支配关系、公务语体插入语、固定搭配',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:45},
+{id:'B2P1',label:'B2·试卷一',name:'试卷一 · 动词与句法',focus:'f1',desc:'体精细辨析、被动形动词、副动词完成体',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:45},
+{id:'B2P2',label:'B2·试卷二',name:'试卷二 · 支配与语体',focus:'f2',desc:'复杂支配关系、公务语体插入语、固定搭配',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:45},
 {id:'B2P3',label:'B2·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：对标 ТРКИ-2 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:50}
 ],
 C1:[
@@ -1421,19 +1439,19 @@ A1:[
 {id:'EN-A1P3',label:'英A1·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：语法+词汇+情景+阅读',sections:{grammar:8,vocab:3,situational:4,reading:4,pairing:2},time:35}
 ],
 A2:[
-{id:'EN-A2P1',label:'英A2·试卷一',name:'试卷一 · 时态与将来（KET 对标）',focus:'f1',desc:'完成时/进行时/将来时',sections:{grammar:8,vocab:4,situational:3,reading:3,pairing:4},time:35},
-{id:'EN-A2P2',label:'英A2·试卷二',name:'试卷二 · 固定搭配（KET 对标）',focus:'f2',desc:'形容词介词搭配/动词短语',sections:{grammar:8,vocab:4,situational:3,reading:3,pairing:4},time:35},
-{id:'EN-A2P3',label:'英A2·试卷三',name:'试卷三 · 综合模拟（KET 对标）',focus:'f3',desc:'全面覆盖 KET 机改部分',sections:{grammar:8,vocab:4,situational:4,reading:4,pairing:4},time:40}
+{id:'EN-A2P1',label:'英A2·试卷一',name:'试卷一 · 时态与将来（KET 对标）',focus:'f1',desc:'完成时/进行时/将来时',sections:{grammar:8,vocab:4,situational:3,reading:3,listening:3,pairing:4},time:35},
+{id:'EN-A2P2',label:'英A2·试卷二',name:'试卷二 · 固定搭配（KET 对标）',focus:'f2',desc:'形容词介词搭配/动词短语',sections:{grammar:8,vocab:4,situational:3,reading:3,listening:3,pairing:4},time:35},
+{id:'EN-A2P3',label:'英A2·试卷三',name:'试卷三 · 综合模拟（KET 对标）',focus:'f3',desc:'全面覆盖 KET 机改部分',sections:{grammar:8,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40}
 ],
 B1:[
-{id:'EN-B1P1',label:'英B1·试卷一',name:'试卷一 · 时态与被动（PET 对标）',focus:'f1',desc:'完成时/被动语态/条件句零-二',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:40},
-{id:'EN-B1P2',label:'英B1·试卷二',name:'试卷二 · 搭配与句型（PET 对标）',focus:'f2',desc:'动词+doing/固定介词/句型',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:40},
-{id:'EN-B1P3',label:'英B1·试卷三',name:'试卷三 · 综合模拟（PET 对标）',focus:'f3',desc:'全面覆盖 PET 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:45}
+{id:'EN-B1P1',label:'英B1·试卷一',name:'试卷一 · 时态与被动（PET 对标）',focus:'f1',desc:'完成时/被动语态/条件句零-二',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40},
+{id:'EN-B1P2',label:'英B1·试卷二',name:'试卷二 · 搭配与句型（PET 对标）',focus:'f2',desc:'动词+doing/固定介词/句型',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40},
+{id:'EN-B1P3',label:'英B1·试卷三',name:'试卷三 · 综合模拟（PET 对标）',focus:'f3',desc:'全面覆盖 PET 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,listening:3,pairing:4},time:45}
 ],
 B2:[
-{id:'EN-B2P1',label:'英B2·试卷一',name:'试卷一 · 倒装与虚拟（FCE 对标）',focus:'f1',desc:'倒装/第三条件句/被动报告结构',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:45},
-{id:'EN-B2P2',label:'英B2·试卷二',name:'试卷二 · 动词介词与短语（FCE 对标）',focus:'f2',desc:'动词+介词/固定短语/词汇进阶',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:45},
-{id:'EN-B2P3',label:'英B2·试卷三',name:'试卷三 · 综合模拟（FCE 对标）',focus:'f3',desc:'全面覆盖 FCE 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:50}
+{id:'EN-B2P1',label:'英B2·试卷一',name:'试卷一 · 倒装与虚拟（FCE 对标）',focus:'f1',desc:'倒装/第三条件句/被动报告结构',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:45},
+{id:'EN-B2P2',label:'英B2·试卷二',name:'试卷二 · 动词介词与短语（FCE 对标）',focus:'f2',desc:'动词+介词/固定短语/词汇进阶',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:45},
+{id:'EN-B2P3',label:'英B2·试卷三',name:'试卷三 · 综合模拟（FCE 对标）',focus:'f3',desc:'全面覆盖 FCE 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,listening:3,pairing:4},time:50}
 ],
 C1:[
 {id:'EN-C1P1',label:'英C1·试卷一',name:'试卷一 · 倒装与精细时态（CAE 对标）',focus:'f1',desc:'Not until/So/Such 倒装/进行式不定式',sections:{grammar:5,vocab:3,situational:2,reading:3,pairing:2},time:40},
@@ -1452,10 +1470,11 @@ const pzL=i=>String.fromCharCode(1040+i);
 const pzFmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 function pzFlat(level){
   const bank=pzLang()==='en'?PZ_BANK_EN:PZ_BANK, extra=pzLang()==='en'?PZ_EXTRA_EN:PZ_EXTRA;
-  const items=[{arr:bank[level]||[],suf:''},{arr:extra[level]||[],suf:'x'}].flatMap(src=>src.arr.map((it,ii)=>({it,ii,suf:src.suf})));
+  const items=[{arr:bank[level]||[],suf:''},{arr:extra[level]||[],suf:'x'},{arr:(pzLang()==='en'?(PZ_LISTEN_EN[level]||[]):[]),suf:'l'}].flatMap(src=>src.arr.map((it,ii)=>({it,ii,suf:src.suf})));
   const out=[];
   items.forEach(({it,ii,suf})=>{
     if(it.type==='reading'){it.qs.forEach((q,qi)=>out.push({_id:level+suf+'-r'+ii+'-'+qi,tag:'阅读',level,lang:pzLang(),passage:it.passage,q:q.q,opts:q.opts,ans:q.ans,explain:q.explain}))}
+    else if(it.type==='listening'){out.push({_id:level+suf+'-l'+ii,tag:'听力',level,lang:pzLang(),audio:it.audio,q:it.q,opts:it.opts,ans:it.ans,explain:it.explain})}
     else if(it.type==='pairing'){
       const cns=it.words.map(w=>w.cn);
       it.words.forEach((w,wi)=>out.push({_id:level+suf+'-p'+ii+'-'+wi,tag:'配对',level,lang:pzLang(),q:'«'+w.ru+'» 的意思是？',opts:cns.slice(),ans:cns.indexOf(w.cn),explain:'词义：'+w.ru+' = '+w.cn,w:w.ru}));
@@ -1469,15 +1488,16 @@ function pzFlat(level){
 }
 const pzGetWrong=()=>ls('pzWrong',[]);
 const pzSetWrong=a=>ss('pzWrong',a);
-function pzAddWrong(c,picked){const a=pzGetWrong();if(!a.some(x=>x._id===c._id))a.push({_id:c._id,level:c.level,tag:c.tag,q:c.q,opts:c.opts,ans:c.ans,explain:c.explain,passage:c.passage,w:c.w,picked});pzSetWrong(a)}
+function pzAddWrong(c,picked){const a=pzGetWrong();if(!a.some(x=>x._id===c._id))a.push({_id:c._id,level:c.level,tag:c.tag,q:c.q,opts:c.opts,ans:c.ans,explain:c.explain,passage:c.passage,w:c.w,audio:c.audio,lang:c.lang,src:c.src,t:Date.now(),picked});pzSetWrong(a)}
 function pzRemoveWrong(id){pzSetWrong(pzGetWrong().filter(x=>x._id!==id))}
 const pzStatGet=()=>ls('pzStat',{total:0,correct:0,days:{}});
-function pzBump(ok){const s=pzStatGet();s.total++;if(ok)s.correct++;const d=pzToday();s.days[d]=s.days[d]||{t:0,c:0};s.days[d].t++;if(ok)s.days[d].c++;ss('pzStat',s)}
+function pzBump(ok,tag){const s=pzStatGet();s.total++;if(ok)s.correct++;const d=pzToday();s.days[d]=s.days[d]||{t:0,c:0};s.days[d].t++;if(ok)s.days[d].c++;if(tag){s.tags=s.tags||{};s.tags[tag]=s.tags[tag]||{t:0,c:0};s.tags[tag].t++;if(ok)s.tags[tag].c++}ss('pzStat',s)}
 function pzStopTimer(){if(PZ&&PZ.timerId){clearInterval(PZ.timerId);PZ.timerId=null}}
 function pzWrongListHTML(items){
   return '<div style="text-align:left;margin:0 2px 12px">'+items.map(x=>`<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;font-size:var(--fs-sm)">
     <div style="margin-bottom:4px"><span class="pz-chip">${x.c.tag}</span>${x.c.lang==='en'?' <span class="pz-chip">🇬🇧</span>':''}${x.c.src?` <span class="pz-chip" style="margin-left:4px">📄 ${escape(x.c.src)}</span>`:''} ${escape(x.c.q)}</div>
     ${x.c.passage?`<div class="pz-pass" style="margin:4px 0">${escape(x.c.passage)}</div>`:''}
+    ${x.c.audio?`<div style="margin:4px 0"><span class="vg-act" style="cursor:pointer" onclick="event.stopPropagation();speakText('${jsStr(x.c.audio)}','${x.c.lang==='en'?'en':'ru'}')">&#9654; 重听原音</span></div>`:''}
     <div style="color:var(--red);font-size:var(--fs-xs)">你的答案：${x.picked==null?'未作答':escape(x.c.opts[x.picked])}</div>
     <div style="color:var(--green);font-size:var(--fs-xs)">正确答案：${escape(x.c.opts[x.c.ans])}</div>
     <div style="color:var(--text3);font-size:var(--fs-xs);margin-top:3px">💡 ${escape(x.c.explain)}</div>
@@ -1485,6 +1505,36 @@ function pzWrongListHTML(items){
   </div>`).join('')+'</div>';
 }
 function pzBindReview(root){root.querySelectorAll('.pz-review').forEach(b=>b.addEventListener('click',()=>{const bid=parseInt(b.dataset.bid||'0');learnShowWord(b.dataset.w,bid);toast('已跳到'+(bid>=100?'英语课程':'课本')+'，搜索：'+b.dataset.w)}))}
+// ── 备份与恢复 ──
+function pzBackupExport(){
+  const data={app:'russian-app',exportedAt:new Date().toISOString(),
+    favs:S.favs,history:S.history,prog:ls('prog',{}),pzWrong:ls('pzWrong',[]),pzStat:ls('pzStat',{total:0,correct:0,days:{}}),
+    pzLevel:ls('pzLevel','A1'),pzPaperFav:ls('pzPaperFav',[]),lastBook:ls('lastBook',1),lastBookEn:ls('lastBookEn',101),
+    settings:Object.assign({},S.settings,{dsKey:''})}; // 接入码不导出
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='russian-app-backup-'+pzToday().replace(/-/g,'')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('备份已导出（不含接入码）');
+}
+function pzBackupImport(inp){
+  const f=inp.files&&inp.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{
+    const d=JSON.parse(rd.result);
+    if(d.app!=='russian-app')throw new Error('不是本软件的备份文件');
+    if(Array.isArray(d.favs)){S.favs=d.favs;save('favs')}
+    if(Array.isArray(d.history)){S.history=d.history;save('history')}
+    if(d.prog)ss('prog',d.prog);
+    if(d.pzWrong)ss('pzWrong',d.pzWrong);
+    if(d.pzStat)ss('pzStat',d.pzStat);
+    if(d.pzLevel)ss('pzLevel',d.pzLevel);
+    if(d.pzPaperFav)ss('pzPaperFav',d.pzPaperFav);
+    if(d.lastBook)ss('lastBook',d.lastBook);
+    if(d.lastBookEn)ss('lastBookEn',d.lastBookEn);
+    if(d.settings){const keep=S.settings.dsKey;S.settings=Object.assign(S.settings,d.settings,{dsKey:keep});save('settings')}
+    toast('备份已导入');renderLearn();
+  }catch(e){toast('导入失败：'+e.message)}};
+  rd.readAsText(f);
+}
 
 // ── PZ 首页 ──
 let PZ=null;
@@ -1492,18 +1542,22 @@ function pzHome(){
   pzStopTimer();PZ=null;
   const el=document.getElementById('practiceArea');
   const wrongs=pzGetWrong(),s=pzStatGet(),dd=s.days[pzToday()]||{t:0,c:0};
+  const oldN=wrongs.filter(w=>!w.t||Date.now()-w.t>3*864e5).length;
   const lv=ls('pzLevel',S.settings.targetLevel||'A1');
   el.innerHTML=`<div class="anim-in" style="padding:2px 0 24px">
     <div style="text-align:center;margin:6px 0 14px">
       <div style="font-size:16px;font-weight:600;color:var(--blue)">🎯 练习中心</div>
       <div style="font-size:var(--fs-xs);color:var(--text3);margin-top:3px">今日已练 ${dd.t} 题 · 正确率 ${dd.t?Math.round(dd.c/dd.t*100):0}% · 备考目标 ${S.settings.targetLevel||'未设'}</div>
     </div>
+    ${wrongs.length?`<div class="pz-entry" id="pzGoReview" style="border-color:var(--yellow)"><span class="pe-ico">🔔</span><span><span class="pe-t">复习提醒</span><div class="pe-d">错题本 ${wrongs.length} 题待重做${oldN?`，其中 ${oldN} 题超过 3 天`:''}</div></span></div>`:''}
     <div class="book-bar" style="justify-content:center;margin-bottom:10px" id="pzLangBar"><button class="book-chip${pzLang()==='ru'?' active':''}" data-pl="ru">🇷🇺 俄语</button><button class="book-chip${pzLang()==='en'?' active':''}" data-pl="en">🇬🇧 英语</button></div>
     <div style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:6px">级别</div>
     <div class="book-bar" style="margin-bottom:12px" id="pzLvBar">${PZ_LVLS.map(l=>`<button class="book-chip${l===lv?' active':''}" data-lv="${l}">${l}</button>`).join('')}</div>
     <div class="pz-entry" id="pzGoSeq"><span class="pe-ico">📚</span><span><span class="pe-t">分级题库练习</span><div class="pe-d">${lv} · 15 题混合 · 逐题判定 + 解析 · 离线可用</div></span></div>
     <div class="pz-entry" id="pzGoMock"><span class="pe-ico">⏱️</span><span><span class="pe-t">模拟测试</span><div class="pe-d">${lv} · 25 题 · 20 分钟倒计时 · 交卷统一判分</div></span></div>
     <div class="pz-entry" id="pzGoPapers"><span class="pe-ico">🎓</span><span><span class="pe-t">等级考卷</span><div class="pe-d">${lv} · 每级 3 套主题试卷 · 对标官方题型 · ⭐ 可收藏</div></span></div>
+    <div class="pz-entry" id="pzGoAI"><span class="pe-ico">🤖</span><span><span class="pe-t">AI 出题</span><div class="pe-d">按级别与弱点现出 10 题 · DeepSeek 生成</div></span></div>
+    <div class="pz-entry" id="pzGoStats"><span class="pe-ico">📊</span><span><span class="pe-t">学习统计</span><div class="pe-d">近 7 天题量与正确率趋势</div></span></div>
     <div class="pz-entry" id="pzGoWrong"><span class="pe-ico">❌</span><span><span class="pe-t">错题重做</span><div class="pe-d">答对自动移出错题本</div></span>${wrongs.length?`<span class="pz-badge">${wrongs.length}</span>`:''}</div>
     ${wrongs.length?`<div class="pz-entry" id="pzGoClear" style="padding:10px 16px"><span class="pe-ico">🧹</span><span><span class="pe-t" style="font-size:var(--fs-sm);color:var(--text2)">清空错题本</span></span></div>`:''}
     <div class="pz-entry" id="pzGoRes"><span class="pe-ico">🔗</span><span><span class="pe-t">真题与资料库</span><div class="pe-d">ТРКИ 样题 · 剑桥/雅思官方模拟 · 外链</div></span></div>
@@ -1512,6 +1566,9 @@ function pzHome(){
   el.querySelector('#pzGoSeq').addEventListener('click',()=>pzStartSeq(lv));
   el.querySelector('#pzGoMock').addEventListener('click',()=>pzStartMock(lv));
   el.querySelector('#pzGoPapers').addEventListener('click',()=>pzPaperList(ls('pzLevel',S.settings.targetLevel||'A1')));
+  el.querySelector('#pzGoAI').addEventListener('click',()=>pzAISetup());
+  el.querySelector('#pzGoStats').addEventListener('click',()=>pzStatsView());
+  const _rv=document.getElementById('pzGoReview');if(_rv)_rv.addEventListener('click',()=>pzStartWrong());
   el.querySelectorAll('#pzLangBar .book-chip').forEach(b=>b.addEventListener('click',()=>{S.settings.plang=b.dataset.pl;save('settings');pzHome();toast(b.dataset.pl==='en'?'英语模式':'俄语模式')}));
   el.querySelector('#pzGoWrong').addEventListener('click',()=>pzStartWrong());
   const clr=el.querySelector('#pzGoClear');if(clr)clr.addEventListener('click',()=>{if(confirm('确定清空所有错题？')){pzSetWrong([]);pzHome();toast('错题本已清空')}});
@@ -1542,13 +1599,14 @@ function pzQSeq(){
       <span style="width:34px"></span>
     </div>
     <div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:14px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${st.idx/total*100}%"></div></div>
-    ${c.passage?`<div class="pz-pass">${escape(c.passage)}</div>`:''}
+    ${c.passage?`<div class="pz-pass">${escape(c.passage)}</div>`:''}${c.audio?`<div class="pz-pass" style="text-align:center"><span class="vg-act" style="font-size:15px;cursor:pointer" onclick="event.stopPropagation();speakText('${jsStr(c.audio)}','${c.lang==='en'?'en':'ru'}')">&#9654; 重听</span></div>`:''}
     <div style="margin-top:10px"><span class="pz-chip">${c.tag}</span></div>
     <div class="pz-qtext">${escape(c.q)}</div>
     <div id="pzOpts" style="display:grid;gap:8px">${c.opts.map((o,i)=>`<button class="pz-opt" data-i="${i}">${pzL(i)}. ${escape(o)}</button>`).join('')}</div>
     <div id="pzExp" class="pz-exp" style="display:none"></div>
   </div>`;
   el.querySelector('#pzBack').addEventListener('click',()=>{if(confirm('退出本次练习？'))pzHome()});
+  if(c.audio)setTimeout(()=>{try{speak(c.audio,c.lang==='en'?'en':'ru',.9)}catch(_){}},400);
   let locked=false;
   el.querySelectorAll('#pzOpts .pz-opt').forEach(btn=>btn.addEventListener('click',()=>{
     if(locked)return;locked=true;
@@ -1557,7 +1615,7 @@ function pzQSeq(){
     else{btn.classList.add('wrong');c._picked=i;el.querySelector(`#pzOpts .pz-opt[data-i="${c.ans}"]`).classList.add('correct')}
     if(ok&&st.mode==='wrong')pzRemoveWrong(c._id);
     if(!ok){pzAddWrong(c,i);st.wrongIds.push(c._id)}
-    pzBump(ok);
+    pzBump(ok,c.tag);
     const exp=el.querySelector('#pzExp');exp.style.display='block';
     exp.innerHTML=(ok?'✅ 答对了！':'❌ 答错了。')+'正确答案：'+pzL(c.ans)+'. '+escape(c.opts[c.ans])+'<br>💡 '+escape(c.explain);
     const nb=document.createElement('button');nb.className='pz-navbtn';nb.style.marginTop='16px';
@@ -1592,8 +1650,8 @@ function pzResultSeq(){
 function pzCompose(lv){
   const flat=pzFlat(lv),by={};
   flat.forEach(c=>{(by[c.tag]=by[c.tag]||[]).push(c)});
-  const want={语法:10,词汇:5,情景:4,阅读:3,配对:3},out=[];
-  ['语法','词汇','情景','阅读','配对'].forEach(t=>{
+  const want=Object.assign({语法:10,词汇:5,情景:4,阅读:3,配对:3},pzLang()==='en'?{听力:3,词汇:4}:{}),out=[];
+  ['语法','词汇','情景','阅读','听力','配对'].forEach(t=>{
     const pool=shuffle((by[t]||[]).slice());
     let need=want[t];
     while(need>0&&pool.length){out.push(pool.pop());need--}
@@ -1624,7 +1682,7 @@ function pzQMock(){
       <span id="pzClock" style="font-size:var(--fs-sm);font-weight:600;color:${st.left<120?'var(--red)':'var(--blue)'}">${pzFmt(st.left)}</span>
     </div>
     <div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:14px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${st.idx/total*100}%"></div></div>
-    ${c.passage?`<div class="pz-pass">${escape(c.passage)}</div>`:''}
+    ${c.passage?`<div class="pz-pass">${escape(c.passage)}</div>`:''}${c.audio?`<div class="pz-pass" style="text-align:center"><span class="vg-act" style="font-size:15px;cursor:pointer" onclick="event.stopPropagation();speakText('${jsStr(c.audio)}','${c.lang==='en'?'en':'ru'}')">&#9654; 重听</span></div>`:''}
     <div style="margin-top:10px"><span class="pz-chip">${c.tag}</span></div>
     <div class="pz-qtext">${escape(c.q)}</div>
     <div id="pzOpts" style="display:grid;gap:8px">${c.opts.map((o,i)=>`<button class="pz-opt${pick===i?' sel':''}" data-i="${i}">${pzL(i)}. ${escape(o)}</button>`).join('')}</div>
@@ -1633,6 +1691,7 @@ function pzQMock(){
       <button class="pz-navbtn" id="pzNext">${st.idx+1>=total?'交卷':'下一题 →'}</button>
     </div>
   </div>`;
+  if(c.audio)setTimeout(()=>{try{speak(c.audio,c.lang==='en'?'en':'ru',.9)}catch(_){}},400);
   el.querySelector('#pzBack').addEventListener('click',()=>{if(confirm('退出模拟测试？本卷作废，不计成绩')){pzStopTimer();pzHome()}});
   el.querySelectorAll('#pzOpts .pz-opt').forEach(btn=>btn.addEventListener('click',()=>{
     st.picks[st.idx]=parseInt(btn.dataset.i);
@@ -1649,7 +1708,7 @@ function pzMockSubmit(){
     per[c.tag]=per[c.tag]||{t:0,c:0};per[c.tag].t++;
     const ok=st.picks[i]===c.ans;
     if(ok)per[c.tag].c++;else{const stored=st.paperLabel?Object.assign({},c,{_id:st.paperLabel.replace(/[·\s]/g,'')+'-'+c._id,src:st.paperLabel}):c;wrongItems.push({c:stored,picked:st.picks[i]});pzAddWrong(stored,st.picks[i])}
-    pzBump(ok);
+    pzBump(ok,c.tag);
   });
   const total=st.cards.length,okN=total-wrongItems.length,pct=Math.round(okN/total*100);
   const secs=Math.max(1,Math.round((Date.now()-st.t0)/1000));
@@ -1689,7 +1748,7 @@ function pzComposePaper(level,paper){
     rest.forEach(c=>used.add(c));
     out.push(...picked,...rest);
   };
-  take('语法',s.grammar||0);take('词汇',s.vocab||0);take('情景',s.situational||0);take('阅读',s.reading||0);take('配对',s.pairing||0);
+  take('语法',s.grammar||0);take('词汇',s.vocab||0);take('情景',s.situational||0);take('阅读',s.reading||0);take('听力',s.listening||0);take('配对',s.pairing||0);
   if(out.length<20){const rest=shuffle(flat.slice()).filter(c=>!used.has(c)&&!out.includes(c));out.push(...rest.slice(0,20-out.length))}
   return out;
 }
@@ -1725,7 +1784,7 @@ function pzPaperList(level){
     <div class="book-bar" style="justify-content:center;margin-bottom:6px" id="pzLvlBar">${PZ_LVLS.map(l=>`<button class="book-chip${l===level?' active':''}" data-lv="${l}">${l}</button>`).join('')}</div>
     <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;margin-bottom:10px">${pzLang()==='en'?'对标剑桥 KET/PET/FCE/CAE/CPE 机改部分（语法词汇/阅读/交际）· 限时 · ⭐ 收藏试卷':'题型与题量对标线下官方考试（语法词汇/阅读/交际）· 限时 · 交卷统一判分 · ⭐ 收藏试卷'}</div>
     ${papers.map(p=>{const isFav=fav.includes(p.id);return `<div class="pz-entry" data-paper="${p.id}"><span class="pe-ico">${isFav?'⭐':'📄'}</span><span><span class="pe-t">${p.name}</span><div class="pe-d">${p.desc}</div><div class="pe-d">约 ${pzComposePaper(level,p).length} 题 · ${p.time} 分钟 · 交卷判分</div></span><span class="pz-fav" data-fid="${p.id}" style="margin-left:auto;font-size:18px;cursor:pointer;padding:0 4px">${isFav?'⭐':'☆'}</span></div>`}).join('')}
-    <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;padding:4px 0 12px">听力/写作/口语部分需语音包与 AI 批改，暂未包含</div>
+    <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;padding:4px 0 12px">${pzLang()==='en'?'听力题由英文 TTS 朗读 · 写作/口语需 AI 批改，暂未包含':'听力/写作/口语部分需语音包与 AI 批改，暂未包含'}</div>
   </div>`;
   el.querySelector('#pzBack').addEventListener('click',pzHome);
   el.querySelectorAll('#pzLvlBar .book-chip').forEach(b=>b.addEventListener('click',()=>pzPaperList(b.dataset.lv)));
@@ -1734,6 +1793,73 @@ function pzPaperList(level){
     if(p)pzStartPaper(level,p);
   }));
   el.querySelectorAll('.pz-fav').forEach(st=>st.addEventListener('click',e=>{e.stopPropagation();pzToggleFavPaper(st.dataset.fid);pzPaperList(level)}));
+}
+
+// ── 学习统计页 ──
+function pzStatsView(){
+  pzStopTimer();PZ=null;
+  const el=document.getElementById('practiceArea');
+  const s=pzStatGet();
+  const days=Object.keys(s.days||{}).sort().slice(-7);
+  const maxT=Math.max(1,...days.map(d=>s.days[d].t));
+  const bars=days.map(d=>{const dd=s.days[d];const h=Math.round(dd.t/maxT*70);
+    return `<div style="text-align:center"><div style="font-size:10px;color:var(--text3)">${dd.t}</div><div style="width:24px;height:${Math.max(4,h)}px;background:var(--blue);border-radius:4px 4px 0 0;margin:0 auto"></div><div style="font-size:9px;color:var(--text3);margin-top:2px">${d.slice(5)}</div></div>`}).join('');
+  const tags=Object.entries(s.tags||{}).map(([t,v])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--border);font-size:var(--fs-sm)"><span>${t}</span><span style="color:${v.c===v.t?'var(--green)':'var(--text2)'}">${v.c}/${v.t}（${v.t?Math.round(v.c/v.t*100):0}%）</span></div>`).join('');
+  el.innerHTML=`<div class="anim-in" style="padding:2px 0 24px">
+    <div style="display:flex;align-items:center;margin-bottom:8px">
+      <span id="pzBack" style="cursor:pointer;font-size:18px;color:var(--blue);padding:4px 8px;line-height:1">←</span>
+      <span style="flex:1;text-align:center;font-weight:600;color:var(--blue)">📊 学习统计</span>
+      <span style="width:34px"></span>
+    </div>
+    <div class="pz-entry" style="cursor:default"><span class="pe-ico">📈</span><span><span class="pe-t">累计 ${s.total||0} 题</span><div class="pe-d">总正确率 ${s.total?Math.round((s.correct||0)/s.total*100):0}%</div></span></div>
+    <div class="pz-entry" style="cursor:default"><span class="pe-ico">📊</span><span style="flex:1"><span class="pe-t">近 7 天每日题量</span><div style="display:flex;gap:10px;align-items:flex-end;height:110px;margin-top:8px">${bars||'<span style="font-size:var(--fs-xs);color:var(--text3)">暂无数据，去做几道题吧</span>'}</div></span></div>
+    <div class="pz-entry" style="cursor:default"><span class="pe-ico">🎯</span><span style="flex:1"><span class="pe-t">各题型正确率（累计）</span><div style="margin-top:6px">${tags||'<span style="font-size:var(--fs-xs);color:var(--text3)">暂无数据</span>'}</div></span></div>
+  </div>`;
+  el.querySelector('#pzBack').addEventListener('click',pzHome);
+}
+
+// ── AI 出题（DeepSeek 生成，接入码计费）──
+async function pzAIGenerate(level,topic){
+  const el=document.getElementById('practiceArea');
+  if(!S.settings.dsKey){gotoKeySetup('AI 出题需要接入码');return}
+  pzStopTimer();PZ=null;
+  el.innerHTML=loadingHTML('🤖 AI 正在按 '+level+' 级出题…约需 15~30 秒');
+  try{
+    const r=await apiFetch('/api/ai-quiz',{body:{key:S.settings.dsKey,level,lang:pzLang(),topic,count:10},timeout:120000});
+    const cards=(r.questions||[]).map((q,i)=>Object.assign(q,{_id:'AI-'+Date.now()+'-'+i,level,lang:pzLang(),tag:['语法','词汇','情景交际'].includes(q.tag)?q.tag:'AI'}));
+    cards.forEach(c=>{const m=c.opts.map((t,i)=>({t,ok:i===c.ans}));shuffle(m);c.opts=m.map(x=>x.t);c.ans=m.findIndex(x=>x.ok)});
+    if(!cards.length)throw new Error('AI 未生成有效题目，请重试');
+    PZ={mode:'ai',level,aiTopic:topic,cards,idx:0,correct:0,wrongIds:[],t0:Date.now()};
+    pzQSeq();
+    toast('AI 已生成 '+cards.length+' 题');
+  }catch(e){
+    el.innerHTML='<div style="color:var(--red);font-size:13px;padding:8px;text-align:center">❌ '+escape(friendlyErr(e))+'</div><div style="text-align:center;margin-top:10px"><button class="pz-ghost" onclick="pzHome()">返回练习中心</button></div>';
+  }
+}
+function pzAISetup(){
+  pzStopTimer();PZ=null;
+  const el=document.getElementById('practiceArea');
+  const lv=ls('pzLevel',S.settings.targetLevel||'A1');
+  const wrongs=pzGetWrong();
+  const weakTags={};wrongs.forEach(w=>{weakTags[w.tag]=(weakTags[w.tag]||0)+1});
+  const weakStr=Object.keys(weakTags).map(t=>t+'×'+weakTags[t]).join('、')||'暂无错题记录';
+  el.innerHTML=`<div class="anim-in" style="padding:2px 0 24px">
+    <div style="display:flex;align-items:center;margin-bottom:8px">
+      <span id="pzBack" style="cursor:pointer;font-size:18px;color:var(--blue);padding:4px 8px;line-height:1">←</span>
+      <span style="flex:1;text-align:center;font-weight:600;color:var(--blue)">🤖 AI 出题</span>
+      <span style="width:34px"></span>
+    </div>
+    <div class="book-bar" style="justify-content:center;margin-bottom:8px" id="pzLvlBar2">${PZ_LVLS.map(l=>`<button class="book-chip${l===lv?' active':''}" data-lv="${l}">${l}</button>`).join('')}</div>
+    <div class="pz-entry" style="cursor:default"><span style="flex:1"><span class="pe-t">出题主题</span><select id="aiTopicSel" style="margin-top:6px;width:100%;padding:10px 12px;border-radius:var(--radius-sm);background:var(--input);border:1.5px solid var(--border);color:var(--text);font-size:var(--fs-sm)"><option value="综合复习（语法+词汇+情景混合）">综合复习（混合题型）</option><option value="语法专项">语法专项</option><option value="词汇辨析与搭配">词汇辨析与搭配</option><option value="情景交际用语">情景交际用语</option><option value="错题弱点强化">错题弱点强化（当前弱项：${weakStr}）</option></select></span></div>
+    <div style="font-size:var(--fs-xs);color:var(--text3);margin:4px 0 10px;text-align:center">生成 10 道题 · 消耗 1 次深度额度 · 逐题判定带解析 · 错题自动入错题本</div>
+    <div style="text-align:center"><button class="pz-navbtn" id="pzAIGo" style="padding:12px 34px;font-size:var(--fs)">🤖 生成题目</button></div>
+  </div>`;
+  el.querySelector('#pzBack').addEventListener('click',pzHome);
+  el.querySelectorAll('#pzLvlBar2 .book-chip').forEach(b=>b.addEventListener('click',()=>{ss('pzLevel',b.dataset.lv);pzAISetup()}));
+  el.querySelector('#pzAIGo').addEventListener('click',()=>{
+    const topic=document.getElementById('aiTopicSel').value==='错题弱点强化'?('针对错题弱点出题：'+weakStr+'，同类考点换新题'):document.getElementById('aiTopicSel').value;
+    pzAIGenerate(lv,topic);
+  });
 }
 
 // ── 刷题/单词测验 子标签切换 ──
