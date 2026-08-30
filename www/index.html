@@ -773,6 +773,21 @@ sections:[
 ]};
 
 const MAJOR_WORDS=CS_RUSSIAN.sections.flatMap(s=>s.words?s.words.map(w=>({...w,book:5})):[]); // 专业俄语词（模块级只算一次）
+const CS_ENGLISH={
+title:'计算机专业英语 · IT 方向',
+desc:'面向计算机专业学生的英语词汇与表达，涵盖编程、硬件、网络、开发日常等领域。',
+sections:[
+{title:'Programming Basics',words:[
+{ru:'code',cn:'代码'},{ru:'program',cn:'程序'},{ru:'developer',cn:'开发者'},{ru:'variable',cn:'变量'},{ru:'function',cn:'函数'},{ru:'loop',cn:'循环'},{ru:'condition',cn:'条件'},{ru:'array',cn:'数组'},{ru:'string',cn:'字符串'},{ru:'object',cn:'对象'},{ru:'class',cn:'类'},{ru:'method',cn:'方法'},{ru:'compiler',cn:'编译器'},{ru:'debug',cn:'调试'},{ru:'syntax',cn:'语法'},{ru:'bug',cn:'程序错误'}
+]},
+{title:'Hardware & Systems',words:[
+{ru:'hardware',cn:'硬件'},{ru:'memory',cn:'内存'},{ru:'storage',cn:'存储'},{ru:'processor',cn:'处理器'},{ru:'server',cn:'服务器'},{ru:'network',cn:'网络'},{ru:'database',cn:'数据库'},{ru:'operating system',cn:'操作系统'},{ru:'interface',cn:'接口'},{ru:'bandwidth',cn:'带宽'},{ru:'backup',cn:'备份'},{ru:'deploy',cn:'部署'}
+]},
+{title:'Web & Internet',words:[
+{ru:'browser',cn:'浏览器'},{ru:'frontend',cn:'前端'},{ru:'backend',cn:'后端'},{ru:'framework',cn:'框架'},{ru:'responsive',cn:'响应式的'},{ru:'hosting',cn:'托管'},{ru:'domain',cn:'域名'},{ru:'request',cn:'请求'},{ru:'response',cn:'响应'},{ru:'cache',cn:'缓存'}
+]},
+{title:'开发日常表达（句型积累）',grammar:'被动语态描述技术事实：The feature was deprecated（该功能已弃用）/ The bug was fixed in v2.1.<br><br>常用短语动词：run the server（运行服务）/ run into an issue（遇到问题）/ push the code（推送代码）/ roll back the update（回滚更新）<br><br>会议表达：standup 每日站会 / code review 代码评审 / ETA 预计完成时间'}
+]};
 // ⚡ 取某本书的单词（课本 1-4 + 专业俄语 5 统一入口，测验/复习共用）
 function bookWords(bid){
   if(bid===5)return MAJOR_WORDS;
@@ -791,6 +806,18 @@ levels:[
 {id:'B2',name:'B2 — 中高级 (Второй сертификационный)',desc:'<strong>词汇量：约 4000-6000 词</strong><br><br><strong>能力描述：</strong><br>• 能理解具体和抽象主题复杂文本的主要思想<br>• 能与母语者进行一定程度的流畅自然交互<br>• 能就各种主题撰写清晰详细的文本<br>• 能解释对某一问题的观点，给出利弊<br><br><strong>核心语法：</strong><br>• 形动词和副动词的完全掌握<br>• 被动语态<br>• 复杂句法结构<br>• 科技/公务语体<br>• 词的支配关系（动词+格）',test:[{q:'B2在俄罗斯留学中通常用于？',opts:['旅游签证','预科入学','本科/研究生入学','短期游学'],ans:2},{q:'B2需要掌握的语体包括？',opts:['只有口语','科技语体和公务语体','只有书面语','诗歌'],ans:1}]},
 {id:'C1',name:'C1 — 流利级 (Третий сертификационный)',desc:'<strong>词汇量：约 8000-10000 词</strong><br><br><strong>能力描述：</strong><br>• 能理解各种要求较高的长篇文本并识别隐含意义<br>• 能流利自发地表达思想而不需明显寻找措辞<br>• 能在社交、学术和职业场合灵活有效地使用语言<br>• 能就复杂主题撰写清晰、结构良好的详细文本<br><br><strong>核心语法：</strong><br>• 句法修辞手法<br>• 熟语和成语<br>• 不同功能语体的自由切换<br>• 近义词辨析<br>• 复杂句子的标点符号规则',test:[{q:'C1级别可担任什么工作？',opts:['不需要俄语的工作','翻译/教师/新闻工作者','只能做体力劳动','不需要证书'],ans:1},{q:'C1的词汇量要求约？',opts:['2000-3000','4000-6000','8000-10000','15000+'],ans:2}]},
 {id:'C2',name:'C2 — 精通级 (Четвёртый сертификационный)',desc:'<strong>词汇量：15000 词以上（接近母语者）</strong><br><br><strong>能力描述：</strong><br>• 能轻松理解几乎所有听到和读到的东西<br>• 能从不同口头和书面来源总结信息<br>• 能连贯地重构论点和叙述<br>• 能自发、流畅、精确地表达，即使在最复杂情况下也能区分细微意义差别<br><br><strong>核心要求：</strong><br>• 全面掌握俄语所有语法和修辞手段<br>• 能理解俄语经典文学<br>• 能撰写专业学术论文<br>• 接近母语者的语感',test:[{q:'C2级别相当于？',opts:['入门','基础交流','接近母语者水平','能读懂菜单'],ans:2},{q:'ТРКИ四级证书(С2)的最低年龄要求？',opts:['无限制','16岁','18岁','21岁'],ans:1}]}
+]};
+
+const CEFR_EN={
+title:'英语等级考试（剑桥体系）',
+desc:'CEFR 分级对应剑桥主流考试：A2 Key (KET)、B1 Preliminary (PET)、B2 First (FCE)、C1 Advanced (CAE)、C2 Proficiency (CPE)。试卷覆盖机改部分：语法词汇、阅读、情景交际。',
+levels:[
+{id:'A1',name:'A1 — Beginner（起步级）',desc:'<strong>对应剑桥 Pre-A1 / A1 少儿系列水平</strong><br><br><strong>能力描述：</strong><br>• 理解并使用日常用语和基本句子<br>• 能进行简单自我介绍与基础问答<br><br><strong>试卷重点：</strong><br>• be 动词与一般现在时<br>• 冠词、介词、基础词汇'},
+{id:'A2',name:'A2 — Key (KET)',desc:'<strong>剑桥 A2 Key (KET)</strong><br><br>词汇量约 1500。能就日常话题进行简单交流，理解简短通知与信息。<br><br><strong>试卷重点：</strong><br>• 完成时初步与将来时<br>• 固定搭配与情景应用'},
+{id:'B1',name:'B1 — Preliminary (PET)',desc:'<strong>剑桥 B1 Preliminary (PET)</strong><br><br>词汇量约 2500-3000。能处理旅行、学习中多数场景，就熟悉话题写连贯短文。<br><br><strong>试卷重点：</strong><br>• 现在完成时与被动语态<br>• 条件句（零~二）与动词搭配'},
+{id:'B2',name:'B2 — First (FCE)',desc:'<strong>剑桥 B2 First (FCE)</strong><br><br>词汇量约 4000-5000。能理解具体与抽象主题的复杂文本，与母语者流利交流。<br><br><strong>试卷重点：</strong><br>• 倒装与第三条件句<br>• 被动报告结构与短语动词'},
+{id:'C1',name:'C1 — Advanced (CAE)',desc:'<strong>剑桥 C1 Advanced (CAE)</strong><br><br>词汇量约 8000。能在社交、学术、职业场合灵活高效运用英语。<br><br><strong>试卷重点：</strong><br>• 学术搭配与精细时态<br>• 让步结构与语篇理解'},
+{id:'C2',name:'C2 — Proficiency (CPE)',desc:'<strong>剑桥 C2 Proficiency (CPE)</strong><br><br>接近母语水平。能理解几乎一切并精确表达细微差别。<br><br><strong>试卷重点：</strong><br>• 虚拟与倒装结构<br>• 高阶习语与正式语体'}
 ]};
 
 // ═══════════════════════════════════════════════════════════════
@@ -819,7 +846,7 @@ function renderBook(el){
     <div class="book-bar">${(pzLang()==='en'?BOOKS_EN:BOOKS.filter(b=>b.id<=4)).map(b=>`<button class="book-chip${b.id===curBook?' active':''}" data-bid="${b.id}">${b.title}</button>`).join('')}</div>
     <div class="search-box"><span class="sicon">🔍</span><input type="text" id="tbSearch" placeholder="搜索单词..." value="${escape(q)}"></div>
     <div class="les-scroll">${lessons.map((l,i)=>`
-      <div class="les-card${(progLesson?l.lesson===progLesson:i===0)&&!q?' open':''}">
+      <div class="les-card${(q?(i===0):(progLesson?l.lesson===progLesson:i===0))?' open':''}">
         <div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')">
           <div><div class="les-num">Урок ${l.lesson}${l.lesson===progLesson?' <span style="color:var(--blue)">🎯</span>':''}</div><div class="les-title">${l.title}</div></div>
           <span class="les-arrow">&#9660;</span>
@@ -866,11 +893,14 @@ window.speakText=(t,l)=>speak(t,l,S.settings.speed);
 window.toggleFav=toggleFav;
 
 function renderMajor(el){
-  let html=`<div style="font-weight:600;font-size:16px;margin-bottom:4px;color:var(--blue)">${CS_RUSSIAN.title}</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">${CS_RUSSIAN.desc}</div>`;
-  CS_RUSSIAN.sections.forEach(s=>{
+  const C=pzLang()==='en'?CS_ENGLISH:CS_RUSSIAN;
+  const hd=pzLang()==='en'?'英语':'俄语';
+  const sp=pzLang()==='en'?'en':'ru';
+  let html=`<div style="font-weight:600;font-size:16px;margin-bottom:4px;color:var(--blue)">${C.title}</div><div style="font-size:var(--fs-sm);color:var(--text3);margin-bottom:12px">${C.desc}</div>`;
+  C.sections.forEach(s=>{
     if(s.words){
-      html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="vocab-grid"><div class="grid-hdr">俄语</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>`;
-      s.words.forEach(w=>{html+=`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','ru')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}',this)">${isFavWord(w)?'★':'☆'}</span>`});
+      html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="vocab-grid"><div class="grid-hdr">${hd}</div><div class="grid-hdr">中文</div><div class="grid-hdr"></div>`;
+      s.words.forEach(w=>{html+=`<div class="vg-ru"><span class="vg-act" onclick="event.stopPropagation();speakText('${jsStr(w.ru)}','${sp}')">&#9654;</span> ${w.ru}</div><div class="vg-cn">${w.cn}</div><span class="vg-act${isFavWord(w)?' saved':''}" onclick="event.stopPropagation();toggleFav('${jsStr(w.ru)}','${jsStr(w.cn)}',this)">${isFavWord(w)?'★':'☆'}</span>`});
       html+='</div></div></div>';
     }
     if(s.grammar){html+=`<div class="les-card open"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">${s.title}</div></div><span class="les-arrow">&#9660;</span></div><div class="les-card-body"><div class="grammar-mini">${s.grammar}</div></div></div>`}
@@ -879,8 +909,9 @@ function renderMajor(el){
 }
 
 function renderCefr(el){
-  let html=`<div style="font-weight:600;font-size:16px;margin-bottom:4px;color:var(--blue)">${CEFR.title}</div><div class="level-desc">${CEFR.desc}</div>`;
-  CEFR.levels.forEach(lv=>{
+  const C=pzLang()==='en'?CEFR_EN:CEFR;
+  let html=`<div style="font-weight:600;font-size:16px;margin-bottom:4px;color:var(--blue)">${C.title}</div><div class="level-desc">${C.desc}</div>`;
+  C.levels.forEach(lv=>{
     html+=`<div class="level-card"><div class="lc-title">${lv.name}</div><div class="level-desc">${lv.desc}</div><button class="lc-btn" onclick="pzEnterExam('${lv.id}')">📝 进入考试</button></div>`;
   });
   el.innerHTML=html;
@@ -1452,10 +1483,10 @@ function pzWrongListHTML(items){
     <div style="color:var(--red);font-size:var(--fs-xs)">你的答案：${x.picked==null?'未作答':escape(x.c.opts[x.picked])}</div>
     <div style="color:var(--green);font-size:var(--fs-xs)">正确答案：${escape(x.c.opts[x.c.ans])}</div>
     <div style="color:var(--text3);font-size:var(--fs-xs);margin-top:3px">💡 ${escape(x.c.explain)}</div>
-    ${x.c.w&&x.c.lang!=='en'?`<button class="pz-ghost pz-review" data-w="${escape(x.c.w)}" style="margin-top:6px;padding:5px 12px;font-size:11px">📖 去课本复习</button>`:''}
+    ${x.c.w?`<button class="pz-ghost pz-review" data-w="${escape(x.c.w)}" data-bid="${x.c.lang==='en'?({A1:101,A2:102,B1:103,B2:104,C1:104,C2:104}[x.c.level]||101):0}" style="margin-top:6px;padding:5px 12px;font-size:11px">📖 去${x.c.lang==='en'?'英语课程':'课本'}复习</button>`:''}
   </div>`).join('')+'</div>';
 }
-function pzBindReview(root){root.querySelectorAll('.pz-review').forEach(b=>b.addEventListener('click',()=>{learnShowWord(b.dataset.w,0);toast('已跳到课本，搜索：'+b.dataset.w)}))}
+function pzBindReview(root){root.querySelectorAll('.pz-review').forEach(b=>b.addEventListener('click',()=>{const bid=parseInt(b.dataset.bid||'0');learnShowWord(b.dataset.w,bid);toast('已跳到'+(bid>=100?'英语课程':'课本')+'，搜索：'+b.dataset.w)}))}
 
 // ── PZ 首页 ──
 let PZ=null;
