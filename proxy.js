@@ -341,9 +341,14 @@ const server = http.createServer((req, res) => {
         if (!access.ok) return deny(res, access);
         countUse(access);
         const key = access.key;
-        const { word } = reqBody;
+        const { word, lang } = reqBody;
+        const isEnDict = lang === 'en';
         const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
-          { role: 'system', content: `你是专业的俄语词典编纂专家。请为给定的俄语单词提供高质量的词典释义。
+          { role: 'system', content: isEnDict ? `你是英汉词典专家。给定英语单词或短语，只返回纯JSON（不要markdown代码块），字段结构：
+{"word":"查询的词","stress":"音标 /.../ ",
+"pos":"词性（中文：名词/动词/形容词/副词/短语）",
+"meanings":[{"index":1,"chinese":"中文释义","explanation":"一句话补充：常用搭配/语域/用法","example":{"ru":"地道英文例句","cn":"例句中文翻译"}}]}
+规则：meanings 给 2-3 个常用义项；例句自然地道；example 里的 ru 字段固定放英文例句（系统显示用）。` : `你是专业的俄语词典编纂专家。请为给定的俄语单词提供高质量的词典释义。
 
 请按以下JSON格式返回（不要包含markdown代码块标记，只返回纯JSON）：
 
@@ -457,7 +462,8 @@ const server = http.createServer((req, res) => {
           res.end(JSON.stringify({ error: '文本为空' }));
           return;
         }
-        const cached = sentenceCache.get(text);
+        const sLang = reqBody.lang === 'en' ? 'en' : 'ru';
+        const cached = sentenceCache.get(sLang + text);
         if (cached) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(cached));
@@ -468,7 +474,13 @@ const server = http.createServer((req, res) => {
         countUse(access);
         const key = access.key;
         const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
-          { role: 'system', content: `你是面向中文学习者的俄语语法讲解专家。用户给一个俄语句子，只返回纯JSON（不要markdown代码块）：
+          { role: 'system', content: sLang === 'en' ? `You are an English grammar teacher for Chinese learners. The user gives an English sentence. Return pure JSON only (no markdown):
+{"structure":"用中文一两句说明句子成分与主句框架",
+"keyPoints":[{"word":"句中出现的形式","base":"原形/词典形","why":"为什么用这个形式（时态/语态/冠词/介词/搭配），用中文一句话讲透"}],
+"grammar":["本句核心语法点，每条一句话（中文）"],
+"literal":"若英语语序与中文差异大，给逐词直译；否则空串",
+"patterns":["换主题保留同款结构的仿造句1","仿造句2"]}
+规则：keyPoints 只挑 3-6 个最关键的词；讲解一律用简体中文；不要逐词罗列虚词。` : `你是面向中文学习者的俄语语法讲解专家。用户给一个俄语句子，只返回纯JSON（不要markdown代码块）：
 {"structure":"用主语/谓语/补语/状语标注句子成分，一两句话",
 "keyPoints":[{"word":"句中出现的形式","base":"原形","why":"为什么用这个形式（格/体/时态/支配关系），一句话讲透"}],
 "grammar":["本句核心语法点，每条一句话"],
@@ -479,7 +491,7 @@ const server = http.createServer((req, res) => {
         ], 3000, 120000);
         if (parsed) {
           parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
-          sentenceCache.set(text, parsed);
+          sentenceCache.set(sLang + text, parsed);
           if (sentenceCache.size > 300) { // 防无限膨胀，删最旧的1/3
             const del = Array.from(sentenceCache.keys()).slice(0, 100);
             del.forEach(k => sentenceCache.delete(k));

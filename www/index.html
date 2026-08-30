@@ -293,12 +293,13 @@ async function fetchWordAnalysis(word){
     return r;
   }catch(e){return {_error:e.message}}
 }
-async function fetchSentAnalysis(text){
-  const key='sa_'+text.trim();
+async function fetchSentAnalysis(text,lang){
+  lang=lang||'ru';
+  const key='sa_'+lang+'_'+text.trim();
   try{
     const hit=ls(key);
     if(hit&&hit.data&&Date.now()-hit.t<30*24*3600*1000)return hit.data; // 句子解析缓存30天，同句秒出
-    const r=await apiFetch('/api/sentence-analysis',{body:{key:S.settings.dsKey,text},timeout:120000});
+    const r=await apiFetch('/api/sentence-analysis',{body:{key:S.settings.dsKey,text,lang},timeout:120000});
     if(r&&!r._error&&r.structure)ss(key,{t:Date.now(),data:r});
     return r;
   }catch(e){return {_error:e.message}}
@@ -495,13 +496,13 @@ function renderResult(r,src){
       document.getElementById('analysisPanels').innerHTML=tag+(a.meanings?renderMultiMeanings(a):'')+renderTensePanel(a)+renderDeclensionPanel(a);
     });
   }
-  if(S.langSrc==='ru'&&!showAnalysis){
+  if((S.langSrc==='ru'||S.langSrc==='en')&&!showAnalysis){
     document.getElementById('btnSent').addEventListener('click',async()=>{
       document.getElementById('btnSent').style.background='var(--blue-bg)';
       const el=document.getElementById('sentPanel');
       if(!S.settings.dsKey){gotoKeySetup('句子解析需要接入码');return}
       el.innerHTML=loadingHTML('正在解析句子…约需 10~30 秒');
-      const d=await fetchSentAnalysis(src);
+      const d=await fetchSentAnalysis(src,S.langSrc);
       if(d._error){el.innerHTML='<div style="color:var(--red);font-size:13px;padding:8px">❌ '+escape(friendlyErr(d._error))+'</div>';return}
       el.innerHTML=(d._model?`<div style="font-size:11px;color:var(--text3);margin:8px 0 2px;text-align:right">🤖 ${escape(d._model)}</div>`:'')+renderSentAnalysisHTML(d);
     });
@@ -580,7 +581,7 @@ async function doDictSearch(){
   if(!S.settings.dsKey){gotoKeySetup('字典查询需要 API Key');return}
   $dictResult.innerHTML=loadingHTML('正在查询词典…首次查询可能需要 30~60 秒');
   try{
-    const d=await apiFetch('/api/dictionary',{body:{key:S.settings.dsKey,word},timeout:60000});
+    const d=await apiFetch('/api/dictionary',{body:{key:S.settings.dsKey,word,lang:/^[a-zA-Z][a-zA-Z '\-]*$/.test(word)?'en':'ru'},timeout:60000});
     renderDictResult(d);
   }catch(e){
     $dictResult.innerHTML=`<div class="dict-card"><div class="tr-text" style="color:var(--text3)">查询失败: ${escape(friendlyErr(e))}</div></div>`;
@@ -1096,6 +1097,210 @@ B2:[
 {q:'Что рекомендуют исследователи?',opts:['Сочетать рукописный и цифровой форматы','Отказаться от технологий','Писать только от руки','Не вести конспекты'],ans:0,explain:'原文：комбинированный подход（组合方式）'}]}
 ]};
 
+// ═══ 英语题库（PZ_BANK_EN / PZ_EXTRA_EN：与俄语同构，经语言切换器启用）═══
+const PZ_BANK_EN={
+A1:[
+{type:'grammar',q:'She ___ a teacher.',opts:['is','are','am','be'],ans:0,explain:'第三人称单数 → is'},
+{type:'grammar',q:'I ___ TV every evening.',opts:['watch','watches','watching','watched'],ans:0,explain:'一般现在时习惯动作，I 用原形'},
+{type:'grammar',q:'They ___ from Kazakhstan.',opts:['are','is','am','be'],ans:0,explain:'复数主语 → are'},
+{type:'grammar',q:'___ you like coffee?',opts:['Do','Does','Are','Is'],ans:0,explain:'一般现在时疑问句用 Do'},
+{type:'grammar',q:'My brother ___ football on Sundays.',opts:['plays','play','playing','played'],ans:0,explain:'第三人称单数动词加 s'},
+{type:'vocab',w:'library',q:'library 的意思？',opts:['图书馆','书店','实验室','礼堂'],ans:0,explain:'library = 图书馆'},
+{type:'vocab',w:'delicious',q:'delicious 的意思？',opts:['美味的','危险的','昂贵的','方便的'],ans:0,explain:'delicious = 美味的'},
+{type:'vocab',w:'colleague',q:'colleague 的意思？',opts:['同事','同学','室友','邻居'],ans:0,explain:'colleague = 同事'},
+{type:'situational',q:'Someone says: How are you doing? 最自然的回应：',opts:['Pretty good, thanks!','I am doing homework now!','Bye!','Who are you?'],ans:0,explain:'How are you doing? = 最近怎么样？'},
+{type:'situational',q:'在商店想刷卡，你说：',opts:['Can I pay by card?','Give me card!','Where is money?','No pay today'],ans:0,explain:'Can I pay by card? = 可以刷卡吗？'},
+{type:'reading',passage:'My name is Dana. I am a student in Almaty. Every morning I get up at seven and go to university by bus. In the evening I cook dinner and call my parents.',qs:[
+{q:'How does Dana get to university?',opts:['By bus','On foot','By taxi','By bike'],ans:0,explain:'原文：goes to university by bus'},
+{q:'What does Dana do in the evening?',opts:['Cooks dinner and calls her parents','Studies at the library','Watches TV','Goes to bed early'],ans:0,explain:'原文：In the evening I cook dinner and call my parents'}]},
+{type:'pairing',words:[{ru:'apple',cn:'苹果'},{ru:'bread',cn:'面包'},{ru:'milk',cn:'牛奶'},{ru:'cheese',cn:'奶酪'}]}
+],
+A2:[
+{type:'grammar',q:'I ___ to London last year.',opts:['went','go','gone','have gone'],ans:0,explain:'last year → 一般过去时 went'},
+{type:'grammar',q:'She ___ here since Monday.',opts:['has lived','lives','lived','is living'],ans:0,explain:'since → 现在完成时 has lived'},
+{type:'grammar',q:'This is ___ interesting book.',opts:['an','a','the','of'],ans:0,explain:'元音音素前用 an'},
+{type:'grammar',q:'You ___ smoke here — it is forbidden.',opts:['must not','have to','may','need'],ans:0,explain:'禁止 → must not'},
+{type:'grammar',q:'There ___ milk in the fridge.',opts:['is some','are some','is many','are much'],ans:0,explain:'不可数名词 → is some'},
+{type:'vocab',w:'appointment',q:'appointment 的意思？',opts:['预约','道歉','奖励','部门'],ans:0,explain:'appointment = 预约、约会'},
+{type:'vocab',w:'afford',q:'afford 的意思？',opts:['负担得起','避免','供应','同意'],ans:0,explain:'afford = 买得起、负担得起'},
+{type:'vocab',w:'on purpose',q:'on purpose 的意思？',opts:['故意地','准时地','突然地','终于'],ans:0,explain:'on purpose = 故意地'},
+{type:'situational',q:'朋友考试没过，你说：',opts:['Better luck next time!','Congratulations!','You deserved it.','Good for me!'],ans:0,explain:'Better luck next time = 下次好运（安慰）'},
+{type:'situational',q:'礼貌地问陌生人时间，你说：',opts:['Excuse me, do you have the time?','Hey! Time!','Time now?!','Tell me the time'],ans:0,explain:'Excuse me 开头最礼貌'},
+{type:'reading',passage:'Last summer my friends and I travelled to the mountains. We rented a small house near a lake. Every day we hiked, swam and cooked together. On the last evening we watched the sunset and promised to come back next year.',qs:[
+{q:'Where did they stay?',opts:['In a small house near a lake','In a hotel','With relatives','In tents'],ans:0,explain:'原文：rented a small house near a lake'},
+{q:'What did they promise?',opts:['To come back next year','To study harder','To buy a house','To travel abroad'],ans:0,explain:'原文：promised to come back next year'}]},
+{type:'pairing',words:[{ru:'depart',cn:'出发'},{ru:'arrive',cn:'到达'},{ru:'book',cn:'预订'},{ru:'luggage',cn:'行李'}]}
+],
+B1:[
+{type:'grammar',q:'By the time we arrived, the film ___ .',opts:['had already started','already started','has already started','starts'],ans:0,explain:'过去的过去 → 过去完成时'},
+{type:'grammar',q:'If I ___ more time, I would travel more.',opts:['had','have','will have','would have'],ans:0,explain:'第二条件句：If + 过去式，would + 原形'},
+{type:'grammar',q:'She suggested ___ a taxi.',opts:['taking','to take','take','took'],ans:0,explain:'suggest + doing'},
+{type:'grammar',q:'The room ___ every day.',opts:['is cleaned','cleans','is cleaning','has cleaned'],ans:0,explain:'被动语态：is + 过去分词'},
+{type:'grammar',q:'I look forward to ___ from you.',opts:['hearing','hear','be heard','have heard'],ans:0,explain:'look forward to + doing'},
+{type:'vocab',w:'reliable',q:'reliable 的意思？',opts:['可靠的','可用的','可疑的','合理的'],ans:0,explain:'reliable = 可靠的'},
+{type:'vocab',w:'achieve',q:'achieve 的意思？',opts:['实现','接近','宣布','承认'],ans:0,explain:'achieve = 实现（目标）'},
+{type:'vocab',w:'get along with',q:'get along with 的意思？',opts:['与…相处融洽','追赶','起床','处理'],ans:0,explain:'get along with = 相处融洽'},
+{type:'situational',q:'上班错过了截止时间，给上司写邮件开头：',opts:['I apologize for missing the deadline.','It was not my fault!','Deadlines are silly.','Maybe next time.'],ans:0,explain:'apologize for = 为…道歉（职场礼貌）'},
+{type:'situational',q:'向朋友推荐一本书，说：',opts:['You should read it — I could not put it down.','The book has 300 pages.','I bought it yesterday.','Books are expensive.'],ans:0,explain:'could not put it down = 爱不释手'},
+{type:'reading',passage:'Remote work has changed the way companies operate. Employees save time on commuting, and employers can hire talent from anywhere. However, some managers report that teamwork suffers when people never meet in person. Many companies now choose a hybrid model: a few days in the office, the rest at home.',qs:[
+{q:'What problem do some managers report?',opts:['Teamwork suffers without in-person meetings','Employees are lazy','Costs are too high','Offices are empty'],ans:0,explain:'原文：teamwork suffers when people never meet'},
+{q:'What is a hybrid model?',opts:['A few days in the office, the rest at home','Fully remote work','Five days in the office','Working two jobs'],ans:0,explain:'原文：a few days in the office, the rest at home'}]},
+{type:'pairing',words:[{ru:'deadline',cn:'截止日期'},{ru:'schedule',cn:'日程'},{ru:'meeting',cn:'会议'},{ru:'colleague',cn:'同事'}]}
+],
+B2:[
+{type:'grammar',q:'Rarely ___ such dedication.',opts:['have I seen','I have seen','I saw','did I saw'],ans:0,explain:'Rarely 否定副词提前 → 倒装 have I seen'},
+{type:'grammar',q:'If I ___ about the meeting, I would have come.',opts:['had known','knew','have known','would know'],ans:0,explain:'第三条件句：had done → would have done'},
+{type:'grammar',q:'He denied ___ the report.',opts:['copying','to copy','copy','copied'],ans:0,explain:'deny + doing'},
+{type:'grammar',q:'It is high time we ___ .',opts:['left','leave','will leave','are leaving'],ans:0,explain:'It is high time + 过去式（虚拟）'},
+{type:'grammar',q:'The project, ___ was led by Dana, succeeded.',opts:['which','that','who','what'],ans:0,explain:'非限制性定语从句用 which'},
+{type:'vocab',w:'compelling',q:'compelling 的意思？',opts:['令人信服的','强迫的','复杂的','便利的'],ans:0,explain:'compelling = 令人信服的'},
+{type:'vocab',w:'turn a blind eye to',q:'turn a blind eye to 的意思？',opts:['对…视而不见','转移注意','严格监督','公开反对'],ans:0,explain:'turn a blind eye to = 视而不见'},
+{type:'vocab',w:'albeit',q:'albeit 的意思？',opts:['尽管','因此','而且','毕竟'],ans:0,explain:'albeit = 尽管（书面语）'},
+{type:'situational',q:'学术研讨会上礼貌表达反对：',opts:['With respect, I would argue that the data suggest otherwise.','You are wrong!','That is nonsense.','I do not care.'],ans:0,explain:'With respect 开头 = 恕我直言（礼貌反驳）'},
+{type:'situational',q:'因病向教授申请延期，写：',opts:['Would it be possible to extend the deadline due to illness?','Give me more time!','I cannot do it.','The deadline is bad.'],ans:0,explain:'Would it be possible to… = 是否可以…（最礼貌）'},
+{type:'reading',passage:'A city that once banned cars from its centre expected chaos. Instead, shops reported higher sales, air quality improved within months, and the streets filled with cyclists and cafes. Critics who predicted economic collapse were proved wrong, and other cities are now studying the model. The lesson, urbanists say, is that people adapt faster than forecasts assume.',qs:[
+{q:'What happened after the ban?',opts:['Shops reported higher sales','The economy collapsed','People left the city','Traffic doubled'],ans:0,explain:'原文：shops reported higher sales'},
+{q:'What do urbanists conclude?',opts:['People adapt faster than forecasts assume','Bans never work','Cars should return','Forecasts are always right'],ans:0,explain:'原文：people adapt faster than forecasts assume'}]},
+{type:'pairing',words:[{ru:'implementation',cn:'实施'},{ru:'feasibility',cn:'可行性'},{ru:'framework',cn:'框架'},{ru:'output',cn:'成果'}]}
+],
+C1:[
+{type:'grammar',q:'Not only ___ the exam, but she also topped the class.',opts:['did she pass','she passed','passed she','she did pass'],ans:0,explain:'Not only 提前 → 倒装 did she pass'},
+{type:'grammar',q:'___ hard he tried, he could not crack the problem.',opts:['However','Whatever','Whenever','Although'],ans:0,explain:'However + 形容词 + 主谓 = 无论多…'},
+{type:'grammar',q:'Were I ___ your position, I would decline.',opts:['in','at','on','for'],ans:0,explain:'Were I in your position = 虚拟倒装（要是我在你的位置）'},
+{type:'grammar',q:'The report needs ___ before Friday.',opts:['revising','to revising','revise','being revised'],ans:0,explain:'need + doing = 需要被做'},
+{type:'grammar',q:'So convincing ___ that everyone agreed.',opts:['was his argument','his argument was','argued his point','did his argument'],ans:0,explain:'So + 形容词提前 → 倒装 was his argument'},
+{type:'vocab',w:'meticulous',q:'meticulous 的意思？',opts:['一丝不苟的','粗心的','吝啬的','谦虚的'],ans:0,explain:'meticulous = 一丝不苟的'},
+{type:'vocab',w:'plausible',q:'plausible 的意思？',opts:['貌似合理的','可折叠的','令人愉快的','可观的'],ans:0,explain:'plausible = 貌似合理的'},
+{type:'vocab',w:'bear the brunt of',q:'bear the brunt of 的意思？',opts:['首当其冲','分摊费用','居中调解','名列前茅'],ans:0,explain:'bear the brunt of = 首当其冲'},
+{type:'situational',q:'会议问答环节请对方讲清方法，说：',opts:['Could you elaborate on the methodology?','Speak Chinese please!','I understood nothing.','Next slide.'],ans:0,explain:'elaborate on = 详细说明'},
+{type:'situational',q:'谈判中表达可以商量，说：',opts:['We are open to discussing the terms.','Final offer, take it!','No negotiation.','Up to you.'],ans:0,explain:'open to discussing = 愿意谈'},
+{type:'reading',passage:'Language extinction is accelerating: nearly half of the roughly seven thousand languages in the world are considered endangered. When a language dies, an entire knowledge system — oral histories, medicinal practices, ecological classifications — often disappears with it. Digital archives can preserve recordings, but scholars stress that preservation is not revitalization: a language survives only when children choose to speak it.',qs:[
+{q:'What is lost when a language dies?',opts:['An entire knowledge system','Only vocabulary','Written literature','Dialects'],ans:0,explain:'原文：an entire knowledge system disappears'},
+{q:'Why is digital archiving not enough?',opts:['A language survives only when children speak it','Archives are expensive','Recordings are low quality','Children prefer apps'],ans:0,explain:'原文：preservation is not revitalization'}]},
+{type:'pairing',words:[{ru:'scrutiny',cn:'审查'},{ru:'consensus',cn:'共识'},{ru:'backlash',cn:'强烈反对'},{ru:'milestone',cn:'里程碑'}]}
+],
+C2:[
+{type:'grammar',q:'___ the controversy, the findings stand.',opts:['Notwithstanding','Despite of','Although','In spite'],ans:0,explain:'Notwithstanding + 名词 = 尽管（正式）'},
+{type:'grammar',q:'Little ___ that the decision would define his career.',opts:['did he know','he knew','he knows','knew he'],ans:0,explain:'Little 提前 → 倒装 did he know'},
+{type:'grammar',q:'But for your timely intervention, the deal ___ .',opts:['would have collapsed','will collapse','had collapsed','would collapse'],ans:0,explain:'But for + 名词 → would have done'},
+{type:'grammar',q:'So abstruse ___ that only specialists could follow.',opts:['was the lecture','the lecture was','lecture was','did the lecture'],ans:0,explain:'So + 形容词提前 → 倒装'},
+{type:'grammar',q:'He is said ___ in three languages.',opts:['to be fluent','being fluent','fluently','be fluent'],ans:0,explain:'据说 → be said to be'},
+{type:'vocab',w:'ubiquitous',q:'ubiquitous 的意思？',opts:['无处不在的','稀有的','过时的','关键的'],ans:0,explain:'ubiquitous = 无处不在的'},
+{type:'vocab',w:'equivocal',q:'equivocal 的意思？',opts:['模棱两可的','平等的','明确的','讽刺的'],ans:0,explain:'equivocal = 模棱两可的'},
+{type:'vocab',w:'a Pyrrhic victory',q:'a Pyrrhic victory 的意思？',opts:['得不偿失的胜利','完胜','惨败','险胜'],ans:0,explain:'皮洛士式胜利 = 代价过大的胜利'},
+{type:'situational',q:'答辩委员会请你概括结论，最合适的开头：',opts:['Allow me to distill my argument to three points.','It is all in the text.','Where to start…','No time, sorry.'],ans:0,explain:'distill = 提炼概括（正式场合）'},
+{type:'situational',q:'回应审稿人尖锐批评，最专业：',opts:['I appreciate the rigor; let me address each concern in turn.','Reviewer 2 is unfair.','I withdraw everything.','These are minor nitpicks.'],ans:0,explain:'appreciate the rigor = 感谢严格审阅（学术修养）'},
+{type:'reading',passage:'That translation shapes thought is a seductive idea, yet the strong version of linguistic relativity has few defenders today. Languages differ in what they must encode — Russian marks aspect obligatorily, English does not — but users of any language can perceive the distinctions another language encodes. What grammar influences is habit of attention, not the boundary of thought; the weak version of the hypothesis survives, the strong one has quietly retired.',qs:[
+{q:'What survives of linguistic relativity?',opts:['The weak version: grammar shapes habit of attention','The strong version','Nothing at all','Thought is impossible without language'],ans:0,explain:'原文：the weak version survives'},
+{q:'How do languages differ, per the passage?',opts:['In what they must encode','In what users can perceive','In vocabulary size only','In writing systems'],ans:0,explain:'原文：differ in what they must encode'}]},
+{type:'pairing',words:[{ru:'corollary',cn:'推论'},{ru:'anomaly',cn:'异常'},{ru:'tenet',cn:'信条'},{ru:'nuance',cn:'细微差别'}]}
+]};
+
+// ═══ 英语试卷专题题库（f1=动词时态语态 f2=句法介词搭配 f3=交际综合）═══
+const PZ_EXTRA_EN={
+A1:[
+{type:'grammar',focus:'f1',q:'We ___ students.',opts:['are','is','am','be'],ans:0,explain:'we → are'},
+{type:'grammar',focus:'f1',q:'He ___ his homework every day.',opts:['does','do','doing','done'],ans:0,explain:'三单 does'},
+{type:'grammar',focus:'f1',q:'Look! It ___ .',opts:['is raining','rains','rained','rain'],ans:0,explain:'Look! 提示正在进行 → 现在进行时'},
+{type:'grammar',focus:'f1',q:'I ___ my keys yesterday.',opts:['lost','lose','am losing','will lose'],ans:0,explain:'yesterday → 过去时 lost'},
+{type:'grammar',focus:'f1',q:'___ she speak English?',opts:['Does','Do','Is','Has'],ans:0,explain:'三单疑问 → Does'},
+{type:'grammar',focus:'f2',q:'This is ___ orange.',opts:['an','a','the','of'],ans:0,explain:'元音音素前用 an'},
+{type:'grammar',focus:'f2',q:'The cat is ___ the table.',opts:['under','of','since','except'],ans:0,explain:'under = 在…下面'},
+{type:'grammar',focus:'f2',q:'I go ___ school every day.',opts:['to','at','in','on'],ans:0,explain:'go to school 固定搭配'},
+{type:'grammar',focus:'f2',q:'These are my ___ .',opts:['children','childs','childrens','child'],ans:0,explain:'child 不规则复数 children'},
+{type:'grammar',focus:'f2',q:'This bike belongs to ___ .',opts:['him','he','his','himself'],ans:0,explain:'to + 宾格 him'},
+{type:'situational',focus:'f3',q:'课上铅笔断了，向老师借笔，说：',opts:['May I borrow a pen, please?','Buy me a pen!','Pens are mine','No more pens'],ans:0,explain:'May I borrow… = 我可以借…吗'},
+{type:'situational',focus:'f3',q:'朋友递来你不喜欢的食物，礼貌拒绝：',opts:['No, thank you.','Yuck, never!','I hate this!','Throw it away!'],ans:0,explain:'No, thank you = 不了谢谢'},
+{type:'reading',focus:'f3',passage:'Tom has a small dog. The dog is white and very friendly. Every Saturday Tom takes the dog to the park. The dog runs, plays with other dogs, and loves people.',qs:[
+{q:'What color is the dog?',opts:['White','Black','Brown','Grey'],ans:0,explain:'原文：The dog is white'},
+{q:'When does Tom go to the park?',opts:['Every Saturday','Every day','On Sundays','At night'],ans:0,explain:'原文：Every Saturday'}]}
+],
+A2:[
+{type:'grammar',focus:'f1',q:'I ___ my phone. I cannot find it.',opts:['have lost','lose','was losing','am losing'],ans:0,explain:'现在完成时表结果（手机现在丢了）'},
+{type:'grammar',focus:'f1',q:'While I ___ , the phone rang.',opts:['was cooking','cooked','cook','had cooked'],ans:0,explain:'while + 过去进行时表背景'},
+{type:'grammar',focus:'f1',q:'She ___ finish the report tomorrow.',opts:['will','is','was','has'],ans:0,explain:'will + 原形表将来'},
+{type:'grammar',focus:'f1',q:'We ___ each other since school.',opts:['have known','know','knew','are knowing'],ans:0,explain:'since + 状态动词 → 现在完成时'},
+{type:'grammar',focus:'f1',q:'Do not worry, I ___ you at the airport.',opts:['will meet','meet','met','am met'],ans:0,explain:'临时决定/承诺 → will meet'},
+{type:'grammar',focus:'f2',q:'I am interested ___ history.',opts:['in','on','at','for'],ans:0,explain:'interested in 固定搭配'},
+{type:'grammar',focus:'f2',q:'She is good ___ languages.',opts:['at','in','on','to'],ans:0,explain:'be good at 固定搭配'},
+{type:'grammar',focus:'f2',q:'This depends ___ the weather.',opts:['on','in','of','from'],ans:0,explain:'depend on 固定搭配'},
+{type:'grammar',focus:'f2',q:'Congratulations ___ your graduation!',opts:['on','for','to','with'],ans:0,explain:'congratulations on 固定搭配'},
+{type:'grammar',focus:'f2',q:'I bought it ___ my sister.',opts:['for','to','at','with'],ans:0,explain:'buy for sb 为某人买'},
+{type:'situational',focus:'f3',q:'酒店前台请你出示证件，你说：',opts:['Here is my passport.','Why do you need it?','I have no bags.','Later maybe.'],ans:0,explain:'Here is my… = 这是我的…'},
+{type:'situational',focus:'f3',q:'礼貌婉拒邀请，说：',opts:['Thank you, but I already have plans.','Never invite me!','I am busy forever.','No party for me.'],ans:0,explain:'Thank you, but… = 谢谢，不过…'},
+{type:'reading',focus:'f3',passage:'E-books are convenient: thousands of books in one device. Yet many readers still prefer paper. Studies suggest people understand and remember more when reading on paper, and screens can tire the eyes before bed. Bookstores, surprisingly, report stable sales of printed fiction among young readers.',qs:[
+{q:'What advantage do e-books have?',opts:['Thousands of books in one device','Better sleep','Always lower prices','More vocabulary'],ans:0,explain:'原文：thousands of books in one device'},
+{q:'Why do some prefer paper?',opts:['Better understanding and memory','Paper is cheaper','Screens are heavy','Paper smells nice'],ans:0,explain:'原文：understand and remember more on paper'}]}
+],
+B1:[
+{type:'grammar',focus:'f1',q:'By next month, I ___ this course.',opts:['will have finished','will finish','finish','finished'],ans:0,explain:'by + 将来时间 → 将来完成时'},
+{type:'grammar',focus:'f1',q:'She made me ___ my mind.',opts:['change','to change','changing','changed'],ans:0,explain:'make sb do 省略 to'},
+{type:'grammar',focus:'f1',q:'The film ___ by a new director.',opts:['was directed','directed','was directing','has directing'],ans:0,explain:'过去被动：was + 过去分词'},
+{type:'grammar',focus:'f1',q:'I would rather ___ at home tonight.',opts:['stay','to stay','staying','stayed'],ans:0,explain:'would rather + 原形'},
+{type:'grammar',focus:'f1',q:'He is used to ___ early.',opts:['getting up','get up','got up','get'],ans:0,explain:'be used to + doing 习惯于'},
+{type:'grammar',focus:'f2',q:'Neither the manager nor the workers ___ informed.',opts:['were','was','is','has'],ans:0,explain:'neither…nor 就近一致 → workers 复数'},
+{type:'grammar',focus:'f2',q:'The key ___ the problem is communication.',opts:['to','of','for','on'],ans:0,explain:'the key to 固定搭配'},
+{type:'grammar',focus:'f2',q:'She is capable ___ more.',opts:['of','in','at','for'],ans:0,explain:'capable of 固定搭配'},
+{type:'grammar',focus:'f2',q:'It depends ___ what you mean.',opts:['on','of','at','with'],ans:0,explain:'depend on 固定搭配'},
+{type:'grammar',focus:'f2',q:'They accused him ___ lying.',opts:['of','for','with','on'],ans:0,explain:'accuse sb of 固定搭配'},
+{type:'situational',focus:'f3',q:'听到有人冒犯你的国家，成熟回应：',opts:['I respect your view, but I see it differently.','Say it again, I dare you.','You are all the same.','Storm off in silence'],ans:0,explain:'尊重但明确不同意的表达'},
+{type:'situational',focus:'f3',q:'小组作业有人不干活，第一步：',opts:['Talk to them privately about the workload.','Report to the teacher at once.','Do everything silently.','Kick them from the group.'],ans:0,explain:'先私下沟通工作量问题'},
+{type:'reading',focus:'f3',passage:'Many learners hit the intermediate plateau: progress feels invisible after a year of study. Teachers suggest changing the input — podcasts, series, articles — and tracking small wins, because motivation follows visible progress. Plateaus are not failure; they are the point where learning becomes invisible work.',qs:[
+{q:'What is the intermediate plateau?',opts:['A stage where progress feels invisible','A failure of memory','A level test','A grammar rule'],ans:0,explain:'定义：progress feels invisible'},
+{q:'What do teachers suggest?',opts:['Changing input and tracking small wins','Studying more grammar only','Quitting for a while','Only watching movies'],ans:0,explain:'原文：changing the input and tracking small wins'}]}
+],
+B2:[
+{type:'grammar',focus:'f1',q:'Had I known earlier, I ___ differently.',opts:['would have acted','would act','had acted','will act'],ans:0,explain:'Had I known 倒装虚拟 → would have done'},
+{type:'grammar',focus:'f1',q:'The house is said ___ in the 18th century.',opts:['to have been built','to build','to be built','being built'],ans:0,explain:'said to have been built（完成被动）'},
+{type:'grammar',focus:'f1',q:'Under no circumstances ___ the password.',opts:['should you share','you should share','you share should','shared you'],ans:0,explain:'Under no circumstances → 倒装 should you'},
+{type:'grammar',focus:'f1',q:'I would sooner ___ than apologize.',opts:['resign','to resign','resigning','resigned'],ans:0,explain:'would sooner + 原形'},
+{type:'grammar',focus:'f1',q:'Hardly ___ the office when it started to pour.',opts:['had he left','he had left','he left','left he'],ans:0,explain:'Hardly had… when… 倒装'},
+{type:'grammar',focus:'f2',q:'The committee insisted ___ the plan.',opts:['on revising','to revise','revise','on revise'],ans:0,explain:'insist on + doing'},
+{type:'grammar',focus:'f2',q:'Her success was attributed ___ hard work.',opts:['to','for','with','on'],ans:0,explain:'attribute to 归因于'},
+{type:'grammar',focus:'f2',q:'There is no point ___ about it now.',opts:['arguing','to argue','argue','argued'],ans:0,explain:'no point + doing'},
+{type:'grammar',focus:'f2',q:'He was charged ___ fraud.',opts:['with','of','for','on'],ans:0,explain:'charge sb with 指控'},
+{type:'grammar',focus:'f2',q:'The new policy ___ effect next month.',opts:['takes','makes','does','gives'],ans:0,explain:'take effect 固定搭配'},
+{type:'situational',focus:'f3',q:'主旨演讲问答，质疑一个论断但保持礼貌：',opts:['Is there data supporting that claim across markets?','That is simply wrong.','I do not believe you.','Please skip this part.'],ans:0,explain:'Is there data supporting… = 有数据支持吗（学术质疑）'},
+{type:'situational',focus:'f3',q:'向客户传达坏消息，最专业：',opts:['I am afraid we have hit a delay — here is our recovery plan.','We failed, deal with it.','No comment.','The vendor is to blame.'],ans:0,explain:'坏消息 + 解决方案（客户沟通）'},
+{type:'reading',focus:'f3',passage:'Urban heat islands — cities several degrees hotter than surrounding areas — hit the poorest neighborhoods hardest, where tree cover is thinnest. Planting initiatives help, but studies warn that saplings need a decade to deliver shade. Cooling centers and subsidized air conditioning bridge the gap, yet the durable fix is design: lighter surfaces, more green corridors, and buildings planned for airflow rather than glass.',qs:[
+{q:'Who suffers most from heat islands?',opts:['Poorest neighborhoods with thin tree cover','Office workers','Suburbs','Tourists'],ans:0,explain:'原文：hit the poorest neighborhoods hardest'},
+{q:'What is the durable fix?',opts:['Design: surfaces, corridors, airflow','Only air conditioning','Cutting all trees','Waiting a decade'],ans:0,explain:'原文：the durable fix is design'}]}
+],
+C1:[
+{type:'grammar',focus:'f1',q:'Not until the results came in ___ the scale of the error.',opts:['did we grasp','we grasped','we did grasp','grasped we'],ans:0,explain:'Not until 提前 → 倒装 did we grasp'},
+{type:'grammar',focus:'f1',q:'So opaque ___ that auditors requested documents.',opts:['were the accounts','the accounts were','accounts were','did the accounts'],ans:0,explain:'So + 形容词 → 倒装 were the accounts'},
+{type:'grammar',focus:'f1',q:'The minister is believed ___ resigning.',opts:['to be considering','considering','to consider','consider'],ans:0,explain:'is believed to be doing（进行式不定式）'},
+{type:'grammar',focus:'f1',q:'But for the whistle-blower, the fraud ___ undetected.',opts:['would have gone','will go','had gone','would go'],ans:0,explain:'But for → would have done'},
+{type:'grammar',focus:'f1',q:'Scarcely ___ the ink dried before critics pounced.',opts:['had','has','did','was'],ans:0,explain:'Scarcely had… before… 倒装'},
+{type:'grammar',focus:'f2',q:'The findings are not amenable ___ simple explanation.',opts:['to','for','with','at'],ans:0,explain:'amenable to 固定搭配'},
+{type:'grammar',focus:'f2',q:'His account is at variance ___ the records.',opts:['with','to','from','against'],ans:0,explain:'at variance with 固定搭配'},
+{type:'grammar',focus:'f2',q:'She was passed over ___ promotion.',opts:['for','of','to','from'],ans:0,explain:'passed over for 错失晋升'},
+{type:'grammar',focus:'f2',q:'The article borders ___ defamation.',opts:['on','to','at','with'],ans:0,explain:'border on 接近于'},
+{type:'grammar',focus:'f2',q:'Critics took issue ___ the methodology.',opts:['with','on','to','against'],ans:0,explain:'take issue with 固定搭配'},
+{type:'situational',focus:'f3',q:'panel 讨论中先认可再反驳，说：',opts:['Fair point — though the longitudinal data complicate that reading.','You missed the point entirely.','That is outdated thinking.','Let us move on.'],ans:0,explain:'Fair point — though… = 有道理，但…'},
+{type:'situational',focus:'f3',q:'期刊拒稿后的申诉信，最专业：',opts:['We respectfully appeal and attach new analyses addressing each concern.','Reject the rejection!','Fine, whatever.','Complain publicly.'],ans:0,explain:'respectfully appeal + 逐一回应（申诉规范）'},
+{type:'reading',focus:'f3',passage:'Pre-print culture has sped up science — and strained its filters. Findings now reach headlines before peer review, and retractions trail months behind. Some argue for slower, certified release; others warn that gatekeeping entrenches incumbents. The unresolved question is institutional design: how to keep speed without surrendering quality control.',qs:[
+{q:'What problem does pre-print culture create?',opts:['Findings spread before quality control','Papers cost too much','Too few papers','Slow peer review'],ans:0,explain:'原文：reach headlines before peer review'},
+{q:'What is the unresolved question?',opts:['How to keep speed without losing quality control','Whether science should be public','How to write papers','Whether to ban pre-prints'],ans:0,explain:'原文：keep speed without surrendering quality control'}]}
+],
+C2:[
+{type:'grammar',focus:'f1',q:'Come what ___ , the show must go on.',opts:['may','might','would','should'],ans:0,explain:'Come what may 固定虚拟让步'},
+{type:'grammar',focus:'f1',q:'To hear him ___, the reform is already lost.',opts:['tell it','told it','telling','be told'],ans:0,explain:'To hear him tell it 据他所说（暗含夸张）'},
+{type:'grammar',focus:'f1',q:'The committee moved that the rule ___ repealed.',opts:['be','was','is','would be'],ans:0,explain:'move that + 原形虚拟语气'},
+{type:'grammar',focus:'f1',q:'Far be it from me ___ , but the data disagree.',opts:['to criticize','criticizing','criticize','criticized'],ans:0,explain:'Far be it from me to… 我本不该…（客套反语）'},
+{type:'grammar',focus:'f1',q:'Never again ___ such audacity in a negotiation.',opts:['have I witnessed','I have witnessed','I witnessed','witnessed I'],ans:0,explain:'Never again 提前 → 倒装 have I witnessed'},
+{type:'grammar',focus:'f2',q:'Their analysis is not without ___ , but the core claim holds.',opts:['merit','a merit','merits','the merit'],ans:0,explain:'not without merit 不无道理'},
+{type:'grammar',focus:'f2',q:'He was nothing if not ___ : every objection anticipated.',opts:['thorough','boring','lucky','late'],ans:0,explain:'nothing if not 极其、无疑是'},
+{type:'grammar',focus:'f2',q:'The apology stopped short ___ an admission.',opts:['of','to','at','from'],ans:0,explain:'stop short of 止步于（未达到）'},
+{type:'grammar',focus:'f2',q:'The two accounts are not mutually ___ .',opts:['exclusive','excluding','exclusionary','excluded'],ans:0,explain:'mutually exclusive 互斥的'},
+{type:'grammar',focus:'f2',q:'The minister resigned ___ the scandal.',opts:['in the wake of','on the wake of','at wake of','by wake of'],ans:0,explain:'in the wake of 紧随…之后'},
+{type:'situational',focus:'f3',q:'与捐赠人晚宴，得体回避政治问题：',opts:['That is above my pay grade — I am here for the students.','Mind your own business.','Shout your opinion.','Leave the table.'],ans:0,explain:'above my pay grade = 这不归我管（幽默化解）'},
+{type:'situational',focus:'f3',q:'识破对方先恭维后有求，回应：',opts:['Flattery aside, what do you actually need?','Anything for you!','I knew this would happen!','Say nothing and leave'],ans:0,explain:'Flattery aside = 恭维就到此为止吧'},
+{type:'reading',focus:'f3',passage:'Every generation declares the novel dead; the novel declines to oblige. Formats mutate — serial, paperback, audio, serialized apps — while the underlying contract endures: a sustained voice holding a reader across hours. What actually dies is packaging. The obituarists confuse the coffin with the body, and the body, restless as ever, keeps checking into new lodgings.',qs:[
+{q:'What endures across formats?',opts:['A sustained voice holding a reader','The paperback','Serialized apps','The obituary'],ans:0,explain:'原文：the underlying contract endures'},
+{q:'What does the coffin metaphor refer to?',opts:['The packaging, not the novel itself','The printing press','The reader','The library'],ans:0,explain:'棺材=外壳包装，小说本体不死'}]}
+]};
+
 // ═══ 等级考卷定义（每级3套：试卷一动词/试卷二变格支配/试卷三综合；对标官方机改部分）═══
 const PZ_PAPERS={
 A1:[
@@ -1129,21 +1334,56 @@ C2:[
 {id:'C2P3',label:'C2·试卷三',name:'试卷三 · 综合阅读（简版）',focus:'f3',desc:'语言学/社会语篇阅读理解',sections:{grammar:3,vocab:2,situational:1,reading:2},time:20}
 ]};
 
+// ═══ 英语等级考卷（对标剑桥 KET/PET/FCE/CAE/CPE 机改部分）═══
+const PZ_PAPERS_EN={
+A1:[
+{id:'EN-A1P1',label:'英A1·试卷一',name:'试卷一 · 动词与基本句型',focus:'f1',desc:'be 动词/一般现在时/三单/现在进行',sections:{grammar:8,vocab:3,situational:3,reading:3,pairing:2},time:30},
+{id:'EN-A1P2',label:'英A1·试卷二',name:'试卷二 · 冠词介词与复数',focus:'f2',desc:'a/an、常用介词、不规则复数',sections:{grammar:8,vocab:3,situational:3,reading:3,pairing:2},time:30},
+{id:'EN-A1P3',label:'英A1·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：语法+词汇+情景+阅读',sections:{grammar:8,vocab:3,situational:4,reading:4,pairing:2},time:35}
+],
+A2:[
+{id:'EN-A2P1',label:'英A2·试卷一',name:'试卷一 · 时态与将来（KET 对标）',focus:'f1',desc:'完成时/进行时/将来时',sections:{grammar:8,vocab:4,situational:3,reading:3,pairing:4},time:35},
+{id:'EN-A2P2',label:'英A2·试卷二',name:'试卷二 · 固定搭配（KET 对标）',focus:'f2',desc:'形容词介词搭配/动词短语',sections:{grammar:8,vocab:4,situational:3,reading:3,pairing:4},time:35},
+{id:'EN-A2P3',label:'英A2·试卷三',name:'试卷三 · 综合模拟（KET 对标）',focus:'f3',desc:'全面覆盖 KET 机改部分',sections:{grammar:8,vocab:4,situational:4,reading:4,pairing:4},time:40}
+],
+B1:[
+{id:'EN-B1P1',label:'英B1·试卷一',name:'试卷一 · 时态与被动（PET 对标）',focus:'f1',desc:'完成时/被动语态/条件句零-二',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:40},
+{id:'EN-B1P2',label:'英B1·试卷二',name:'试卷二 · 搭配与句型（PET 对标）',focus:'f2',desc:'动词+doing/固定介词/句型',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:40},
+{id:'EN-B1P3',label:'英B1·试卷三',name:'试卷三 · 综合模拟（PET 对标）',focus:'f3',desc:'全面覆盖 PET 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:45}
+],
+B2:[
+{id:'EN-B2P1',label:'英B2·试卷一',name:'试卷一 · 倒装与虚拟（FCE 对标）',focus:'f1',desc:'倒装/第三条件句/被动报告结构',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:45},
+{id:'EN-B2P2',label:'英B2·试卷二',name:'试卷二 · 动词介词与短语（FCE 对标）',focus:'f2',desc:'动词+介词/固定短语/词汇进阶',sections:{grammar:10,vocab:4,situational:4,reading:4,pairing:4},time:45},
+{id:'EN-B2P3',label:'英B2·试卷三',name:'试卷三 · 综合模拟（FCE 对标）',focus:'f3',desc:'全面覆盖 FCE 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:50}
+],
+C1:[
+{id:'EN-C1P1',label:'英C1·试卷一',name:'试卷一 · 倒装与精细时态（CAE 对标）',focus:'f1',desc:'Not until/So/Such 倒装/进行式不定式',sections:{grammar:5,vocab:3,situational:2,reading:3,pairing:2},time:40},
+{id:'EN-C1P2',label:'英C1·试卷二',name:'试卷二 · 学术搭配（CAE 对标）',focus:'f2',desc:'amenable to/at variance with 等学术搭配',sections:{grammar:5,vocab:3,situational:2,reading:3,pairing:2},time:40},
+{id:'EN-C1P3',label:'英C1·试卷三',name:'试卷三 · 综合阅读（CAE 对标）',focus:'f3',desc:'学术语篇阅读理解',sections:{grammar:4,vocab:3,situational:2,reading:3,pairing:2},time:40}
+],
+C2:[
+{id:'EN-C2P1',label:'英C2·试卷一',name:'试卷一 · 虚拟与倒装（CPE 对标）',focus:'f1',desc:'Come what may/Little 倒装/移位结构',sections:{grammar:5,vocab:3,situational:2,reading:3,pairing:2},time:45},
+{id:'EN-C2P2',label:'英C2·试卷二',name:'试卷二 · 高阶习语与搭配（CPE 对标）',focus:'f2',desc:'nothing if not/in the wake of 等',sections:{grammar:5,vocab:3,situational:2,reading:3,pairing:2},time:45},
+{id:'EN-C2P3',label:'英C2·试卷三',name:'试卷三 · 综合阅读（CPE 对标）',focus:'f3',desc:'高阶语篇阅读理解',sections:{grammar:4,vocab:3,situational:2,reading:3,pairing:2},time:45}
+]};
+
 // ── PZ 工具 ──
 const pzToday=()=>new Date().toLocaleDateString('sv');
 const pzL=i=>String.fromCharCode(1040+i);
 const pzFmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+const pzLang=()=>S.settings.plang==='en'?'en':'ru';
 function pzFlat(level){
-  const items=[{arr:(PZ_BANK[level]||[]),suf:''},{arr:(PZ_EXTRA[level]||[]),suf:'x'}].flatMap(src=>src.arr.map((it,ii)=>({it,ii,suf:src.suf})));
+  const bank=pzLang()==='en'?PZ_BANK_EN:PZ_BANK, extra=pzLang()==='en'?PZ_EXTRA_EN:PZ_EXTRA;
+  const items=[{arr:bank[level]||[],suf:''},{arr:extra[level]||[],suf:'x'}].flatMap(src=>src.arr.map((it,ii)=>({it,ii,suf:src.suf})));
   const out=[];
   items.forEach(({it,ii,suf})=>{
-    if(it.type==='reading'){it.qs.forEach((q,qi)=>out.push({_id:level+suf+'-r'+ii+'-'+qi,tag:'阅读',level,passage:it.passage,q:q.q,opts:q.opts,ans:q.ans,explain:q.explain}))}
+    if(it.type==='reading'){it.qs.forEach((q,qi)=>out.push({_id:level+suf+'-r'+ii+'-'+qi,tag:'阅读',level,lang:pzLang(),passage:it.passage,q:q.q,opts:q.opts,ans:q.ans,explain:q.explain}))}
     else if(it.type==='pairing'){
       const cns=it.words.map(w=>w.cn);
-      it.words.forEach((w,wi)=>out.push({_id:level+suf+'-p'+ii+'-'+wi,tag:'配对',level,q:'«'+w.ru+'» 的意思是？',opts:cns.slice(),ans:cns.indexOf(w.cn),explain:'词义：'+w.ru+' = '+w.cn,w:w.ru}));
+      it.words.forEach((w,wi)=>out.push({_id:level+suf+'-p'+ii+'-'+wi,tag:'配对',level,lang:pzLang(),q:'«'+w.ru+'» 的意思是？',opts:cns.slice(),ans:cns.indexOf(w.cn),explain:'词义：'+w.ru+' = '+w.cn,w:w.ru}));
     }else{
       const tag=it.type==='grammar'?'语法':it.type==='vocab'?'词汇':'情景';
-      out.push({_id:level+suf+'-'+it.type[0]+ii,tag,level,focus:it.focus,q:it.q,opts:it.opts,ans:it.ans,explain:it.explain,w:it.w});
+      out.push({_id:level+suf+'-'+it.type[0]+ii,tag,level,lang:pzLang(),focus:it.focus,q:it.q,opts:it.opts,ans:it.ans,explain:it.explain,w:it.w});
     }
   });
   out.forEach(c=>{const m=c.opts.map((t,i)=>({t,ok:i===c.ans}));shuffle(m);c.opts=m.map(x=>x.t);c.ans=m.findIndex(x=>x.ok)});
@@ -1158,12 +1398,12 @@ function pzBump(ok){const s=pzStatGet();s.total++;if(ok)s.correct++;const d=pzTo
 function pzStopTimer(){if(PZ&&PZ.timerId){clearInterval(PZ.timerId);PZ.timerId=null}}
 function pzWrongListHTML(items){
   return '<div style="text-align:left;margin:0 2px 12px">'+items.map(x=>`<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;font-size:var(--fs-sm)">
-    <div style="margin-bottom:4px"><span class="pz-chip">${x.c.tag}</span>${x.c.src?` <span class="pz-chip" style="margin-left:4px">📄 ${escape(x.c.src)}</span>`:''} ${escape(x.c.q)}</div>
+    <div style="margin-bottom:4px"><span class="pz-chip">${x.c.tag}</span>${x.c.lang==='en'?' <span class="pz-chip">🇬🇧</span>':''}${x.c.src?` <span class="pz-chip" style="margin-left:4px">📄 ${escape(x.c.src)}</span>`:''} ${escape(x.c.q)}</div>
     ${x.c.passage?`<div class="pz-pass" style="margin:4px 0">${escape(x.c.passage)}</div>`:''}
     <div style="color:var(--red);font-size:var(--fs-xs)">你的答案：${x.picked==null?'未作答':escape(x.c.opts[x.picked])}</div>
     <div style="color:var(--green);font-size:var(--fs-xs)">正确答案：${escape(x.c.opts[x.c.ans])}</div>
     <div style="color:var(--text3);font-size:var(--fs-xs);margin-top:3px">💡 ${escape(x.c.explain)}</div>
-    ${x.c.w?`<button class="pz-ghost pz-review" data-w="${escape(x.c.w)}" style="margin-top:6px;padding:5px 12px;font-size:11px">📖 去课本复习</button>`:''}
+    ${x.c.w&&x.c.lang!=='en'?`<button class="pz-ghost pz-review" data-w="${escape(x.c.w)}" style="margin-top:6px;padding:5px 12px;font-size:11px">📖 去课本复习</button>`:''}
   </div>`).join('')+'</div>';
 }
 function pzBindReview(root){root.querySelectorAll('.pz-review').forEach(b=>b.addEventListener('click',()=>{learnShowWord(b.dataset.w,0);toast('已跳到课本，搜索：'+b.dataset.w)}))}
@@ -1180,6 +1420,7 @@ function pzHome(){
       <div style="font-size:16px;font-weight:600;color:var(--blue)">🎯 练习中心</div>
       <div style="font-size:var(--fs-xs);color:var(--text3);margin-top:3px">今日已练 ${dd.t} 题 · 正确率 ${dd.t?Math.round(dd.c/dd.t*100):0}% · 备考目标 ${S.settings.targetLevel||'未设'}</div>
     </div>
+    <div class="book-bar" style="justify-content:center;margin-bottom:10px" id="pzLangBar"><button class="book-chip${pzLang()==='ru'?' active':''}" data-pl="ru">🇷🇺 俄语</button><button class="book-chip${pzLang()==='en'?' active':''}" data-pl="en">🇬🇧 英语</button></div>
     <div style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:6px">级别</div>
     <div class="book-bar" style="margin-bottom:12px" id="pzLvBar">${PZ_LVLS.map(l=>`<button class="book-chip${l===lv?' active':''}" data-lv="${l}">${l}</button>`).join('')}</div>
     <div class="pz-entry" id="pzGoSeq"><span class="pe-ico">📚</span><span><span class="pe-t">分级题库练习</span><div class="pe-d">${lv} · 15 题混合 · 逐题判定 + 解析 · 离线可用</div></span></div>
@@ -1193,6 +1434,7 @@ function pzHome(){
   el.querySelector('#pzGoSeq').addEventListener('click',()=>pzStartSeq(lv));
   el.querySelector('#pzGoMock').addEventListener('click',()=>pzStartMock(lv));
   el.querySelector('#pzGoPapers').addEventListener('click',()=>pzPaperList(ls('pzLevel',S.settings.targetLevel||'A1')));
+  el.querySelectorAll('#pzLangBar .book-chip').forEach(b=>b.addEventListener('click',()=>{S.settings.plang=b.dataset.pl;save('settings');pzHome();toast(b.dataset.pl==='en'?'英语模式':'俄语模式')}));
   el.querySelector('#pzGoWrong').addEventListener('click',()=>pzStartWrong());
   const clr=el.querySelector('#pzGoClear');if(clr)clr.addEventListener('click',()=>{if(confirm('确定清空所有错题？')){pzSetWrong([]);pzHome();toast('错题本已清空')}});
   el.querySelector('#pzGoRes').addEventListener('click',()=>{showScreen('sMore');showMoreTab('res')});
@@ -1206,8 +1448,8 @@ function pzStartSeq(lv){
   pzQSeq();
 }
 function pzStartWrong(list){
-  const items=list||pzGetWrong();
-  if(!items.length){toast('错题本是空的，太棒了！');pzHome();return}
+  const items=(list||pzGetWrong()).filter(x=>(x.lang||'ru')===pzLang());
+  if(!items.length){toast(pzLang()==='en'?'No English mistakes in the book!':'错题本是空的，太棒了！');pzHome();return}
   PZ={mode:'wrong',level:items[0].level||'',cards:shuffle(items.slice()).slice(0,15),idx:0,correct:0,wrongIds:[],t0:Date.now()};
   pzQSeq();
 }
@@ -1388,28 +1630,29 @@ function pzStartPaper(level,paper){
 const pzFavPapers=()=>ls('pzPaperFav',[]);
 function pzToggleFavPaper(id){const f=pzFavPapers();const i=f.indexOf(id);if(i>=0)f.splice(i,1);else f.push(id);ss('pzPaperFav',f)}
 window.pzEnterExam=function(lid){showScreen('sQuiz');document.querySelector('#sQuiz .sub-tab[data-pq="practice"]').click();pzPaperList(lid)};
+const pzPapersFor=level=>(pzLang()==='en'?PZ_PAPERS_EN:PZ_PAPERS)[level]||[];
 function pzPaperList(level){
   pzStopTimer();PZ=null;
   level=PZ_LVLS.includes(level)?level:'A1';
   ss('pzLevel',level);
   const el=document.getElementById('practiceArea');
   const fav=pzFavPapers();
-  const papers=(PZ_PAPERS[level]||[]).slice().sort((a,b)=>(fav.includes(b.id)?1:0)-(fav.includes(a.id)?1:0));
+  const papers=pzPapersFor(level).slice().sort((a,b)=>(fav.includes(b.id)?1:0)-(fav.includes(a.id)?1:0));
   el.innerHTML=`<div class="anim-in" style="padding:2px 0 24px">
     <div style="display:flex;align-items:center;margin-bottom:8px">
       <span id="pzBack" style="cursor:pointer;font-size:18px;color:var(--blue);padding:4px 8px;line-height:1">←</span>
-      <span style="flex:1;text-align:center;font-weight:600;color:var(--blue)">🎓 等级考试 · 试卷</span>
+      <span style="flex:1;text-align:center;font-weight:600;color:var(--blue)">🎓 等级考试 · 试卷${pzLang()==='en'?'（英语）':''}</span>
       <span style="width:34px"></span>
     </div>
     <div class="book-bar" style="justify-content:center;margin-bottom:6px" id="pzLvlBar">${PZ_LVLS.map(l=>`<button class="book-chip${l===level?' active':''}" data-lv="${l}">${l}</button>`).join('')}</div>
-    <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;margin-bottom:10px">题型与题量对标线下官方考试（语法词汇/阅读/交际）· 限时 · 交卷统一判分 · ⭐ 收藏试卷</div>
+    <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;margin-bottom:10px">${pzLang()==='en'?'对标剑桥 KET/PET/FCE/CAE/CPE 机改部分（语法词汇/阅读/交际）· 限时 · ⭐ 收藏试卷':'题型与题量对标线下官方考试（语法词汇/阅读/交际）· 限时 · 交卷统一判分 · ⭐ 收藏试卷'}</div>
     ${papers.map(p=>{const isFav=fav.includes(p.id);return `<div class="pz-entry" data-paper="${p.id}"><span class="pe-ico">${isFav?'⭐':'📄'}</span><span><span class="pe-t">${p.name}</span><div class="pe-d">${p.desc}</div><div class="pe-d">约 ${pzComposePaper(level,p).length} 题 · ${p.time} 分钟 · 交卷判分</div></span><span class="pz-fav" data-fid="${p.id}" style="margin-left:auto;font-size:18px;cursor:pointer;padding:0 4px">${isFav?'⭐':'☆'}</span></div>`}).join('')}
     <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;padding:4px 0 12px">听力/写作/口语部分需语音包与 AI 批改，暂未包含</div>
   </div>`;
   el.querySelector('#pzBack').addEventListener('click',pzHome);
   el.querySelectorAll('#pzLvlBar .book-chip').forEach(b=>b.addEventListener('click',()=>pzPaperList(b.dataset.lv)));
   el.querySelectorAll('.pz-entry').forEach(card=>card.addEventListener('click',()=>{
-    const p=(PZ_PAPERS[level]||[]).find(x=>x.id===card.dataset.paper);
+    const p=pzPapersFor(level).find(x=>x.id===card.dataset.paper);
     if(p)pzStartPaper(level,p);
   }));
   el.querySelectorAll('.pz-fav').forEach(st=>st.addEventListener('click',e=>{e.stopPropagation();pzToggleFavPaper(st.dataset.fid);pzPaperList(level)}));
@@ -1573,7 +1816,7 @@ function classRender(){
       panel.dataset.sap=idx;
       panel.innerHTML=loadingHTML('正在解析句子…约需 10~30 秒');
       root.appendChild(panel);
-      const d=await fetchSentAnalysis(it.original);
+      const d=await fetchSentAnalysis(it.original,'ru');
       if(d._error){panel.innerHTML='<div style="color:var(--red);font-size:13px;padding:6px">❌ '+escape(friendlyErr(d._error))+'</div>';return}
       panel.innerHTML=(d._model?`<div style="font-size:11px;color:var(--text3);margin:8px 0 2px;text-align:right">🤖 ${escape(d._model)}</div>`:'')+renderSentAnalysisHTML(d);
     });
