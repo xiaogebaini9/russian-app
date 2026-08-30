@@ -181,6 +181,7 @@ function ss(k,v){localStorage.setItem('ru_'+k,JSON.stringify(v))}
 const S={settings:ls('settings',{model:'mymemory',speed:.75,fontSize:16,autoTr:true,mode:'fast',dsKey:'',apiBase:''}),history:ls('history',[]),favs:ls('favs',[]),isSpeaking:false,result:null,langSrc:'ru',langTgt:'zh-CN'};
 function save(k){ss(k,S[k])}
 const pzLang=()=>S.settings.plang==='en'?'en':'ru'; // 当前练习/学习语言（ru/en），定义在前供全脚本使用
+function pzFixBook(bid,lang){bid=parseInt(bid)||0;if(lang==='en')return(bid>=100&&bid<=104)?bid:101;return(bid>=1&&bid<=4)?bid:1;} // 清理跨语言污染的书号
 const API_BASE=(S.settings.apiBase&&S.settings.apiBase.trim())||(/Android/i.test(navigator.userAgent)?'http://10.0.2.2:8765':'http://localhost:8765');
 
 // ⚡ 统一 API 调用：超时、错误提取、snippet 诊断信息一处收敛（SW 503 的"离线模式"JSON 自然流进 friendlyErr）
@@ -837,8 +838,7 @@ function renderLearn(){
 
 function renderBook(el){
   const q=(document.getElementById('tbSearch')?document.getElementById('tbSearch').value:'').toLowerCase().trim();
-  if(pzLang()==='en'&&curBook<100)curBook=ls('lastBookEn',101);
-  if(pzLang()!=='en'&&curBook>=100)curBook=ls('lastBook',1);
+  curBook=pzFixBook(curBook,pzLang());
   const V=pzLang()==='en'?VOCAB_EN:VOCAB;let lessons=V[curBook]||[];const progLesson=ls('prog',{})[curBook];
   if(q){lessons=lessons.map(l=>{const w=l.words.filter(w=>w.ru.toLowerCase().includes(q)||w.cn.includes(q));return w.length?{...l,words:w}:null}).filter(Boolean);if(!lessons.length){el.innerHTML='<div class="empty-state">没有匹配的单词</div>';return}}
   el.innerHTML=`
@@ -944,13 +944,11 @@ document.querySelectorAll('#learnTabs .sub-tab').forEach(b=>b.addEventListener('
 
 document.querySelectorAll('.subj-tab').forEach(x=>x.classList.toggle('active',x.dataset.subj===pzLang()));
 const _mtInit=document.querySelector('#learnTabs .sub-tab[data-tab="major"]');if(_mtInit)_mtInit.textContent=pzLang()==='en'?'专业英语':'专业俄语';
-if(pzLang()==='en'&&curBook<100)curBook=ls('lastBookEn',101);
-if(pzLang()!=='en'&&curBook>=100)curBook=ls('lastBook',1);
+curBook=pzFixBook(curBook,pzLang());
 document.querySelectorAll('.subj-tab').forEach(b=>b.addEventListener('click',()=>{
   if(b.dataset.subj===pzLang())return;
   S.settings.plang=b.dataset.subj;save('settings');
-  if(b.dataset.subj==='en'&&curBook<100)curBook=ls('lastBookEn',101);
-  if(b.dataset.subj!=='en'&&curBook>=100)curBook=ls('lastBook',1);
+  curBook=pzFixBook(curBook,b.dataset.subj);
   ss(b.dataset.subj==='en'?'lastBookEn':'lastBook',curBook);
   document.querySelectorAll('.subj-tab').forEach(x=>x.classList.toggle('active',x.dataset.subj===b.dataset.subj));
   const _mt=document.querySelector('#learnTabs .sub-tab[data-tab="major"]');if(_mt)_mt.textContent=b.dataset.subj==='en'?'专业英语':'专业俄语';
@@ -1745,6 +1743,7 @@ document.querySelectorAll('#sQuiz .sub-tab').forEach(b=>b.addEventListener('clic
   const isP=b.dataset.pq==='practice';
   document.getElementById('practiceArea').style.display=isP?'block':'none';
   document.getElementById('quizArea').style.display=isP?'none':'block';
+  if(!isP)renderQuizSetup(); // 每次进入单词测验重渲染，书单/语言/进度永远最新
 }));
 pzHome();
 
