@@ -26,7 +26,7 @@ const arg = process.argv[3];
 if (cmd === 'key') {
   if (!arg || !arg.startsWith('sk-')) { console.log('用法：node gen-codes.js key sk-xxxx  （key 要以 sk- 开头）'); process.exit(1); }
   fs.writeFileSync(KEYS_FILE, JSON.stringify({ key: arg.trim() }, null, 2));
-  console.log('✅ API Key 已保存到 keys.json（该文件已列入 .gitignore，不会上传 GitHub）');
+  console.log('[OK] API Key 已保存到 keys.json（该文件已列入 .gitignore，不会上传 GitHub）');
   process.exit(0);
 }
 
@@ -51,7 +51,7 @@ if (cmd === 'del') {
   if (!arg || !db.codes[arg]) { console.log('没找到这个码：' + arg); process.exit(1); }
   delete db.codes[arg];
   saveCodes(db);
-  console.log('✅ 已停用 ' + arg + '（立即生效，不用重启代理）');
+  console.log('[OK] 已停用 ' + arg + '（立即生效，不用重启代理）');
   process.exit(0);
 }
 
@@ -67,6 +67,6 @@ while (made.length < n) {
   made.push(c);
 }
 saveCodes(db);
-console.log('✅ 已生成 ' + made.length + ' 个接入码（每码每日 ' + (db.dailyLimit || 100) + ' 次），发给需要的人：');
+console.log('[OK] 已生成 ' + made.length + ' 个接入码（每码每日 ' + (db.dailyLimit || 100) + ' 次），发给需要的人：');
 made.forEach((c, i) => console.log('  ' + (i + 1) + '. ' + c));
 console.log('提示：改备注名可用 node gen-codes.js list 查看；停用用 node gen-codes.js del <码>');
