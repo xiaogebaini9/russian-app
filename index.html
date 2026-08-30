@@ -1410,6 +1410,24 @@ B2:[
 {type:'listening',audio:'Please bear in mind that the deadline is negotiable only in exceptional cases.',q:'🔊 截止日期可以随便改吗？',opts:['只有特殊情况可协商','完全可以改','绝对不能再提','每周都会改'],ans:0,explain:'only in exceptional cases = 仅限特殊情况'}
 ]};
 
+// ═══ 俄语听力题库（系统 TTS 朗读：Microsoft Pavel/Irina）═══
+const PZ_LISTEN_RU={
+A2:[
+{type:'listening',audio:'Где находится автобусная остановка?',q:'🔊 你听到的是在问什么？',opts:['公交车站在哪','火车站在哪','博物馆在哪','银行在哪'],ans:0,explain:'автобусная остановка = 公交车站'},
+{type:'listening',audio:'Я хочу купить билет до Москвы.',q:'🔊 他想做什么？',opts:['买一张去莫斯科的票','去莫斯科定居','给莫斯科打电话','从莫斯科回来'],ans:0,explain:'билет до Москвы = 去莫斯科的票'},
+{type:'listening',audio:'Завтра будет дождь, возьмите зонт.',q:'🔊 为什么建议带伞？',opts:['明天有雨','今天很冷','要去旅行','天下雪了'],ans:0,explain:'дождь = 雨'}
+],
+B1:[
+{type:'listening',audio:'Я не смог прийти на встречу, потому что заболел.',q:'🔊 他为什么没来开会？',opts:['因为生病','因为工作','因为天气','因为忘记了'],ans:0,explain:'заболел = 生病了'},
+{type:'listening',audio:'Если сдашь экзамен на отлично, получишь стипендию.',q:'🔊 怎样才能拿到奖学金？',opts:['考试考优秀','按时上课','帮教授做事','写一篇论文'],ans:0,explain:'на отлично = 拿优秀（5分制）'},
+{type:'listening',audio:'Мы договорились встретиться в семь у главного входа.',q:'🔊 他们约了几点见面？',opts:['七点','六点','八点','九点'],ans:0,explain:'в семь = 七点'}
+],
+B2:[
+{type:'listening',audio:'Несмотря на кризис, компания продолжала инвестировать в новые технологии.',q:'🔊 公司在危机中做了什么？',opts:['继续投资新技术','停止所有投资','出售了公司','裁员一半'],ans:0,explain:'продолжала инвестировать = 继续投资'},
+{type:'listening',audio:'Реформа была проведена без учёта мнения сотрудников, что вызвало недовольство.',q:'🔊 改革引发了什么？',opts:['员工的不满','员工的支持','媒体的关注','政府的奖励'],ans:0,explain:'недовольство = 不满'},
+{type:'listening',audio:'Чем объясняется рост цен, пока никто не может сказать точно.',q:'🔊 关于价格上涨，人们能说的是？',opts:['没人能确切解释','原因很清楚','政府已经解释了','价格上涨是假的'],ans:0,explain:'никто не может сказать точно = 没人能确切说明'}
+]};
+
 // ═══ 等级考卷定义（每级3套：试卷一动词/试卷二变格支配/试卷三综合；对标官方机改部分）═══
 const PZ_PAPERS={
 A1:[
@@ -1420,17 +1438,17 @@ A1:[
 A2:[
 {id:'A2P1',label:'A2·试卷一',name:'试卷一 · 动词的体与时间',focus:'f1',desc:'完成体/未完成体、定向不定向、将来时',sections:{grammar:8,vocab:4,situational:3,reading:3,listening:3,pairing:4},time:35},
 {id:'A2P2',label:'A2·试卷二',name:'试卷二 · 变格与支配',focus:'f2',desc:'六格强化、动词支配关系、数量词搭配',sections:{grammar:8,vocab:4,situational:3,reading:3,listening:3,pairing:4},time:35},
-{id:'A2P3',label:'A2·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：语法+词汇+情景+阅读',sections:{grammar:8,vocab:4,situational:4,reading:4,pairing:4},time:40}
+{id:'A2P3',label:'A2·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：语法+词汇+情景+阅读',sections:{grammar:8,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40}
 ],
 B1:[
 {id:'B1P1',label:'B1·试卷一',name:'试卷一 · 动词的体与时间',focus:'f1',desc:'体深入、过去时视角、命令式、Чем…тем 结构',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40},
 {id:'B1P2',label:'B1·试卷二',name:'试卷二 · 变格与支配',focus:'f2',desc:'动词支配关系、形动词初步、间接引语',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:40},
-{id:'B1P3',label:'B1·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：对标 ТРКИ-1 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:45}
+{id:'B1P3',label:'B1·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：对标 ТРКИ-1 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,listening:3,pairing:4},time:45}
 ],
 B2:[
 {id:'B2P1',label:'B2·试卷一',name:'试卷一 · 动词与句法',focus:'f1',desc:'体精细辨析、被动形动词、副动词完成体',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:45},
 {id:'B2P2',label:'B2·试卷二',name:'试卷二 · 支配与语体',focus:'f2',desc:'复杂支配关系、公务语体插入语、固定搭配',sections:{grammar:10,vocab:4,situational:4,reading:4,listening:3,pairing:4},time:45},
-{id:'B2P3',label:'B2·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：对标 ТРКИ-2 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,pairing:4},time:50}
+{id:'B2P3',label:'B2·试卷三',name:'试卷三 · 综合模拟',focus:'f3',desc:'全面覆盖：对标 ТРКИ-2 机改部分',sections:{grammar:10,vocab:5,situational:5,reading:5,listening:3,pairing:4},time:50}
 ],
 C1:[
 {id:'C1P1',label:'C1·试卷一',name:'试卷一 · 动词与句法（简版）',focus:'f1',desc:' паронимы/成语/复杂句法',sections:{grammar:4,vocab:2,situational:1,reading:2},time:20},
@@ -1482,7 +1500,7 @@ const pzL=i=>String.fromCharCode(1040+i);
 const pzFmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 function pzFlat(level){
   const bank=pzLang()==='en'?PZ_BANK_EN:PZ_BANK, extra=pzLang()==='en'?PZ_EXTRA_EN:PZ_EXTRA;
-  const items=[{arr:bank[level]||[],suf:''},{arr:extra[level]||[],suf:'x'},{arr:(pzLang()==='en'?(PZ_LISTEN_EN[level]||[]):[]),suf:'l'}].flatMap(src=>src.arr.map((it,ii)=>({it,ii,suf:src.suf})));
+  const items=[{arr:bank[level]||[],suf:''},{arr:extra[level]||[],suf:'x'},{arr:(pzLang()==='en'?(PZ_LISTEN_EN[level]||[]):(PZ_LISTEN_RU[level]||[])),suf:'l'}].flatMap(src=>src.arr.map((it,ii)=>({it,ii,suf:src.suf})));
   const out=[];
   items.forEach(({it,ii,suf})=>{
     if(it.type==='reading'){it.qs.forEach((q,qi)=>out.push({_id:level+suf+'-r'+ii+'-'+qi,tag:'阅读',level,lang:pzLang(),passage:it.passage,q:q.q,opts:q.opts,ans:q.ans,explain:q.explain}))}
@@ -1662,7 +1680,7 @@ function pzResultSeq(){
 function pzCompose(lv){
   const flat=pzFlat(lv),by={};
   flat.forEach(c=>{(by[c.tag]=by[c.tag]||[]).push(c)});
-  const want=Object.assign({语法:10,词汇:5,情景:4,阅读:3,配对:3},pzLang()==='en'?{听力:3,词汇:4}:{}),out=[];
+  const want=Object.assign({语法:10,词汇:5,情景:4,阅读:3,听力:3,配对:3},pzLang()==='en'?{词汇:4}:{}),out=[];
   ['语法','词汇','情景','阅读','听力','配对'].forEach(t=>{
     const pool=shuffle((by[t]||[]).slice());
     let need=want[t];
@@ -1796,7 +1814,7 @@ function pzPaperList(level){
     <div class="book-bar" style="justify-content:center;margin-bottom:6px" id="pzLvlBar">${PZ_LVLS.map(l=>`<button class="book-chip${l===level?' active':''}" data-lv="${l}">${l}</button>`).join('')}</div>
     <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;margin-bottom:10px">${pzLang()==='en'?'对标剑桥 KET/PET/FCE/CAE/CPE 机改部分（语法词汇/阅读/交际）· 限时 · ⭐ 收藏试卷':'题型与题量对标线下官方考试（语法词汇/阅读/交际）· 限时 · 交卷统一判分 · ⭐ 收藏试卷'}</div>
     ${papers.map(p=>{const isFav=fav.includes(p.id);return `<div class="pz-entry" data-paper="${p.id}"><span class="pe-ico">${isFav?'⭐':'📄'}</span><span><span class="pe-t">${p.name}</span><div class="pe-d">${p.desc}</div><div class="pe-d">约 ${pzComposePaper(level,p).length} 题 · ${p.time} 分钟 · 交卷判分</div></span><span class="pz-fav" data-fid="${p.id}" style="margin-left:auto;font-size:18px;cursor:pointer;padding:0 4px">${isFav?'⭐':'☆'}</span></div>`}).join('')}
-    <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;padding:4px 0 12px">${pzLang()==='en'?'听力题由英文 TTS 朗读 · 写作/口语需 AI 批改，暂未包含':'听力/写作/口语部分需语音包与 AI 批改，暂未包含'}</div>
+    <div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;padding:4px 0 12px">${pzLang()==='en'?'听力题由英文 TTS 朗读 · 写作/口语需 AI 批改，暂未包含':'听力题由俄语 TTS 朗读（Pavel/Irina 音色）· 写作/口语需 AI 批改，暂未包含'}</div>
   </div>`;
   el.querySelector('#pzBack').addEventListener('click',pzHome);
   el.querySelectorAll('#pzLvlBar .book-chip').forEach(b=>b.addEventListener('click',()=>pzPaperList(b.dataset.lv)));
