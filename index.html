@@ -112,6 +112,8 @@
           <span style="font-weight:600;font-size:15px;color:var(--blue)">🎤 课堂模式</span>
           <span id="classStatus" style="font-size:11px;color:var(--text3)">未开始</span>
           <span style="flex:1"></span>
+          <button id="classTermsBtn" class="mini-chip">📖 术语</button>
+          <button id="classScrollBtn" class="mini-chip">⏸ 滚动</button>
           <button id="classHistBtn" class="mini-chip">📚 历史</button>
           <span style="font-size:11px;color:var(--text3)" id="classCount">0 句</span>
         </div>
@@ -121,6 +123,15 @@
         </div>
         <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:6px" id="classHint">
           说俄语 → 自动转文字 → 翻译显示。识别引擎：<b id="classEngine">检测中…</b>
+        </div>
+        <div id="classTermsPanel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <input id="classTermRu" placeholder="русский 术语" style="flex:1;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
+            <input id="classTermCn" placeholder="中文翻译" style="flex:1;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
+            <button id="classTermAdd" style="padding:7px 12px;border-radius:8px;font-size:12px;background:var(--blue);color:#fff;border:none;cursor:pointer">添加</button>
+          </div>
+          <div id="classTermsList" style="font-size:12px;max-height:120px;overflow-y:auto"></div>
+          <div style="font-size:10px;color:var(--text3);margin-top:4px">术语会注入课堂翻译，保证整节课译法统一</div>
         </div>
       </div>
       <div id="classBoard" style="flex:1;overflow-y:auto;min-height:0;padding-bottom:10px">
@@ -1952,7 +1963,7 @@ function genId(){return Date.now().toString(36)+Math.random().toString(36).slice
 function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 
-const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null};
+const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true};
 let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0;
 
 function classAddItem(original,translation,note,confidence){
@@ -1963,11 +1974,10 @@ function classAddItem(original,translation,note,confidence){
   if(CLASS.items.length>200)CLASS.items.shift();
   // 异步写入 IndexedDB，不阻塞字幕渲染
   if(CLASS.sessionId){
-    idbStore.put('transcripts',{id:item._id,sessionId:CLASS.sessionId,timestamp:item._ts,original,translation,note:note||'',confidence:item.confidence}).catch(()=>{});
+    idbStore.put('transcripts',{id:item._id,sessionId:CLASS.sessionId,timestamp:item._ts,original,translation,note:note||'',confidence:item.confidence,star:item.star?1:0}).catch(()=>{});
   }
   classRender();
-  const board=document.getElementById('classBoard');
-  board.scrollTop=board.scrollHeight;
+  if(CLASS.scrollOn!==false){const board=document.getElementById('classBoard');board.scrollTop=board.scrollHeight;}
 }
 
 function classRender(){
@@ -1975,15 +1985,15 @@ function classRender(){
   document.getElementById('classCount').textContent=CLASS.items.length+' 句';
   if(!CLASS.items.length){el.innerHTML='<div class="empty-state" id="classEmpty">点击"开始录音"，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div>';return}
   el.innerHTML=CLASS.items.map((it,i)=>`
-    <div class="class-item" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:6px;animation:fadeIn .2s ease">
+    <div class="class-item" style="background:var(--surface);border:${it.star?'1.5px solid var(--yellow)':'1px solid var(--border)'};border-radius:var(--radius);padding:12px;margin-bottom:6px;animation:fadeIn .2s ease">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:10px;color:var(--text3)">${it.time}</span>
         <span style="display:flex;gap:6px">
           <span class="class-play" data-i="${i}" data-lang="ru" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊原文</span>
-          <span class="class-play" data-i="${i}" data-lang="zh" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊译文</span> <span class="class-sa" data-i="${i}" title="句子解析" style="font-size:12px;color:var(--blue);padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">📐</span> <span class="class-del" data-i="${i}" style="font-size:12px;color:var(--red);padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">🗑</span>
+          <span class="class-play" data-i="${i}" data-lang="zh" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input)">🔊译文</span> <span class="class-star" data-i="${i}" title="标为重点" style="font-size:12px;color:${it.star?'var(--yellow)':'var(--text3)'};padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">${it.star?'⭐':'☆'}</span> <span class="class-sa" data-i="${i}" title="句子解析" style="font-size:12px;color:var(--blue);padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">📐</span> <span class="class-del" data-i="${i}" style="font-size:12px;color:var(--red);padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">🗑</span>
         </span>
       </div>
-      <div data-edit="${i}" title="点击编辑原文" style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px;cursor:pointer">${escape(it.original)}${it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-weight:400;font-size:13px">⚠️ 识别不准</span>':''}</div>
+      <div data-edit="${i}" title="点击编辑原文" style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px;cursor:pointer">${it.star?'<span style="color:var(--yellow)">⭐ </span>':''}${escape(it.original)}${it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-weight:400;font-size:13px">⚠️ 识别不准</span>':''}</div>
       <div style="font-size:14px;color:var(--blue);line-height:1.5">${escape(it.translation)}</div>
       ${it.note?`<div style="font-size:11px;color:var(--yellow);margin-top:3px">⚠️ ${escape(it.note)}</div>`:''}
     </div>`).join('');
@@ -1995,6 +2005,15 @@ function classRender(){
   });
   el.querySelectorAll('[data-edit]').forEach(b=>{
     b.addEventListener('click',()=>classEditItem(parseInt(b.dataset.edit)));
+  });
+  el.querySelectorAll('.class-star').forEach(b=>{
+    b.addEventListener('click',e=>{
+      e.stopPropagation();
+      const idx=parseInt(b.dataset.i);const it=CLASS.items[idx];if(!it)return;
+      it.star=!it.star;
+      if(it._id&&CLASS.sessionId)idbStore.put('transcripts',{id:it._id,sessionId:CLASS.sessionId,timestamp:it._ts,original:it.original,translation:it.translation,note:it.note,confidence:it.confidence,star:it.star?1:0}).catch(()=>{});
+      classRender();
+    });
   });
   el.querySelectorAll('.class-del').forEach(b=>{
     b.addEventListener('click',e=>{
@@ -2052,7 +2071,7 @@ function classEditItem(i){
       it.note=r.note||'';
       it.confidence=null; // 手动修正后清除低置信标记
       if(it._id&&CLASS.sessionId){
-        idbStore.put('transcripts',{id:it._id,sessionId:CLASS.sessionId,timestamp:it._ts,original:it.original,translation:it.translation,note:it.note,confidence:null}).catch(()=>{});
+        idbStore.put('transcripts',{id:it._id,sessionId:CLASS.sessionId,timestamp:it._ts,original:it.original,translation:it.translation,note:it.note,confidence:null,star:it.star?1:0}).catch(()=>{});
       }
     }
     classRender();
@@ -2067,7 +2086,7 @@ function classEditItem(i){
 async function classTranslate(text){
   if(!S.settings.dsKey){return{original:text,translation:'（需要 DeepSeek Key 才能翻译，请在设置中填写）',note:''}}
   try{
-    const d=await apiFetch('/api/class-translate',{body:{key:S.settings.dsKey,text},timeout:35000});
+    const d=await apiFetch('/api/class-translate',{body:{key:S.settings.dsKey,text,terms:classTermsGet().map(t=>t.ru+'='+t.cn).join('; ').slice(0,800)},timeout:35000});
     return{original:d.original||text,translation:d.translation||'',note:d.note||''};
   }catch(e){
     return{original:text,translation:'（翻译失败: '+friendlyErr(e)+'）',note:''};
@@ -2198,16 +2217,18 @@ let classHistMode=false;
 const CLASS_BACK_BTN='<button id="classBackLive" style="padding:7px 14px;border-radius:16px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">← 返回字幕板</button>';
 function classItemsToText(items){return items.map((it,i)=>`${i+1}. [${it.time||fmtTimeShort(it.timestamp)}] ${it.original}\n    ${it.translation}${it.note?' ⚠️'+it.note:''}${it.confidence!==null&&it.confidence<-0.8?' ⚠️识别不准':''}`).join('\n\n')}
 function classItemsToMarkdown(session,items){
-  const head=['# 课堂记录','','- 日期：'+fmtTime(session.startTime),'- 时长：'+(session.endTime?Math.round((session.endTime-session.startTime)/1000)+' 秒':'进行中'),'- 句数：'+items.length,'','---',''];
+  const stars=items.filter(x=>x.star);
+  const head=['# 课堂记录','','- 日期：'+fmtTime(session.startTime),'- 时长：'+(session.endTime?Math.round((session.endTime-session.startTime)/1000)+' 秒':'进行中'),'- 句数：'+items.length,'- 重点句：'+stars.length,'','---',''];
+  const starSec=stars.length?['## ⭐ 本课重点',''].concat(stars.map(x=>'- '+x.original+' — '+x.translation),['','---','']):[];
   const body=items.map((it,i)=>{
-    let line='### '+(i+1)+'. '+it.original;
+    let line='### '+(it.star?'⭐ ':'')+(i+1)+'. '+it.original;
     line+='\n\n> '+it.translation;
     if(it.note)line+='\n\n⚠️ '+it.note;
     if(it.confidence!==null&&it.confidence<-0.8)line+='\n\n⚠️ 识别不准';
     line+='\n\n<small>'+(it.time||fmtTimeShort(it.timestamp))+'</small>';
     return line;
   });
-  return head.join('\n')+body.join('\n\n');
+  return head.join('\n')+starSec.join('\n')+'\n'+body.join('\n\n');
 }
 function downloadMd(filename,content){
   const blob=new Blob(['﻿'+content],{type:'text/markdown;charset=utf-8'});
@@ -2278,6 +2299,23 @@ document.getElementById('classStartBtn').addEventListener('click',classStart);
 document.getElementById('classStopBtn').addEventListener('click',classStop);
 document.getElementById('classSaveBtn').addEventListener('click',classSave);
 document.getElementById('classClearBtn').addEventListener('click',classClear);
+document.getElementById('classScrollBtn').addEventListener('click',()=>{CLASS.scrollOn=!CLASS.scrollOn;document.getElementById('classScrollBtn').textContent=CLASS.scrollOn?'⏸ 滚动':'▶ 已暂停';toast(CLASS.scrollOn?'自动滚动已恢复':'自动滚动已暂停')});
+const classTermsGet=()=>ls('classTerms',[]);
+function classTermsRender(){
+  const box=document.getElementById('classTermsList');if(!box)return;
+  const t=classTermsGet();
+  box.innerHTML=t.length?t.map((x,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dashed var(--border)"><span><b style="color:var(--blue)">${escape(x.ru)}</b> = ${escape(x.cn)}</span><span class="class-term-del" data-i="${i}" style="color:var(--red);cursor:pointer">✕</span></div>`).join(''):'<span style="color:var(--text3)">还没有术语，添加后翻译即刻生效</span>';
+  box.querySelectorAll('.class-term-del').forEach(b=>b.addEventListener('click',()=>{const a=classTermsGet();a.splice(parseInt(b.dataset.i),1);ss('classTerms',a);classTermsRender()}));
+}
+document.getElementById('classTermsBtn').addEventListener('click',()=>{const p=document.getElementById('classTermsPanel');p.style.display=p.style.display==='block'?'none':'block';classTermsRender()});
+document.getElementById('classTermAdd').addEventListener('click',()=>{
+  const ru=document.getElementById('classTermRu').value.trim(),cn=document.getElementById('classTermCn').value.trim();
+  if(!ru||!cn){toast('两边都要填');return}
+  const a=classTermsGet();if(a.some(x=>x.ru===ru)){toast('该术语已存在');return}
+  a.push({ru,cn});ss('classTerms',a);
+  document.getElementById('classTermRu').value='';document.getElementById('classTermCn').value='';
+  classTermsRender();toast('术语已添加，翻译即刻生效');
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  APP SETTINGS

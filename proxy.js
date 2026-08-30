@@ -566,6 +566,7 @@ const server = http.createServer((req, res) => {
       try {
         const reqBody = JSON.parse(body);
         const { text } = reqBody;
+        const terms = String(reqBody.terms || '').slice(0, 800);
         if (!text || !text.trim()) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: '文本为空' }));
@@ -588,7 +589,7 @@ const server = http.createServer((req, res) => {
 {"original":"规整后的俄语原文","translation":"中文翻译","note":"术语注释（如有难译术语，无则空字符串）"}
 
 如果听不清或文本不完整，original保留原样，translation翻译能听懂的部分，note注明"音频不完整"。` },
-          { role: 'user', content: text }
+          { role: 'user', content: text + (terms ? '\n\n[课程术语表，这些词的中文翻译必须采用：' + terms + ']' : '') }
         ], 2000, 30000);
         const raw = d.data.choices?.[0]?.message?.content?.trim() || '';
         const parsed = extractJson(raw);
