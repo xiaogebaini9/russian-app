@@ -1595,7 +1595,7 @@ function pzQSeq(){
   el.innerHTML=`<div class="anim-in" style="padding:8px 0 24px">
     <div style="display:flex;align-items:center;margin-bottom:6px">
       <span id="pzBack" style="cursor:pointer;font-size:18px;color:var(--blue);padding:4px 8px;line-height:1">←</span>
-      <span style="flex:1;text-align:center;font-size:var(--fs-sm);color:var(--text3)">${st.mode==='wrong'?'错题重做':'顺序练习'} · ${st.level} · ${st.idx+1}/${total}</span>
+      <span style="flex:1;text-align:center;font-size:var(--fs-sm);color:var(--text3)">${st.mode==='wrong'?'错题重做':st.mode==='ai'?'AI 出题':'顺序练习'} · ${st.level} · ${st.idx+1}/${total}</span>
       <span style="width:34px"></span>
     </div>
     <div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:14px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${st.idx/total*100}%"></div></div>
