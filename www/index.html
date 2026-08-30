@@ -96,7 +96,14 @@
     </div>
 
     <!-- ══ QUIZ ══ -->
-    <div class="screen" id="sQuiz"><div id="quizArea"></div></div>
+    <div class="screen" id="sQuiz">
+      <div class="sub-tabs" style="margin-bottom:10px;flex-shrink:0">
+        <button class="sub-tab active" data-pq="practice">🎯 刷题练习</button>
+        <button class="sub-tab" data-pq="oldquiz">📝 单词测验</button>
+      </div>
+      <div id="practiceArea" style="flex:1;overflow-y:auto;min-height:0"></div>
+      <div id="quizArea" style="display:none;flex:1;overflow-y:auto;min-height:0"></div>
+    </div>
 
     <!-- ══ CLASS MODE (课堂语音翻译) ══ -->
     <div class="screen" id="sClass">
@@ -855,6 +862,395 @@ function learnShowWord(word,bid){
 renderQuizSetup();
 
 // ═══════════════════════════════════════════════════════════════
+//  PZ_ 练习中心（独立区：不碰 VOCAB/CEFR/旧测验函数，全部 pz 前缀）
+// ═══════════════════════════════════════════════════════════════
+const PZ_LVLS=['A1','A2','B1','B2','C1','C2'];
+const PZ_BANK={
+A1:[
+{type:'grammar',q:'У меня есть одна ___.',opts:['книга','книги','книгу','о книге'],ans:0,explain:'есть + 名词主格单数：одна книга（一本书）'},
+{type:'grammar',q:'Мы ___ по-русски.',opts:['говорим','говорите','говорит','говорю'],ans:0,explain:'мы + говорим（говорить 第一变位法 -ем）'},
+{type:'grammar',q:'Антон вчера ___ новый фильм.',opts:['смотрел','смотрит','посмотрю','смотрят'],ans:0,explain:'вчера 表过去 → 阳性过去时 смотрел'},
+{type:'grammar',q:'Студенты живут ___.',opts:['в общежитии','в общежитие','в общежитию','общежитие'],ans:0,explain:'жить где → 前置格 в+第六格：в общежитии'},
+{type:'grammar',q:'Я читаю ___.',opts:['книгу','книги','книга','книге'],ans:0,explain:'читать что → 宾格第四格：книгу'},
+{type:'grammar',q:'У меня две ___.',opts:['ручки','ручка','ручку','ручке'],ans:0,explain:'две + 名词单数二格：две ручки'},
+{type:'grammar',q:'— ___ ты живёшь? — В общежитии.',opts:['Где','Куда','Когда','Как'],ans:0,explain:'Где? 问地点在哪里；Куда? 问方向'},
+{type:'grammar',q:'Меня ___ Антон.',opts:['зовут','зовёт','называю','зовёшь'],ans:0,explain:'Меня зовут + 名字 = 我叫…（固定表达）'},
+{type:'grammar',q:'У меня нет ___.',opts:['брата','брат','брату','брате'],ans:0,explain:'нет + 名词单数二格：нет брата'},
+{type:'grammar',q:'Вчера мы ___ в театр.',opts:['шли','шёл','шло','шла'],ans:0,explain:'мы + 过去时复数 шли（идти 的过去时）'},
+{type:'grammar',q:'Ты ___ русский язык?',opts:['изучаешь','изучает','изучаем','изучаю'],ans:0,explain:'ты + -ешь（изучать 第一变位法）'},
+{type:'grammar',q:'Мы едем ___.',opts:['в Астану','в Астане','Астаны','по Астане'],ans:0,explain:'ехать куда → в+第四格：в Астану（Астана→Астану）'},
+{type:'vocab',w:'университет',q:'университет 的意思？',opts:['大学','中学','图书馆','宿舍'],ans:0,explain:'университет = 大学'},
+{type:'vocab',w:'общежитие',q:'общежитие 的意思？',opts:['宿舍','食堂','教学楼','操场'],ans:0,explain:'общежитие = 宿舍'},
+{type:'vocab',w:'расписание',q:'расписание 的意思？',opts:['课程表','考试','笔记本','假期'],ans:0,explain:'расписание = 课程表/时刻表'},
+{type:'vocab',w:'преподаватель',q:'преподаватель 的意思？',opts:['老师','学生','校长','同学'],ans:0,explain:'преподаватель = 教师（高校）'},
+{type:'situational',q:'— Доброе утро! 选最合适的应答：',opts:['Доброе утро!','Добрый вечер!','Спокойной ночи!','До свидания!'],ans:0,explain:'早间问候用早间问候回应'},
+{type:'situational',q:'— Как дела? 你回答：',opts:['Спасибо, хорошо!','Здравствуйте!','До свидания!','Пожалуйста!'],ans:0,explain:'Как дела? = 最近怎么样？→ 回答 Спасибо, хорошо!'},
+{type:'situational',q:'你想礼貌地询问对方的名字，说：',opts:['Как вас зовут?','Кто вы такой?','Откуда вы?','Сколько вам лет?'],ans:0,explain:'Как вас зовут? = 您叫什么名字'},
+{type:'reading',passage:'Меня зовут Антон. Я студент. Я живу в Алматы, в общежитии. Каждое утро я иду в университет. Вечером я читаю и слушаю музыку.',qs:[
+{q:'Где живёт Антон?',opts:['В общежитии','Дома','В гостинице','У друзей'],ans:0,explain:'原文：живу в общежитии（住宿舍）'},
+{q:'Что Антон делает вечером?',opts:['Читает и слушает музыку','Смотрит телевизор','Играет в футбол','Работает'],ans:0,explain:'原文：Вечером я читаю и слушаю музыку'}]},
+{type:'pairing',words:[{ru:'студент',cn:'大学生'},{ru:'урок',cn:'课'},{ru:'словарь',cn:'词典'},{ru:'экзамен',cn:'考试'}]}
+],
+A2:[
+{type:'grammar',q:'Завтра я ___ в кино.',opts:['пойду','иду','ходил','хожу'],ans:0,explain:'завтра 表将来 → идти 的将来时 пойду'},
+{type:'grammar',q:'Вчера я ___ домашнее задание за час.',opts:['сделал','делаю','буду делать','делаете'],ans:0,explain:'за час 表示完成所需时间 → 完成体 сделал'},
+{type:'grammar',q:'Обычно я ___ письма родителям.',opts:['пишу','напишу','написал','пишут'],ans:0,explain:'обычно 表经常 → 未完成体 пишу'},
+{type:'grammar',q:'Вчера мы были ___.',opts:['в музее','в музей','музея','о музее'],ans:0,explain:'быть где → 前置格：в музее'},
+{type:'grammar',q:'Летом мы поедем ___.',opts:['на юг','на юге','югом','в юге'],ans:0,explain:'поехать куда → на+第四格：на юг'},
+{type:'grammar',q:'Мне ___ этот фильм.',opts:['нравится','нравятся','нравиться','понравишься'],ans:0,explain:'主语 фильм 是单数 → нравится；喜欢者用第三格 Мне'},
+{type:'grammar',q:'В группе нет новых ___.',opts:['студентов','студенты','студентам','студента'],ans:0,explain:'нет + 复数二格：нет новых студентов'},
+{type:'grammar',q:'Раньше она была ___.',opts:['учительницей','учительница','учительницы','учительницу'],ans:0,explain:'была кем → 第五格：учительницей'},
+{type:'grammar',q:'Сестре двадцать ___.',opts:['лет','года','год','годы'],ans:0,explain:'двадцать（5–20 范围）+ лет：двадцать лет'},
+{type:'grammar',q:'Эта песня очень ___.',opts:['красивая','красиво','красивый','красивым'],ans:0,explain:'песня 阴性 → 形容词阴性 -ая：красивая'},
+{type:'grammar',q:'Мой друг живёт в ___.',opts:['Пекине','Пекин','Пекина','Пекину'],ans:0,explain:'живёт где → в+第六格：в Пекине'},
+{type:'grammar',q:'Я хочу ___ русский язык.',opts:['знать','знаю','знал','знаешь'],ans:0,explain:'хочу + 不定式：хочу знать'},
+{type:'vocab',w:'проверять',q:'проверять 的意思？',opts:['检查','惩罚','证明','复制'],ans:0,explain:'проверять = 检查、核对'},
+{type:'vocab',w:'каникулы',q:'каникулы 的意思？',opts:['假期','课程','食堂','毕业'],ans:0,explain:'каникулы = 假期（只用复数）'},
+{type:'vocab',w:'ошибаться',q:'ошибаться 的意思？',opts:['犯错','道歉','回答','忘记'],ans:0,explain:'ошибаться = 犯错（ошибка 的动词）'},
+{type:'vocab',w:'успевать',q:'успевать 的意思？',opts:['来得及','失败','休息','迟到'],ans:0,explain:'успевать = 来得及、赶上'},
+{type:'situational',q:'你没听清老师的问题，礼貌地说：',opts:['Повторите, пожалуйста!','Что? Не понял!','Молчание!','До свидания!'],ans:0,explain:'Повторите, пожалуйста = 请再说一遍（礼貌）'},
+{type:'situational',q:'— Спасибо большое! 应答：',opts:['Пожалуйста!','Здравствуйте!','Доброе утро!','Кто это?'],ans:0,explain:'对 Спасибо 的固定应答是 Пожалуйста（不客气）'},
+{type:'situational',q:'朋友考了满分，你说：',opts:['Поздравляю!','Сочувствую!','Ничего страшного!','Бывает!'],ans:0,explain:'Поздравляю = 祝贺你'},
+{type:'reading',passage:'Внимание, студенты первого курса! Занятия начинаются в 9:00. Лекция по русскому языку будет в аудитории 305. После обеда — семинар по литературе в аудитории 210. Не опаздывайте!',qs:[
+{q:'Во сколько начинаются занятия?',opts:['В 9:00','В 8:00','В 10:00','В 12:00'],ans:0,explain:'原文：занятия начинаются в 9:00'},
+{q:'Где будет семинар по литературе?',opts:['В аудитории 210','В аудитории 305','В библиотеке','Дома'],ans:0,explain:'原文：семинар по литературе в аудитории 210'}]},
+{type:'pairing',words:[{ru:'покупать',cn:'买'},{ru:'продавать',cn:'卖'},{ru:'платить',cn:'付款'},{ru:'цена',cn:'价格'}]}
+],
+B1:[
+{type:'grammar',q:'Я горжусь ___.',opts:['своей работой','свою работу','своей работе','своей работа'],ans:0,explain:'гордиться кем-чем → 第五格：своей работой'},
+{type:'grammar',q:'Мы благодарим друзей за ___.',opts:['помощь','помощи','помощью','о помощи'],ans:0,explain:'благодарить кого за что → за+第四格：за помощь'},
+{type:'grammar',q:'Студенты, ___ в аудитории, готовятся к экзамену.',opts:['занимающиеся','занимавшиеся','занимаясь','занимаемые'],ans:0,explain:'正在进行的动作 → 现在时主动形动词 -ущ-/-ющ-：занимающиеся'},
+{type:'grammar',q:'___ мной текст нужно проверить.',opts:['Написанный','Написав','Написавши','Напишу'],ans:0,explain:'被写的（被动含义）→ 被动形动词 Написанный'},
+{type:'grammar',q:'___ упражнение, я пошёл гулять.',opts:['Сделав','Делая','Делаю','Сделать'],ans:0,explain:'先做完再走 → 完成体副动词 Сделав（做完…之后）'},
+{type:'grammar',q:'___ больше времени, я выучил бы весь текст.',opts:['Если бы у меня было','Если у меня есть','Когда у меня будет','Если у меня будет'],ans:0,explain:'虚拟条件：Если бы + 过去时，主句有 бы'},
+{type:'grammar',q:'Я хотел бы ___ в Россию летом.',opts:['поехать','поехал','поеду','ехать'],ans:0,explain:'хотел бы + 不定式 = 希望（委婉愿望）'},
+{type:'grammar',q:'Он сказал, ___ придёт вечером.',opts:['что','чтобы','если','когда'],ans:0,explain:'转述陈述内容 → что'},
+{type:'grammar',q:'Он попросил, ___ я купил билеты.',opts:['чтобы','что','если','когда'],ans:0,explain:'转述请求/愿望 → чтобы + 过去时'},
+{type:'grammar',q:'Она отказалась от ___.',opts:['помощи','помощь','помощью','о помощи'],ans:0,explain:'отказаться от + 二格：от помощи'},
+{type:'grammar',q:'Когда я ___ домой, я встретил соседа.',opts:['шёл','пошёл','схожу','хожу'],ans:0,explain:'作为背景正在进行的动作 → 未完成体 шёл'},
+{type:'grammar',q:'Новая квартира ___ , чем старая.',opts:['удобнее','удобная','удобно','удобнейший'],ans:0,explain:'比较级 -ее：удобнее（比…更舒适）'},
+{type:'vocab',w:'достопримечательность',q:'достопримечательность 的意思？',opts:['名胜古迹','百货商店','火车站','广场'],ans:0,explain:'достопримечательность = 名胜古迹'},
+{type:'vocab',w:'возможность',q:'возможность 的意思？',opts:['可能性','困难','优点','问题'],ans:0,explain:'возможность = 可能性、机会'},
+{type:'vocab',w:'впечатление',q:'впечатление 的意思？',opts:['印象','预言','记录','决定'],ans:0,explain:'впечатление = 印象'},
+{type:'vocab',w:'зависеть',q:'зависеть (от) 的意思？',opts:['取决于','依靠自己','独立','跟随'],ans:0,explain:'зависеть от = 取决于…'},
+{type:'situational',q:'你想请老师安排答疑，礼貌地说：',opts:['Извините, когда у вас консультация?','Давайте встретимся!','Придите ко мне!','Вы свободны?'],ans:0,explain:'консультация = 高校教师的答疑时间'},
+{type:'situational',q:'— Как вы сдали экзамен? 回答考得不错：',opts:['Нормально, кажется на четвёрку','Экзамен был в аудитории','Я сдал документы','Кажется, опоздал'],ans:0,explain:'на четвёрку = 得了4分（俄制5分制）'},
+{type:'situational',q:'你想委婉表达不同意，说：',opts:['Я не совсем согласен','Ты не прав!!','Это глупость!','Молчу!'],ans:0,explain:'Я не совсем согласен = 我不完全同意（委婉）'},
+{type:'reading',passage:'Уважаемые студенты! С 1 сентября библиотека работает по новому расписанию: с 9:00 до 20:00, в субботу — с 10:00 до 18:00, воскресенье — выходной. Читальный зал закрывается за 30 минут до окончания работы. Учебники можно брать на две недели, художественную литературу — на месяц. За просроченный учебник взимается небольшой штраф.',qs:[
+{q:'Когда библиотека НЕ работает?',opts:['В воскресенье','В субботу','В будни','После 18:00 в субботу'],ans:0,explain:'原文：воскресенье — выходной（周日闭馆）'},
+{q:'На сколько можно взять учебник?',opts:['На две недели','На месяц','На один день','На три дня'],ans:0,explain:'原文：учебники можно брать на две недели'},
+{q:'Что будет за просроченный учебник?',opts:['Небольшой штраф','Ничего','Отчисление','Предупреждение от декана'],ans:0,explain:'взимается штраф = 收取罚金'}]},
+{type:'pairing',words:[{ru:'зарплата',cn:'工资'},{ru:'расходы',cn:'支出'},{ru:'доход',cn:'收入'},{ru:'счёт',cn:'账单'}]}
+],
+B2:[
+{type:'grammar',q:'Температура ___ до +15 градусов к вечеру.',opts:['поднимется','поднималась','поднимается','поднималась бы'],ans:0,explain:'к вечеру（到傍晚时）表将来结果 → 完成体 поднимется'},
+{type:'grammar',q:'Проблема, ___ учёными много лет, до конца не решена.',opts:['изучаемая','изученная','изучающая','изучив'],ans:0,explain:'多年一直在被研究 → 现在时被动形动词 -ем-/-им-：изучаемая'},
+{type:'grammar',q:'Если бы не его помощь, мы ___ проект в срок.',opts:['не сдали бы','не сдадим','не сдали','не сдадим ли'],ans:0,explain:'虚拟过去：Если бы не…, 主句 не сдали бы'},
+{type:'grammar',q:'Несмотря на то ___ были сложности, проект завершён.',opts:['что','чтобы','который','как'],ans:0,explain:'несмотря на то что = 尽管…（让步）'},
+{type:'grammar',q:'Эта статья посвящена ___ древней литературы.',opts:['проблемам','проблем','проблемами','о проблемах'],ans:0,explain:'посвящена чему → 第三格：проблемам'},
+{type:'grammar',q:'Чем больше усилий, ___ .',opts:['тем лучше результат','тем лучше результата','лучше результат тем','то лучше результат'],ans:0,explain:'Чем…, тем… 双重比较固定结构'},
+{type:'grammar',q:'___ , соглашение будет подписано в мае.',opts:['По имеющимся данным','Между нами говоря','Короче говоря','Попросту говоря'],ans:0,explain:'По имеющимся данным = 据现有资料（新闻/公务语体插入语）'},
+{type:'grammar',q:'Деканат предупредил нас ___ расписания.',opts:['об изменении','об изменения','об изменением','об изменение'],ans:0,explain:'предупредить о + 第六格：об изменении'},
+{type:'grammar',q:'Проверив расчёты, бухгалтер ___ отчёт.',opts:['отправил','отправляет','отправит ли','отправлял'],ans:0,explain:'Проверив（查完之后）→ 主句完成体过去 отправил'},
+{type:'grammar',q:'Все, ___ пришёл на встречу, подписал протокол.',opts:['кто','который','что','чтобы'],ans:0,explain:'все, кто… 固定呼应结构'},
+{type:'vocab',w:'ответственность',q:'ответственность 的意思？',opts:['责任','能力','奖励','自由'],ans:0,explain:'ответственность = 责任（нессти ответственность 承担责任）'},
+{type:'vocab',w:'предпринимать',q:'предпринимать меры 的意思？',opts:['采取措施','制定法律','做出预测','提出问题'],ans:0,explain:'предпринимать меры = 采取措施（固定搭配）'},
+{type:'vocab',w:'последствие',q:'последствие 的意思？',opts:['后果','原因','过程','前提'],ans:0,explain:'последствие = 后果'},
+{type:'vocab',w:'свидетельство',q:'свидетельство 的意思？',opts:['证明','证人','假期','报销'],ans:0,explain:'свидетельство = 证明、凭证'},
+{type:'situational',q:'考试周你想申请补考，给系办写申请，开头最合适：',opts:['Прошу разрешить мне сдать экзамен дополнительно','Дайте пересдачу!','Я не хочу сдавать!','Когда каникулы?'],ans:0,explain:'Прошу разрешить… = 请批准我…（公务申请语体）'},
+{type:'situational',q:'导师指出你论文的不足，得体的回应：',opts:['Спасибо, учту замечания','Это не важно!','Не согласен вообще!','Уже поздно!'],ans:0,explain:'учту замечания = 我会注意这些意见（学术沟通）'},
+{type:'reading',passage:'Исследование, проведённое среди студентов казахстанских университетов, показало: более 70% опрошенных совмещают учёбу с работой. При этом большинство работает не более 20 часов в неделю. Главной причиной подработки студенты назвали желание быть финансово независимыми от родителей. Однако 40% отметили, что работа мешает готовиться к занятиям. Учёные рекомендуют университетам развивать гибкий график: часть лекций можно слушать в записи.',qs:[
+{q:'Сколько процентов студентов совмещают учёбу с работой?',opts:['Более 70%','Более 40%','Менее 20%','Около 50%'],ans:0,explain:'原文：более 70% опрошенных'},
+{q:'Почему студенты подрабатывают?',opts:['Хотят быть финансово независимыми','Им не нравится учёба','Чтобы платить за общежитие','По требованию родителей'],ans:0,explain:'главная причина — финансовая независимость（经济独立）'},
+{q:'Что рекомендуют учёные?',opts:['Гибкий график занятий','Запретить работу студентам','Сократить каникулы','Увеличить часы лекций'],ans:0,explain:'原文：развивать гибкий график'}]},
+{type:'pairing',words:[{ru:'применение',cn:'应用'},{ru:'исследование',cn:'研究'},{ru:'разработка',cn:'开发'},{ru:'результат',cn:'结果'}]}
+],
+C1:[
+{type:'grammar',q:'Этот план ___ на два года.',opts:['рассчитан','рассчитал','расчётлив','расчёты'],ans:0,explain:'短尾被动：рассчитан на + 时间 = 计划为期…'},
+{type:'grammar',q:'Она работает не ___ рук.',opts:['покладая','сложа','опустив','поднимая'],ans:0,explain:'не покладая рук = 不辞辛劳地（成语）；сложа руки = 袖手旁观'},
+{type:'grammar',q:'Как ни ___, а правила менять не будут.',opts:['старались','старались бы','старайтесь','стараемся'],ans:0,explain:'как ни + 过去时 = 无论怎么努力…（让步从句）'},
+{type:'grammar',q:'Учёные пришли ___ , что климат меняется.',opts:['к выводу','на вывод','в вывод','вывода'],ans:0,explain:'прийти к выводу = 得出结论（固定搭配）'},
+{type:'grammar',q:'Его вклад трудно ___.',opts:['переоценить','оценить','недооценить','оценивать'],ans:0,explain:'трудно переоценить = 价值无法估量'},
+{type:'grammar',q:'___ , задача решена лишь частично.',opts:['Строго говоря','Короче говоря','Между прочим','Как раз'],ans:0,explain:'строго говоря = 严格来说'},
+{type:'vocab',w:'умозаключение',q:'умозаключение 的意思？',opts:['推理','结论','假设','观察'],ans:0,explain:'умозаключение = 推理、推论'},
+{type:'vocab',w:'неоспоримый',q:'неоспоримый 的意思？',opts:['无可争辩的','不确定的','有争议的','有条件的'],ans:0,explain:'неоспоримый = 无可争辩的'},
+{type:'situational',q:'学术会议上质疑讲者的数据，礼貌的说法：',opts:['Позвольте не согласиться: данные, кажется, устарели','Вы ошибаетесь!','Это ложь!','Не хочу слушать!'],ans:0,explain:'Позвольте не согласиться = 请允许我不同意（学术礼貌用语）'},
+{type:'reading',passage:'Цифровизация образования — процесс необратимый, однако её эффективность зависит не от количества экранов, а от методики. Как показывают последние исследования, студенты, использующие электронные ресурсы систематически, показывают результаты на 15–20% выше. Проблема в другом: доступ к качественным материалам распределён неравномерно, и это усиливает образовательное неравенство.',qs:[
+{q:'От чего зависит эффективность цифровизации?',opts:['От методики','От количества экранов','От числа студентов','От цены техники'],ans:0,explain:'原文：зависит не от количества экранов, а от методики'},
+{q:'Какую проблему выделяет автор?',opts:['Неравный доступ к материалам','Отсутствие интернета','Медленный интернет','Дорогие ноутбуки'],ans:0,explain:'原文：доступ распределён неравномерно（获取不均）'}]}
+],
+C2:[
+{type:'grammar',q:'Докладчик говорил ___, без единой запинки.',opts:['бегло','бегом','набегло','на бегу'],ans:0,explain:'бегло = 流利地（副词）；бегом = 跑着地'},
+{type:'grammar',q:'___ все трудности, проект был завершён в срок.',opts:['Невзирая на','Не смотря в окно','Несмотря о','Вопреки с'],ans:0,explain:'невзирая на = 尽管（公文语体，比 несмотря на 更书面）'},
+{type:'grammar',q:'Речь специалиста отличалась ___ терминологии.',opts:['точностью','точный','точно','точность'],ans:0,explain:'отличаться чем → 第五格：точностью'},
+{type:'grammar',q:'Его аргументы были ___.',opts:['неоспоримы','неоспоримый','неоспоримо','неоспоримость'],ans:0,explain:'были + 短尾复数：неоспоримы'},
+{type:'vocab',w:'апеллировать',q:'апеллировать к фактам 的意思？',opts:['援引事实','反对事实','删除事实','伪造事实'],ans:0,explain:'апеллировать к = 援引、诉诸（正式用语）'},
+{type:'vocab',w:'прецедент',q:'прецедент 的意思？',opts:['先例','事故','传统','惩罚'],ans:0,explain:'прецедент = 先例'},
+{type:'situational',q:'答辩委员会请你概括陈述结论，最合适的开头：',opts:['Позвольте резюмировать основные выводы','Сейчас всё расскажу с начала!','Я не готов!','Зачитайте сами!'],ans:0,explain:'резюмировать = 概括总结（正式场合）'},
+{type:'reading',passage:'Лингвисты давно спорят о статусе русского языка в постсоветском пространстве. Данные последних десятилетий противоречивы: с одной стороны, сокращается русскоязычное вещание, с другой — растёт интерес к русскому как языку науки и делового общения. Вероятно, будущее русского языка определит не государственная политика, а экономика: язык следует за рынком, а не за декларациями.',qs:[
+{q:'Что, по мнению автора, определит будущее русского языка?',opts:['Экономика','Государственная политика','Декларации','Вещание'],ans:0,explain:'原文：определит не политика, а экономика'},
+{q:'Какова ситуация с русским как языком науки?',opts:['Интерес растёт','Интерес сокращается','Не меняется','Не изучалась'],ans:0,explain:'原文：растёт интерес к русскому как языку науки'}]}
+]};
+
+// ── PZ 工具 ──
+const pzToday=()=>new Date().toLocaleDateString('sv');
+const pzL=i=>String.fromCharCode(1040+i);
+const pzFmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+function pzFlat(level){
+  const out=[];(PZ_BANK[level]||[]).forEach((it,ii)=>{
+    if(it.type==='reading'){it.qs.forEach((q,qi)=>out.push({_id:level+'-r'+ii+'-'+qi,tag:'阅读',level,passage:it.passage,q:q.q,opts:q.opts,ans:q.ans,explain:q.explain}))}
+    else if(it.type==='pairing'){
+      const cns=it.words.map(w=>w.cn);
+      it.words.forEach((w,wi)=>out.push({_id:level+'-p'+ii+'-'+wi,tag:'配对',level,q:'«'+w.ru+'» 的意思是？',opts:cns.slice(),ans:cns.indexOf(w.cn),explain:'词义：'+w.ru+' = '+w.cn,w:w.ru}));
+    }else{
+      const tag=it.type==='grammar'?'语法':it.type==='vocab'?'词汇':'情景';
+      out.push({_id:level+'-'+it.type[0]+ii,tag,level,q:it.q,opts:it.opts,ans:it.ans,explain:it.explain,w:it.w});
+    }
+  });
+  out.forEach(c=>{const m=c.opts.map((t,i)=>({t,ok:i===c.ans}));shuffle(m);c.opts=m.map(x=>x.t);c.ans=m.findIndex(x=>x.ok)});
+  return out;
+}
+const pzGetWrong=()=>ls('pzWrong',[]);
+const pzSetWrong=a=>ss('pzWrong',a);
+function pzAddWrong(c,picked){const a=pzGetWrong();if(!a.some(x=>x._id===c._id))a.push({_id:c._id,level:c.level,tag:c.tag,q:c.q,opts:c.opts,ans:c.ans,explain:c.explain,passage:c.passage,w:c.w,picked});pzSetWrong(a)}
+function pzRemoveWrong(id){pzSetWrong(pzGetWrong().filter(x=>x._id!==id))}
+const pzStatGet=()=>ls('pzStat',{total:0,correct:0,days:{}});
+function pzBump(ok){const s=pzStatGet();s.total++;if(ok)s.correct++;const d=pzToday();s.days[d]=s.days[d]||{t:0,c:0};s.days[d].t++;if(ok)s.days[d].c++;ss('pzStat',s)}
+function pzStopTimer(){if(PZ&&PZ.timerId){clearInterval(PZ.timerId);PZ.timerId=null}}
+function pzWrongListHTML(items){
+  return '<div style="text-align:left;margin:0 2px 12px">'+items.map(x=>`<div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;font-size:var(--fs-sm)">
+    <div style="margin-bottom:4px"><span class="pz-chip">${x.c.tag}</span> ${escape(x.c.q)}</div>
+    ${x.c.passage?`<div class="pz-pass" style="margin:4px 0">${escape(x.c.passage)}</div>`:''}
+    <div style="color:var(--red);font-size:var(--fs-xs)">你的答案：${x.picked==null?'未作答':escape(x.c.opts[x.picked])}</div>
+    <div style="color:var(--green);font-size:var(--fs-xs)">正确答案：${escape(x.c.opts[x.c.ans])}</div>
+    <div style="color:var(--text3);font-size:var(--fs-xs);margin-top:3px">💡 ${escape(x.c.explain)}</div>
+    ${x.c.w?`<button class="pz-ghost pz-review" data-w="${escape(x.c.w)}" style="margin-top:6px;padding:5px 12px;font-size:11px">📖 去课本复习</button>`:''}
+  </div>`).join('')+'</div>';
+}
+function pzBindReview(root){root.querySelectorAll('.pz-review').forEach(b=>b.addEventListener('click',()=>{learnShowWord(b.dataset.w,0);toast('已跳到课本，搜索：'+b.dataset.w)}))}
+
+// ── PZ 首页 ──
+let PZ=null;
+function pzHome(){
+  pzStopTimer();PZ=null;
+  const el=document.getElementById('practiceArea');
+  const wrongs=pzGetWrong(),s=pzStatGet(),dd=s.days[pzToday()]||{t:0,c:0};
+  const lv=ls('pzLevel',S.settings.targetLevel||'A1');
+  el.innerHTML=`<div class="anim-in" style="padding:2px 0 24px">
+    <div style="text-align:center;margin:6px 0 14px">
+      <div style="font-size:16px;font-weight:600;color:var(--blue)">🎯 练习中心</div>
+      <div style="font-size:var(--fs-xs);color:var(--text3);margin-top:3px">今日已练 ${dd.t} 题 · 正确率 ${dd.t?Math.round(dd.c/dd.t*100):0}% · 备考目标 ${S.settings.targetLevel||'未设'}</div>
+    </div>
+    <div style="font-size:var(--fs-sm);color:var(--text2);margin-bottom:6px">级别</div>
+    <div class="book-bar" style="margin-bottom:12px" id="pzLvBar">${PZ_LVLS.map(l=>`<button class="book-chip${l===lv?' active':''}" data-lv="${l}">${l}</button>`).join('')}</div>
+    <div class="pz-entry" id="pzGoSeq"><span class="pe-ico">📚</span><span><span class="pe-t">分级题库练习</span><div class="pe-d">${lv} · 15 题混合 · 逐题判定 + 解析 · 离线可用</div></span></div>
+    <div class="pz-entry" id="pzGoMock"><span class="pe-ico">⏱️</span><span><span class="pe-t">模拟测试</span><div class="pe-d">${lv} · 25 题 · 20 分钟倒计时 · 交卷统一判分</div></span></div>
+    <div class="pz-entry" id="pzGoWrong"><span class="pe-ico">❌</span><span><span class="pe-t">错题重做</span><div class="pe-d">答对自动移出错题本</div></span>${wrongs.length?`<span class="pz-badge">${wrongs.length}</span>`:''}</div>
+    ${wrongs.length?`<div class="pz-entry" id="pzGoClear" style="padding:10px 16px"><span class="pe-ico">🧹</span><span><span class="pe-t" style="font-size:var(--fs-sm);color:var(--text2)">清空错题本</span></span></div>`:''}
+    <div class="pz-entry" id="pzGoRes"><span class="pe-ico">🔗</span><span><span class="pe-t">真题与资料库</span><div class="pe-d">ТРКИ 样题 · 剑桥/雅思官方模拟 · 外链</div></span></div>
+  </div>`;
+  el.querySelectorAll('#pzLvBar .book-chip').forEach(b=>b.addEventListener('click',()=>{ss('pzLevel',b.dataset.lv);pzHome()}));
+  el.querySelector('#pzGoSeq').addEventListener('click',()=>pzStartSeq(lv));
+  el.querySelector('#pzGoMock').addEventListener('click',()=>pzStartMock(lv));
+  el.querySelector('#pzGoWrong').addEventListener('click',()=>pzStartWrong());
+  const clr=el.querySelector('#pzGoClear');if(clr)clr.addEventListener('click',()=>{if(confirm('确定清空所有错题？')){pzSetWrong([]);pzHome();toast('错题本已清空')}});
+  el.querySelector('#pzGoRes').addEventListener('click',()=>{showScreen('sMore');showMoreTab('res')});
+}
+
+// ── 模式一：顺序练习 / 错题重做（逐题判定）──
+function pzStartSeq(lv){
+  const flat=pzFlat(lv);
+  if(!flat.length){toast('该级别题库建设中');return}
+  PZ={mode:'seq',level:lv,cards:shuffle(flat.slice()).slice(0,15),idx:0,correct:0,wrongIds:[],t0:Date.now()};
+  pzQSeq();
+}
+function pzStartWrong(list){
+  const items=list||pzGetWrong();
+  if(!items.length){toast('错题本是空的，太棒了！');pzHome();return}
+  PZ={mode:'wrong',level:items[0].level||'',cards:shuffle(items.slice()).slice(0,15),idx:0,correct:0,wrongIds:[],t0:Date.now()};
+  pzQSeq();
+}
+function pzQSeq(){
+  const st=PZ,el=document.getElementById('practiceArea');
+  if(st.idx>=st.cards.length){pzResultSeq();return}
+  const c=st.cards[st.idx],total=st.cards.length;
+  el.innerHTML=`<div class="anim-in" style="padding:8px 0 24px">
+    <div style="display:flex;align-items:center;margin-bottom:6px">
+      <span id="pzBack" style="cursor:pointer;font-size:18px;color:var(--blue);padding:4px 8px;line-height:1">←</span>
+      <span style="flex:1;text-align:center;font-size:var(--fs-sm);color:var(--text3)">${st.mode==='wrong'?'错题重做':'顺序练习'} · ${st.level} · ${st.idx+1}/${total}</span>
+      <span style="width:34px"></span>
+    </div>
+    <div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:14px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${st.idx/total*100}%"></div></div>
+    ${c.passage?`<div class="pz-pass">${escape(c.passage)}</div>`:''}
+    <div style="margin-top:10px"><span class="pz-chip">${c.tag}</span></div>
+    <div class="pz-qtext">${escape(c.q)}</div>
+    <div id="pzOpts" style="display:grid;gap:8px">${c.opts.map((o,i)=>`<button class="pz-opt" data-i="${i}">${pzL(i)}. ${escape(o)}</button>`).join('')}</div>
+    <div id="pzExp" class="pz-exp" style="display:none"></div>
+  </div>`;
+  el.querySelector('#pzBack').addEventListener('click',()=>{if(confirm('退出本次练习？'))pzHome()});
+  let locked=false;
+  el.querySelectorAll('#pzOpts .pz-opt').forEach(btn=>btn.addEventListener('click',()=>{
+    if(locked)return;locked=true;
+    const i=parseInt(btn.dataset.i),ok=i===c.ans;
+    if(ok){btn.classList.add('correct');st.correct++}
+    else{btn.classList.add('wrong');c._picked=i;el.querySelector(`#pzOpts .pz-opt[data-i="${c.ans}"]`).classList.add('correct')}
+    if(ok&&st.mode==='wrong')pzRemoveWrong(c._id);
+    if(!ok){pzAddWrong(c,i);st.wrongIds.push(c._id)}
+    pzBump(ok);
+    const exp=el.querySelector('#pzExp');exp.style.display='block';
+    exp.innerHTML=(ok?'✅ 答对了！':'❌ 答错了。')+'正确答案：'+pzL(c.ans)+'. '+escape(c.opts[c.ans])+'<br>💡 '+escape(c.explain);
+    const nb=document.createElement('button');nb.className='pz-navbtn';nb.style.marginTop='16px';
+    nb.textContent=st.idx+1>=total?'查看结果':'下一题 →';
+    nb.addEventListener('click',()=>{st.idx++;pzQSeq()});
+    el.querySelector('.anim-in').appendChild(nb);
+    nb.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }));
+}
+function pzResultSeq(){
+  const st=PZ,el=document.getElementById('practiceArea');
+  const secs=Math.max(1,Math.round((Date.now()-st.t0)/1000));
+  const pct=st.cards.length?Math.round(st.correct/st.cards.length*100):0;
+  const wrongCards=st.cards.filter(c=>st.wrongIds.includes(c._id)).map(c=>({c,picked:c._picked==null?null:c._picked}));
+  el.innerHTML=`<div class="anim-in" style="padding:24px 0;text-align:center">
+    <div style="font-size:48px;font-weight:300;color:var(--blue)">${st.correct}/${st.cards.length}</div>
+    <div style="font-size:var(--fs-sm);color:var(--text2);margin:6px 0 2px">正确率 ${pct}% · 用时 ${pzFmt(secs)}</div>
+    <div style="font-size:var(--fs-xs);color:var(--text3);margin-bottom:16px">${st.mode==='wrong'?'错题重做完成 · 答对的已自动移出错题本':'错题已自动收入错题本'}</div>
+    ${wrongCards.length?pzWrongListHTML(wrongCards):'<div style="color:var(--green);font-size:var(--fs-sm);margin-bottom:16px">🎉 全部正确！</div>'}
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px">
+      ${wrongCards.length?'<button class="pz-ghost" id="pzRedo">错题重做</button>':''}
+      <button class="pz-ghost" id="pzAgain">再来一组</button>
+      <button class="pz-navbtn" id="pzHomeBtn">回练习中心</button>
+    </div></div>`;
+  pzBindReview(el);
+  const rd=el.querySelector('#pzRedo');if(rd)rd.addEventListener('click',()=>pzStartWrong(wrongCards.map(x=>x.c)));
+  el.querySelector('#pzAgain').addEventListener('click',()=>{st.mode==='wrong'?pzStartWrong():pzStartSeq(st.level)});
+  el.querySelector('#pzHomeBtn').addEventListener('click',pzHome);
+}
+
+// ── 模式二：模拟测试（统一判分 + 倒计时）──
+function pzCompose(lv){
+  const flat=pzFlat(lv),by={};
+  flat.forEach(c=>{(by[c.tag]=by[c.tag]||[]).push(c)});
+  const want={语法:10,词汇:5,情景:4,阅读:3,配对:3},out=[];
+  ['语法','词汇','情景','阅读','配对'].forEach(t=>{
+    const pool=shuffle((by[t]||[]).slice());
+    let need=want[t];
+    while(need>0&&pool.length){out.push(pool.pop());need--}
+  });
+  if(out.length<25){const rest=shuffle(flat.slice()).filter(c=>!out.includes(c));out.push(...rest.slice(0,25-out.length))}
+  return out;
+}
+function pzStartMock(lv){
+  const cards=pzCompose(lv);
+  if(cards.length<5){toast('该级别题目不足');return}
+  PZ={mode:'mock',level:lv,cards,idx:0,picks:Array(cards.length).fill(null),t0:Date.now(),left:20*60,timerId:null};
+  pzQMock();
+  PZ.timerId=setInterval(()=>{
+    PZ.left--;
+    const c=document.getElementById('pzClock');
+    if(c){c.textContent=pzFmt(PZ.left);c.style.color=PZ.left<120?'var(--red)':'var(--blue)'}
+    if(PZ.left<=0){pzStopTimer();toast('时间到，自动交卷');pzMockSubmit()}
+  },1000);
+}
+function pzQMock(){
+  const st=PZ,el=document.getElementById('practiceArea');
+  if(st.idx>=st.cards.length){pzMockSubmit();return}
+  const c=st.cards[st.idx],total=st.cards.length,pick=st.picks[st.idx];
+  el.innerHTML=`<div class="anim-in" style="padding:8px 0 24px">
+    <div style="display:flex;align-items:center;margin-bottom:6px">
+      <span id="pzBack" style="cursor:pointer;font-size:18px;color:var(--blue);padding:4px 8px;line-height:1">←</span>
+      <span style="flex:1;text-align:center;font-size:var(--fs-sm);color:var(--text3)">模拟测试 · ${st.level} · ${st.idx+1}/${total}</span>
+      <span id="pzClock" style="font-size:var(--fs-sm);font-weight:600;color:${st.left<120?'var(--red)':'var(--blue)'}">${pzFmt(st.left)}</span>
+    </div>
+    <div style="height:3px;border-radius:2px;background:var(--border);margin-bottom:14px;overflow:hidden"><div style="height:100%;border-radius:2px;background:var(--blue);transition:width .3s;width:${st.idx/total*100}%"></div></div>
+    ${c.passage?`<div class="pz-pass">${escape(c.passage)}</div>`:''}
+    <div style="margin-top:10px"><span class="pz-chip">${c.tag}</span></div>
+    <div class="pz-qtext">${escape(c.q)}</div>
+    <div id="pzOpts" style="display:grid;gap:8px">${c.opts.map((o,i)=>`<button class="pz-opt${pick===i?' sel':''}" data-i="${i}">${pzL(i)}. ${escape(o)}</button>`).join('')}</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:18px">
+      <button class="pz-ghost" id="pzPrev" ${st.idx===0?'style="opacity:.4"':''}>上一题</button>
+      <button class="pz-navbtn" id="pzNext">${st.idx+1>=total?'交卷':'下一题 →'}</button>
+    </div>
+  </div>`;
+  el.querySelector('#pzBack').addEventListener('click',()=>{if(confirm('退出模拟测试？本卷作废，不计成绩')){pzStopTimer();pzHome()}});
+  el.querySelectorAll('#pzOpts .pz-opt').forEach(btn=>btn.addEventListener('click',()=>{
+    st.picks[st.idx]=parseInt(btn.dataset.i);
+    el.querySelectorAll('#pzOpts .pz-opt').forEach(x=>x.classList.remove('sel'));
+    btn.classList.add('sel');
+  }));
+  el.querySelector('#pzPrev').addEventListener('click',()=>{if(st.idx>0){st.idx--;pzQMock()}});
+  el.querySelector('#pzNext').addEventListener('click',()=>{st.idx+1>=total?pzMockSubmit():(st.idx++,pzQMock())});
+}
+function pzMockSubmit(){
+  const st=PZ;pzStopTimer();
+  const per={},wrongItems=[];
+  st.cards.forEach((c,i)=>{
+    per[c.tag]=per[c.tag]||{t:0,c:0};per[c.tag].t++;
+    const ok=st.picks[i]===c.ans;
+    if(ok)per[c.tag].c++;else{wrongItems.push({c,picked:st.picks[i]});pzAddWrong(c,st.picks[i])}
+    pzBump(ok);
+  });
+  const total=st.cards.length,okN=total-wrongItems.length,pct=Math.round(okN/total*100);
+  const secs=Math.max(1,Math.round((Date.now()-st.t0)/1000));
+  const el=document.getElementById('practiceArea');
+  el.innerHTML=`<div class="anim-in" style="padding:24px 0;text-align:center">
+    <div style="font-size:48px;font-weight:300;color:var(--blue)">${okN}/${total}</div>
+    <div style="font-size:var(--fs-sm);color:var(--text2);margin:6px 0 2px">正确率 ${pct}% · 用时 ${pzFmt(secs)}</div>
+    <div style="font-size:var(--fs-xs);color:var(--text3);margin-bottom:14px">错题已自动收入错题本</div>
+    <div style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin:0 2px 12px;font-size:var(--fs-sm);text-align:left">
+      <div style="font-weight:600;margin-bottom:6px">各题型正确率</div>
+      ${Object.keys(per).map(t=>{const p=per[t];return `<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>${t}</span><span style="color:${p.c===p.t?'var(--green)':'var(--text2)'}">${p.c}/${p.t}（${Math.round(p.c/p.t*100)}%）</span></div>`}).join('')}
+    </div>
+    ${wrongItems.length?pzWrongListHTML(wrongItems):'<div style="color:var(--green);font-size:var(--fs-sm);margin-bottom:12px">🎉 全部正确！</div>'}
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px">
+      <button class="pz-ghost" id="pzAgain">再来一套</button>
+      <button class="pz-navbtn" id="pzHomeBtn">回练习中心</button>
+    </div></div>`;
+  pzBindReview(el);
+  el.querySelector('#pzAgain').addEventListener('click',()=>pzStartMock(st.level));
+  el.querySelector('#pzHomeBtn').addEventListener('click',pzHome);
+}
+
+// ── 刷题/单词测验 子标签切换 ──
+document.querySelectorAll('#sQuiz .sub-tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#sQuiz .sub-tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  const isP=b.dataset.pq==='practice';
+  document.getElementById('practiceArea').style.display=isP?'block':'none';
+  document.getElementById('quizArea').style.display=isP?'none':'block';
+}));
+pzHome();
+
+// ── 资料库（更多→资料；外链需联网）──
+const PZ_RES=[
+{title:'俄语 · ТРКИ 真题与备考',items:[
+ {lv:'全等级',name:'UVic ТРКИ 全六级在线样题',desc:'A1–C2 每级一套官方风格样题，自测首选',url:'https://hcmc.uvic.ca/torfl/sampleTests.php'},
+ {lv:'官方',name:'圣彼得堡国立大学备考资料',desc:'SPbU 官方模拟题（中文页面）',url:'https://testingcenter.spbu.ru/zh/exam-pre-cn.html'},
+ {lv:'全等级',name:'Russificate 免费模拟卷',desc:'各级别完整试卷 PDF 下载',url:'https://russianschoolrussificate.com/free-materials-for-self-preparation-for-the-torfl-test/'},
+ {lv:'A1–B1',name:'鄂木斯克师大样题下载',desc:'A1/A2/B1 三级 PDF 样题',url:'https://omgpu.ru/en/test-russian-foreign-language'},
+ {lv:'课程',name:'学堂在线 ТРКИ 备考课',desc:'SPbU 出品 · 中文字幕 · 讲解考试结构',url:'https://www.xuetangx.com/course/spbu05021010206'},
+ {lv:'报考',name:'黑龙江大学 ТРКИ 考点',desc:'中国境内官方考点 · 报名与考试信息',url:'https://kszx.hlju.edu.cn/info/1239/1719.htm'}]},
+{title:'俄语 · 定级与日常练习',items:[
+ {lv:'定级',name:'GoLearnRussian 定级测试',desc:'80 题从 A1 排到 B2+，摸底首选',url:'https://golearnrussian.com/free-online-test/'},
+ {lv:'A1–C2',name:'Pa-russki 语法测试',desc:'按 CEFR 分档 + 变格专项练习',url:'https://pa-russki.com/grammar-tests/'},
+ {lv:'三级',name:'Russian For Free 语法练习',desc:'初/中/高三级，碎片时间刷',url:'https://www.russianforfree.com/exercises.php'},
+ {lv:'出分',name:'Testizer 在线测试',desc:'各级别即时出分',url:'https://testizer.com/tests/russian-proficiency-test-online-a2/'}]},
+{title:'英语 · 定级与分级练习',items:[
+ {lv:'定级',name:'Cambridge Test Your English',desc:'官方 25 分钟免费定级，直接推荐对应证书考试',url:'https://www.cambridgeenglish.org/test-your-english/'},
+ {lv:'定级',name:'EF SET 标准定级测试',desc:'50 分钟标准化测试，出具 CEFR 成绩',url:'https://www.efset.org'},
+ {lv:'A1–C2',name:'Test-English 分级练习',desc:'每级都有语法课 + 练习 + 小测验',url:'https://test-english.com'},
+ {lv:'B1–C2',name:'Use of English 专项',desc:'B1–C2 语法与阅读专项练习',url:'https://useofenglishpro.com'}]},
+{title:'英语 · 考试样题',items:[
+ {lv:'A2–C2',name:'剑桥各等级官方样题',desc:'KET/PET/FCE/CAE/CPE 官方免费样卷',url:'https://www.cambridgeenglish.org/exams/'},
+ {lv:'雅思',name:'British Council 雅思免费模拟',desc:'听说读写四项全覆盖官方模拟测试',url:'https://takeielts.britishcouncil.org/prepare/ielts-free-practice-mock-tests'}]}
+];
+function pzResHtml(items){return items.map(r=>`<a class="res-link" href="${r.url}" target="_blank" rel="noopener"><span class="res-lv">${r.lv}</span><span class="res-main"><span class="res-name">${r.name}</span><span class="res-desc">${r.desc}</span></span><span class="res-go">↗</span></a>`).join('')}
+window.pzRenderRes=function(){
+  const el=document.getElementById('resContent');if(!el)return;
+  el.innerHTML=PZ_RES.map(g=>`<div class="setting-group" style="margin-top:0"><div class="setting-group-title">${g.title}</div>${pzResHtml(g.items)}</div>`).join('')+'<div style="font-size:var(--fs-xs);color:var(--text3);text-align:center;padding:6px 0 20px">链接在系统浏览器中打开 · 需要联网</div>';
+};
+
+// ═══════════════════════════════════════════════════════════════
 //  CLASS MODE (课堂语音翻译)
 // ═══════════════════════════════════════════════════════════════
 // ═══ IndexedDB 封装（零依赖，Promise 风格，异步不阻塞 UI）═══
@@ -1217,7 +1613,7 @@ document.getElementById('classClearBtn').addEventListener('click',classClear);
 function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">代理服务器</div><div class="setting-card"><div class="s-label">服务器地址</div><div class="s-desc">深度翻译/字典/课堂走本地代理。电脑上保持默认；手机端填电脑的局域网 IP（如 http://192.168.x.x:8765）</div><input type="text" id="apiBaseInput" value="${s.apiBase||''}" placeholder="http://localhost:8765" style="margin-top:6px;font-size:var(--fs-sm)"><button id="apiBaseSave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="apiBaseMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">DeepSeek API</div><div class="setting-card"><div class="s-label">API Key</div><div class="s-desc">深度翻译、字典、单词分析、课堂翻译共用。官方地址可查余额，中转地址测连通</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="sk-..." autocomplete="off" style="margin-top:6px;font-size:var(--fs-sm)"><div style="display:flex;gap:6px;margin-top:8px"><button id="dsKeySave" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">💾 保存</button><button id="dsKeyTest" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">🔍 测试</button>${s.dsKey?'<button id="dsKeyClear" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--red);border:1.5px solid var(--red)">🗑 清除</button>':''}</div><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">❓ 帮助</div><details class="setting-card"><summary style="font-weight:500;cursor:pointer">深度功能提示"网络不可用"怎么办</summary><div class="s-desc" style="margin-top:6px">电脑上运行 <b>node proxy.js</b>（俄语学习目录），再刷新页面。手机端要在「代理服务器」填电脑的局域网 IP。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">朗读俄语没声音 / 发音怪</summary><div class="s-desc" style="margin-top:6px">系统没装俄语语音包：Windows 设置 → 时间和语言 → 添加俄语 → 勾选"语音" → 重启浏览器。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">API Key 怎么获取</summary><div class="s-desc" style="margin-top:6px">platform.deepseek.com 注册 → 创建 API Key → 填到上方并点「🔍 测试」验证。深度翻译、字典、变位、课堂翻译都需要。</div></details></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v6.2<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek<br><a href="privacy.html" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">📜 隐私政策</a></div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)});const kt2=document.getElementById('dsKeyTest');if(kt2)kt2.addEventListener('click',async()=>{const key=(document.getElementById('dsKeyInput').value||S.settings.dsKey||'').trim();if(!key){toast('请先填入 API Key');return}const msg=document.getElementById('dsKeyMsg');msg.textContent='测试中…';try{const c=await apiFetch('/api/config',{method:'GET',timeout:8000}).catch(()=>({isOfficial:false}));if(c.isOfficial){const d=await apiFetch('/api/balance',{method:'GET',headers:{'x-api-key':key},timeout:12000});const b=d.balance_infos&&d.balance_infos[0];msg.textContent='✅ Key 有效，余额 ¥'+(b?parseFloat(b.total_balance).toFixed(2):'?')+'，'+(d.is_available?'可用':'已用尽');setTimeout(()=>msg.textContent='',6000)}else{await apiFetch('/api/testkey',{method:'GET',headers:{'x-api-key':key},timeout:16000});msg.textContent='✅ API 可用（中转地址，无余额查询）';setTimeout(()=>msg.textContent='',6000)}}catch(e){console.error('API Key 测试失败:',e);msg.textContent='❌ '+escape(friendlyErr(e));setTimeout(()=>msg.textContent='',6000)}});const kc2=document.getElementById('dsKeyClear');if(kc2)kc2.addEventListener('click',()=>{if(!confirm('清除已保存的 API Key？'))return;S.settings.dsKey='';save('settings');renderAppSettings();toast('Key 已清除')})}
 renderAppSettings();
 document.addEventListener('click',e=>{const t=e.target;if(t&&t.id==='apiBaseSave'){S.settings.apiBase=(document.getElementById('apiBaseInput')||{value:''}).value.trim();save('settings');const m=document.getElementById('apiBaseMsg');if(m)m.textContent='已保存';setTimeout(()=>{if(m)m.textContent=''},2000)}});
-document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none'}));
+document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subRes').style.display=id==='res'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none';if(id==='res')pzRenderRes()}));
 
 // ═══ 系统诊断 ═══
 window.runDiagnose=async function(btn){

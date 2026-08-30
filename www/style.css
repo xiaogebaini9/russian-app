@@ -297,3 +297,22 @@ input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;hei
 .res-name{display:block;font-size:var(--fs-sm);font-weight:600;color:var(--text)}
 .res-desc{display:block;font-size:var(--fs-xs);color:var(--text3);margin-top:2px}
 .res-go{flex-shrink:0;color:var(--text3);font-size:16px}
+
+/* ── 练习中心（PZ_ 独立区） ── */
+.pz-entry{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--radius);background:var(--surface);border:1.5px solid var(--border);margin-bottom:10px;cursor:pointer;transition:border-color .15s}
+.pz-entry:active{border-color:var(--blue)}
+.pz-entry .pe-ico{font-size:22px;flex-shrink:0}
+.pz-entry .pe-t{font-weight:600;font-size:var(--fs)}
+.pz-entry .pe-d{font-size:var(--fs-xs);color:var(--text3);margin-top:2px}
+.pz-badge{margin-left:auto;flex-shrink:0;min-width:22px;text-align:center;font-size:11px;font-weight:700;color:#fff;background:var(--red);border-radius:10px;padding:2px 7px}
+.pz-chip{font-size:10px;font-weight:700;color:var(--blue);background:var(--blue-bg2);padding:3px 8px;border-radius:20px}
+.pz-qtext{font-size:var(--fs);font-weight:500;line-height:1.6;margin:10px 0 14px;color:var(--text)}
+.pz-pass{font-size:var(--fs-sm);line-height:1.8;color:var(--text2);background:var(--blue-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-top:8px}
+.pz-opt{display:block;width:100%;text-align:left;padding:12px 14px;border-radius:var(--radius-sm);background:var(--surface);border:1.5px solid var(--border);font-size:var(--fs-sm);color:var(--text);transition:all .15s}
+.pz-opt:active{transform:scale(.98)}
+.pz-opt.correct{border-color:var(--green);background:rgba(34,197,94,.08);color:var(--green)}
+.pz-opt.wrong{border-color:var(--red);background:rgba(239,68,68,.08);color:var(--red)}
+.pz-opt.sel{border-color:var(--blue);background:var(--blue-bg2)}
+.pz-exp{font-size:var(--fs-sm);line-height:1.7;color:var(--text2);background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-top:12px}
+.pz-navbtn{padding:11px 26px;border-radius:20px;background:var(--blue);color:#fff;font-weight:600;font-size:var(--fs-sm);border:none;cursor:pointer}
+.pz-ghost{padding:11px 22px;border-radius:20px;font-size:var(--fs-sm);background:var(--surface);color:var(--text2);border:1.5px solid var(--border);cursor:pointer}
