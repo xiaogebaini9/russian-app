@@ -44,6 +44,60 @@ function readBody(req) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  接入码系统：真 key 藏在服务端（keys.json），用户只持 7 位数字码
+//  codes.json: { dailyLimit: 100, codes: { "4826159": { name, used: { 日期: 次数 } } } }
+//  管理命令：node gen-codes.js（生成/key/list/del）
+// ═══════════════════════════════════════════════════════════════
+const CODES_FILE = path.join(__dirname, 'codes.json');
+const KEYS_FILE = path.join(__dirname, 'keys.json');
+
+function loadCodes() {
+  try { return JSON.parse(fs.readFileSync(CODES_FILE, 'utf8')); }
+  catch { return { dailyLimit: 100, codes: {} }; }
+}
+function saveCodes(db) {
+  try { fs.writeFileSync(CODES_FILE, JSON.stringify(db, null, 2)); } catch (e) { log('codes.json 写入失败:', e.message); }
+}
+function loadMasterKey() {
+  try { return (JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')).key || '').trim(); }
+  catch { return ''; }
+}
+
+// raw = 用户在设置里填的内容：完整 sk- key 直通（兼容旧用法）；4~8 位数字码查名单
+function resolveAccess(raw) {
+  const k = String(raw || '').trim();
+  if (/^sk-/.test(k)) return { ok: true, key: k };
+  if (!/^\d{4,8}$/.test(k)) return { ok: false, status: 403, msg: '请先在设置中填写接入码（管理员发放的数字）或 API Key' };
+  const db = loadCodes();
+  const entry = db.codes && db.codes[k];
+  if (!entry) return { ok: false, status: 403, msg: '接入码无效，请联系管理员' };
+  const today = new Date().toISOString().slice(0, 10);
+  const used = (entry.used && entry.used[today]) || 0;
+  const limit = db.dailyLimit || 100;
+  if (used >= limit) return { ok: false, status: 429, msg: `今日额度已用完（每码每天 ${limit} 次），明天再来` };
+  const master = loadMasterKey();
+  if (!master) return { ok: false, status: 500, msg: '服务端还没配置 API Key，请管理员运行 node gen-codes.js key sk-xxx' };
+  return { ok: true, key: master, code: k, entry, today, limit };
+}
+
+// 请求通过验证即计一次额度（按尝试计，防重试刷量）；sk- 直通不计
+function countUse(info) {
+  if (!info || !info.code) return;
+  const db = loadCodes();
+  const entry = db.codes && db.codes[info.code];
+  if (!entry) return;
+  entry.used = entry.used || {};
+  entry.used[info.today] = (entry.used[info.today] || 0) + 1;
+  saveCodes(db);
+}
+
+// 各接口通用的拒绝响应（JSON，前端 friendlyErr 会原样显示）
+function deny(res, access) {
+  res.writeHead(access.status || 403, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: access.msg }));
+}
+
 // ⚡ DeepSeek 调用（模型回退：第一个模型失败时自动试下一个）
 async function callDeepSeek(key, messages, maxTokens, timeoutMs, models, useJsonMode) {
   const list = models || ['deepseek-v4-flash', 'deepseek-chat'];
@@ -184,9 +238,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── Key 测试（转发给上游真实接口，成功/失败原文透传，前端据此显示）──
+  // ── Key 测试（接入码走本地验证不耗额度；完整 key 透传上游）──
   if (req.method === 'GET' && url === '/api/testkey') {
-    const key = req.headers['x-api-key'] || '';
+    const rawKey = String(req.headers['x-api-key'] || '').trim();
+    if (/^\d{4,8}$/.test(rawKey)) {
+      const access = resolveAccess(rawKey);
+      if (!access.ok) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: access.msg }));
+        return;
+      }
+      const used = (access.entry.used && access.entry.used[access.today]) || 0;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, code: true, remaining: Math.max(0, access.limit - used) }));
+      return;
+    }
+    const key = rawKey;
     fetch(`${DEEPSEEK}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -224,7 +291,12 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, src, tgt, text } = JSON.parse(body);
+        const parsed = JSON.parse(body);
+        const access = resolveAccess(parsed.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const { src, tgt, text } = parsed;
         const NAMES={ru:'俄语',en:'英语','zh-CN':'中文'};
         const srcName=NAMES[src]||src;
         const tgtName=NAMES[tgt]||tgt;
@@ -261,7 +333,12 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, word } = JSON.parse(body);
+        const reqBody = JSON.parse(body);
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const { word } = reqBody;
         const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
           { role: 'system', content: `你是专业的俄语词典编纂专家。请为给定的俄语单词提供高质量的词典释义。
 
@@ -317,14 +394,19 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, word } = JSON.parse(body);
-        // ⚡ 内存缓存：同一单词第二次查询秒回
+        const reqBody = JSON.parse(body);
+        const { word } = reqBody;
+        // ⚡ 内存缓存：同一单词第二次查询秒回（缓存命中不计额度）
         const cached = analysisCache.get(word);
         if (cached) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(cached));
           return;
         }
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
         const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
           { role: 'system', content: `你是俄语语法分析专家。给定俄语单词，只返回纯JSON（不要markdown代码块）：
 
@@ -364,12 +446,17 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, text } = JSON.parse(body);
+        const reqBody = JSON.parse(body);
+        const { text } = reqBody;
         if (!text || !text.trim()) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: '文本为空' }));
           return;
         }
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
         const d = await callDeepSeek(key, [
           { role: 'system', content: `你是同声传译专家，处理俄语大学课堂口语。
 
