@@ -14,6 +14,9 @@ const ROOT = __dirname; // russian-app 目录
 // ⚡ 单词分析内存缓存（同词二次查询秒回）
 const analysisCache = new Map();
 
+// ⚡ 句子解析内存缓存（同句二次秒回，不计额度）
+const sentenceCache = new Map();
+
 // 请求体上限 1MB，防止超大请求滥用
 const MAX_BODY = 1000000;
 
@@ -438,6 +441,64 @@ const server = http.createServer((req, res) => {
   }
 
   // ── 课堂翻译（口语规整 + 学术翻译，一次调用）──
+  // ── 句子解析（结构/关键点/语法点/直译/仿造句；思维链模型，token预算3000）──
+  if (req.method === 'POST' && url === '/api/sentence-analysis') {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
+      try {
+        const reqBody = JSON.parse(body);
+        const { text } = reqBody;
+        if (!text || !text.trim()) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '文本为空' }));
+          return;
+        }
+        const cached = sentenceCache.get(text);
+        if (cached) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(cached));
+          return;
+        }
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
+          { role: 'system', content: `你是面向中文学习者的俄语语法讲解专家。用户给一个俄语句子，只返回纯JSON（不要markdown代码块）：
+{"structure":"用主语/谓语/补语/状语标注句子成分，一两句话",
+"keyPoints":[{"word":"句中出现的形式","base":"原形","why":"为什么用这个形式（格/体/时态/支配关系），一句话讲透"}],
+"grammar":["本句核心语法点，每条一句话"],
+"literal":"若俄语语序与中文差异大，给逐字直译；否则空串",
+"patterns":["换主题但保留同款结构的仿造例句1","仿造例句2"]}
+规则：keyPoints只挑3-6个最关键的词；简体中文讲解，语法术语准确；不要逐词罗列虚词。` },
+          { role: 'user', content: text }
+        ], 3000, 120000);
+        if (parsed) {
+          parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
+          sentenceCache.set(text, parsed);
+          if (sentenceCache.size > 300) { // 防无限膨胀，删最旧的1/3
+            const del = Array.from(sentenceCache.keys()).slice(0, 100);
+            del.forEach(k => sentenceCache.delete(k));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(parsed));
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'JSON解析失败' }));
+        }
+      } catch (e) {
+        log('ERROR', url, e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   if (req.method === 'POST' && url === '/api/class-translate') {
     readBody(req).then(async (body) => {
       if (body === null) {
