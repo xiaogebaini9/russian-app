@@ -11,3 +11,5 @@ whisper/__pycache__/
 proxy-startup.log
 codes.json
 keys.json
+cloud.json
+cloud/.dev.vars

@@ -1,0 +1,22 @@
+# 云端代理部署配置（Cloudflare Workers）
+# 部署：cd cloud && wrangler deploy
+name = "russian-app-proxy"
+main = "worker.js"
+compatibility_date = "2026-08-15"
+
+# DeepSeek 上游地址（如需中转改这里后重新 deploy）
+[vars]
+DS_BASE_URL = "https://api.deepseek.com"
+
+# 静态页面：直接托管 www/ 目录（手机浏览器打开根地址即可用，PWA 方式）
+[assets]
+directory = "../www"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "e67311413df842de8188a7cc014a300f"
+
+# 自定义域名：把整个 aimisi.top 绑到本 Worker（网页 + API 同域）
+routes = [
+  { pattern = "aimisi.top", custom_domain = true }
+]
