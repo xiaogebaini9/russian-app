@@ -8,6 +8,10 @@ compatibility_date = "2026-08-15"
 [vars]
 DS_BASE_URL = "https://api.deepseek.com"
 
+# Workers AI：云语音识别 Whisper（免费额度）
+[ai]
+binding = "AI"
+
 # 静态页面：直接托管 www/ 目录（手机浏览器打开根地址即可用，PWA 方式）
 [assets]
 directory = "../www"

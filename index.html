@@ -21,6 +21,7 @@
 
     <!-- ══ TRANSLATE ══ -->
     <div class="screen active" id="sTranslate">
+      <div id="trialBar" style="display:none;margin:8px 12px 0;padding:9px 12px;border-radius:10px;background:var(--blue-bg);color:var(--blue);font-size:12px;font-weight:500;cursor:pointer" onclick="showScreen('settings')">🎁 新用户免费试用中，点此填接入码解锁全部</div>
       <div class="lang-bar">
         <div class="lang-sel" id="srcSel">
           <button class="lang-sel-btn" id="srcLangBtn">俄语</button>
@@ -120,6 +121,7 @@
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <button id="classStartBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--blue);color:#fff">🎙️ 开始录音</button>
           <button id="classStopBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--input);color:var(--text2);border:1.5px solid var(--border)" disabled>⏹ 停止</button>
+          <button id="classSaveRecBtn" style="display:none;flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:12px;font-weight:700;background:#22c55e;color:#fff;border:none">💾 保存录音</button>
         </div>
         <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:6px" id="classHint">
           说俄语 → 自动转文字 → 翻译显示。识别引擎：<b id="classEngine">检测中…</b>
@@ -197,13 +199,36 @@ const API_BASE=(S.settings.apiBase&&S.settings.apiBase.trim())||'https://aimisi.
 
 // ⚡ 统一 API 调用：超时、错误提取、snippet 诊断信息一处收敛（SW 503 的"离线模式"JSON 自然流进 friendlyErr）
 async function apiFetch(path,{method='POST',body,timeout=60000,headers={}}={}){
-  const resp=await fetch(API_BASE+path,{method,headers:Object.assign({'Content-Type':'application/json'},headers),body:body!==undefined?JSON.stringify(body):undefined,signal:AbortSignal.timeout(timeout)});
+  let b=body;
+  if(b&&typeof b==='object'&&b.key!==undefined){b=Object.assign({},b,{deviceId:devId()})} // 深度功能自动携带设备ID（没填码时走免费试用）
+  const resp=await fetch(API_BASE+path,{method,headers:Object.assign({'Content-Type':'application/json'},headers),body:b!==undefined?JSON.stringify(b):undefined,signal:AbortSignal.timeout(timeout)});
   const d=await resp.json().catch(()=>({})); // ⚡ 有的上游把 error 返回成对象，这里统一转字符串，避免页面显示 [object Object]
   if(d.error&&typeof d.error!=='string')d.error=d.error.message||JSON.stringify(d.error);
   if(!resp.ok)throw new Error(d.error||('HTTP '+resp.status));
   if(d.error)throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''));
+  if(d.remaining!==undefined){S.quota=d.remaining;updateQuotaUI()} // 剩余次数常显
   return d;
 }
+
+// 🎁 设备ID（免费试用身份）：一次生成永久保存
+const devId=()=>{let id=ls('devid','');if(!/^[A-Za-z0-9-]{8,64}$/.test(id)){id=(crypto.randomUUID?crypto.randomUUID():('dev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)));ss('devid',id)}return id};
+// 剩余次数常显（试用和接入码通用；quotaLine 在设置页，trialBar 在翻译页）
+function updateQuotaUI(){const el=document.getElementById('quotaLine');if(el){const q=S.quota;if(q===undefined){el.textContent=''}else{const isTrial=!S.settings.dsKey;el.textContent=(isTrial?'🎁 试用中 · ':'📶 今日剩余 ')+q+' 次'+(isTrial?'（填接入码解锁全部）':'')}}const tb=document.getElementById('trialBar');if(tb){if(!S.settings.dsKey){tb.style.display='block';if(S.quota!==undefined)tb.textContent='🎁 试用中 · 今日剩余 '+S.quota+' 次 · 点此填接入码解锁全部'}else{tb.style.display='none'}}}
+async function refreshQuota(){try{const t=await apiFetch('/api/testkey',{method:'GET',headers:{'x-api-key':S.settings.dsKey||'','x-device-id':devId()},timeout:12000});if(t.remaining!==undefined){S.quota=t.remaining;updateQuotaUI()}}catch(e){/* 离线时静默 */}}
+
+// 👋 新手指引（首次启动自动弹；设置→帮助可再看）
+function showOnboard(){const el=document.getElementById('onboardOv');if(el)el.style.display='flex';S._obIdx=0;obRender()}
+function obRender(){const i=S._obIdx||0;const slides=[{e:'🌐',t:'俄·英·中 三语互译',d:'快速翻译免费不限次；深度翻译由 DeepSeek 驱动，表达更地道'},{e:'📚',t:'学习 · 测验 · 课堂',d:'走遍俄罗斯 1-4 册课本、AI 出题、课堂同传，一个 App 全覆盖'},{e:'🔑',t:'免费试用 & 接入码',d:'新用户自动获得 3 天免费试用（每天 25 次深度功能）。试用结束后，找管理员买接入码，到 设置→接入码 填入即解锁'}];const s=slides[i];document.getElementById('obEmoji').textContent=s.e;document.getElementById('obTitle').textContent=s.t;document.getElementById('obDesc').textContent=s.d;document.getElementById('obDots').innerHTML=slides.map((_,k)=>'<span style="display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 4px;background:'+(k===i?'var(--blue)':'var(--border)')+'"></span>').join('');document.getElementById('obNext').textContent=i<2?'下一页':'开始使用'}
+function obStep(){const idx=(S._obIdx||0)+1;if(idx>=3){document.getElementById('onboardOv').style.display='none';ss('onboard',1);return}S._obIdx=idx;obRender()}
+document.addEventListener('DOMContentLoaded',()=>{
+  const ov=document.createElement('div');ov.id='onboardOv';ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(10,10,25,.55);display:none;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div style="background:var(--surface,#fff);border-radius:16px;max-width:340px;width:100%;padding:28px 24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)"><div id="obEmoji" style="font-size:52px"></div><div id="obTitle" style="font-size:19px;font-weight:700;margin-top:12px;color:var(--text,#222)"></div><div id="obDesc" style="font-size:13px;line-height:1.8;margin-top:10px;color:var(--text3,#888);min-height:66px"></div><div id="obDots" style="margin-top:14px"></div><button id="obNext" style="margin-top:16px;width:100%;padding:11px 0;border-radius:10px;font-size:15px;font-weight:700;background:var(--blue,#3b82f6);color:#fff;border:none"></button><button id="obSkip" style="margin-top:10px;background:none;border:none;font-size:12px;color:var(--text3,#999)">跳过</button></div>';
+  document.body.appendChild(ov);
+  document.getElementById('obNext').addEventListener('click',obStep);
+  document.getElementById('obSkip').addEventListener('click',()=>{ov.style.display='none';ss('onboard',1)});
+  if(!ls('onboard',0))showOnboard();
+  updateQuotaUI();refreshQuota();
+});
 
 let _tt;
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2200)}
@@ -456,9 +481,6 @@ function renderMultiMeanings(analysis){
 async function doTranslate(){
   const t=$trInput.value.trim();
   if(!t){toast('请输入内容');return}
-  if(S.settings.mode==='deep'&&!S.settings.dsKey){
-    gotoKeySetup('深度翻译需要 API Key');return;
-  }
   autoSrcLang(t);
   $trResult.innerHTML=loadingHTML();
   $btnTr.disabled=true;
@@ -489,7 +511,6 @@ function renderResult(r,src){
     let _a=null;
     const ensure=async()=>{
       if(_a)return _a;
-      if(!S.settings.dsKey){gotoKeySetup('查看变位需要 API Key');return null}
       document.getElementById('analysisPanels').innerHTML=loadingHTML('正在分析变位…首次可能需要 30~60 秒');
       _a=await fetchWordAnalysis(word);
       if(_a._error){document.getElementById('analysisPanels').innerHTML='<div style="color:var(--red);font-size:13px;padding:8px">❌ '+escape(friendlyErr(_a._error))+'</div>';return null}
@@ -513,7 +534,6 @@ function renderResult(r,src){
     document.getElementById('btnSent').addEventListener('click',async()=>{
       document.getElementById('btnSent').style.background='var(--blue-bg)';
       const el=document.getElementById('sentPanel');
-      if(!S.settings.dsKey){gotoKeySetup('句子解析需要接入码');return}
       const analText=S.langSrc!=='zh-CN'?src:r.text, analLang=S.langSrc!=='zh-CN'?S.langSrc:S.langTgt;
       el.innerHTML=loadingHTML('正在解析句子…约需 10~30 秒');
       const d=await fetchSentAnalysis(analText,analLang);
@@ -523,7 +543,8 @@ function renderResult(r,src){
   }
 }
 
-let _deb;$trInput.addEventListener('input',()=>{document.getElementById('charCount').textContent=$trInput.value.length;if(!S.settings.autoTr)return;clearTimeout(_deb);_deb=setTimeout(doTranslate,600)});
+let _deb;$trInput.addEventListener('input',()=>{document.getElementById('charCount').textContent=$trInput.value.length;if(!S.settings.autoTr)return;if(S.settings.mode==='deep')return; // 深度模式不自动翻译：点 ▶ 或回车才消耗额度
+clearTimeout(_deb);_deb=setTimeout(doTranslate,600)});
 $trInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doTranslate()}});
 document.getElementById('clearInput').addEventListener('click',()=>{$trInput.value='';$trResult.innerHTML='';$btnSpeak.disabled=true;S.result=null;document.getElementById('charCount').textContent='0'});
 document.getElementById('btnTranslate').addEventListener('click',doTranslate);
@@ -592,7 +613,6 @@ const $dictInput=document.getElementById('dictInput'),$dictResult=document.getEl
 async function doDictSearch(){
   const word=$dictInput.value.trim();
   if(!word){toast('请输入单词');return}
-  if(!S.settings.dsKey){gotoKeySetup('字典查询需要 API Key');return}
   $dictResult.innerHTML=loadingHTML('正在查询词典…首次查询可能需要 30~60 秒');
   try{
     const d=await apiFetch('/api/dictionary',{body:{key:S.settings.dsKey,word,lang:/^[a-zA-Z][a-zA-Z '\-]*$/.test(word)?'en':'ru'},timeout:60000});
@@ -1851,7 +1871,6 @@ function pzStatsView(){
 // ── AI 出题（DeepSeek 生成，接入码计费）──
 async function pzAIGenerate(level,topic){
   const el=document.getElementById('practiceArea');
-  if(!S.settings.dsKey){gotoKeySetup('AI 出题需要接入码');return}
   pzStopTimer();PZ=null;
   el.innerHTML=loadingHTML('🤖 AI 正在按 '+level+' 级出题…约需 15~30 秒');
   try{
@@ -1982,7 +2001,7 @@ function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.ge
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 
 const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true};
-let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0;
+let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[];
 
 function classAddItem(original,translation,note,confidence){
   const now=new Date();
@@ -2051,7 +2070,6 @@ function classRender(){
       const idx=parseInt(b.dataset.i);
       const it=CLASS.items[idx];
       if(!it)return;
-      if(!S.settings.dsKey){gotoKeySetup('句子解析需要接入码');return}
       const root=b.closest('.class-item');
       let panel=root.querySelector(`[data-sap="${idx}"]`);
       if(panel){panel.remove();return}
@@ -2102,7 +2120,6 @@ function classEditItem(i){
 }
 
 async function classTranslate(text){
-  if(!S.settings.dsKey){return{original:text,translation:'（需要 DeepSeek Key 才能翻译，请在设置中填写）',note:''}}
   try{
     const d=await apiFetch('/api/class-translate',{body:{key:S.settings.dsKey,text,terms:classTermsGet().map(t=>t.ru+'='+t.cn).join('; ').slice(0,800)},timeout:35000});
     return{original:d.original||text,translation:d.translation||'',note:d.note||''};
@@ -2122,6 +2139,7 @@ function classStart(){
     classStream=stream;
     // 每次开始录音新建一个课堂会话，句子自动存入该会话
     CLASS.sessionId=genId();
+    CLASS._recSid=CLASS.sessionId;
     CLASS._sessionStart=Date.now();
     idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:null,courseName:''}).catch(()=>{});
     classAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -2129,13 +2147,15 @@ function classStart(){
     classAnalyser=classAudioCtx.createAnalyser();
     classAnalyser.fftSize=1024;
     srcNode.connect(classAnalyser);
-    classMime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
+    classMime=MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')?'audio/mp4;codecs=mp4a.40.2':(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm');
     classRecorder=new MediaRecorder(stream,{mimeType:classMime});
-    classChunks=[];
-    classRecorder.ondataavailable=e=>{if(e.data&&e.data.size)classChunks.push(e.data)};
+    classChunks=[];classSessionChunks=[];classFailedChunks=[];CLASS._recBlob=null;
+    document.getElementById('classSaveRecBtn').style.display='none';
+    classRecorder.ondataavailable=e=>{if(e.data&&e.data.size){classChunks.push(e.data);classSessionChunks.push(e.data)}};
     classRecorder.onstop=()=>{
       if(classChunks.length){const blob=new Blob(classChunks,{type:classMime});classChunks=[];classRecognize(blob)}
       if(CLASS.running){try{classRecorder.start(200)}catch(e){}}
+      else{classFinalizeRecording()} // 课堂结束：拼接全程录音 + 失败段HQ重试
     };
     classRecorder.start(200);
     CLASS.running=true;classSilenceMs=0;
@@ -2158,6 +2178,33 @@ async function classRecognize(blob){
     classSendText(d.text||'', d.confidence);
   }catch(e){
     console.error('语音识别失败',e.message||e);
+    if(classFailedChunks.length<20)classFailedChunks.push(blob); // 记下来，课堂结束用HQ模型重试
+  }
+}
+
+// 课堂结束：全程原始录音存 IndexedDB（单独一份，不怕课上翻错）+ 失败段自动用完整版模型重试
+async function classFinalizeRecording(){
+  if(classSessionChunks.length){
+    const blob=new Blob(classSessionChunks,{type:classMime});
+    CLASS._recBlob=blob;
+    const sid=CLASS._recSid||'rec_'+Date.now();
+    idbStore.put('recordings',{id:sid,blob:blob,time:Date.now()}).catch(()=>{});
+    const btn=document.getElementById('classSaveRecBtn');
+    if(btn){btn.style.display='inline-block';const mins=Math.max(1,Math.round(blob.size/600000));btn.textContent='💾 保存课堂录音（约'+mins+'分钟）'}
+  }
+  classSessionChunks=[];
+  if(classFailedChunks.length){
+    const st=document.getElementById('classHint');
+    if(st)st.innerHTML='🔁 正在用高精度模型重试 '+classFailedChunks.length+' 段未识别音频…';
+    const failed=classFailedChunks.splice(0);
+    for(let i=0;i<failed.length;i++){
+      try{
+        const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:failed[i],signal:AbortSignal.timeout(180000)});
+        const d=await r.json().catch(()=>({}));
+        if(!d.error&&d.text)classSendText(d.text,null);
+      }catch(e){console.error('HQ重试失败',e.message||e)}
+    }
+    if(st)st.innerHTML='说俄语 → 自动识别 → 翻译显示';
   }
 }
 
@@ -2166,7 +2213,8 @@ async function updateClassEngine(){
   const el=document.getElementById('classEngine');if(!el)return;
   try{
     const d=await apiFetch('/api/voice-health',{method:'GET',timeout:5000});
-    el.textContent=d.stt?('本地 Whisper'+(d.model?' · '+d.model:''))+'（GPU）':'Web Speech API（Whisper 未启动）';
+    if(d.device==='cloud'){el.textContent='☁️ 云 Whisper · 免费'}
+    else{el.textContent=d.stt?('本地 Whisper'+(d.model?' · '+d.model:''))+'（GPU）':'Web Speech API（Whisper 未启动）'}
   }catch(e){el.textContent='Web Speech API（代理未连接）'}
 }
 
@@ -2338,9 +2386,9 @@ document.getElementById('classTermAdd').addEventListener('click',()=>{
 // ═══════════════════════════════════════════════════════════════
 //  APP SETTINGS
 // ═══════════════════════════════════════════════════════════════
-function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">服务器</div><div class="setting-card"><div class="s-label">服务器地址</div><div class="s-desc">深度翻译/字典/课堂已默认走云端服务器，保持为空即可。语音识别需连作者的电脑时，才填电脑局域网地址（如 http://192.168.x.x:8765）</div><input type="text" id="apiBaseInput" value="${s.apiBase||''}" placeholder="默认：云端服务器" style="margin-top:6px;font-size:var(--fs-sm)"><button id="apiBaseSave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="apiBaseMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">接入码</div><div class="setting-card"><div class="s-label">接入码 / API Key</div><div class="s-desc">填管理员发的 7 位数字接入码（推荐，手机上只输数字），或你自己的完整 sk- key。深度翻译、字典、变位、课堂翻译共用</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="接入码（数字）或 sk-..." autocomplete="off" style="margin-top:6px;font-size:var(--fs-sm)"><div style="display:flex;gap:6px;margin-top:8px"><button id="dsKeySave" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">💾 保存</button><button id="dsKeyTest" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">🔍 测试</button>${s.dsKey?'<button id="dsKeyClear" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--red);border:1.5px solid var(--red)">🗑 清除</button>':''}</div><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">❓ 帮助</div><details class="setting-card"><summary style="font-weight:500;cursor:pointer">深度功能提示"网络不可用"怎么办</summary><div class="s-desc" style="margin-top:6px">先检查手机能否正常上网；再到 设置→接入码 点「🔍 测试」验证接入码是否有效。仍然不行请联系管理员。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">朗读俄语没声音 / 发音怪</summary><div class="s-desc" style="margin-top:6px">系统没装俄语语音包：Windows 设置 → 时间和语言 → 添加俄语 → 勾选"语音" → 重启浏览器。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">接入码怎么获取</summary><div class="s-desc" style="margin-top:6px">联系管理员购买或领取接入码（一串数字），填到「接入码」并点「🔍 测试」验证。深度翻译、字典、变位、课堂翻译共用一个码。</div></details></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v6.3<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译 · 句子语法解析<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek<br><a href="privacy.html" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">📜 隐私政策</a></div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)});const kt2=document.getElementById('dsKeyTest');if(kt2)kt2.addEventListener('click',async()=>{const key=(document.getElementById('dsKeyInput').value||S.settings.dsKey||'').trim();if(!key){toast('请先填入 API Key');return}const msg=document.getElementById('dsKeyMsg');msg.textContent='测试中…';try{const c=await apiFetch('/api/config',{method:'GET',timeout:8000}).catch(()=>({isOfficial:false}));if(c.isOfficial&&!/^\d{4,8}$/.test(key)){const d=await apiFetch('/api/balance',{method:'GET',headers:{'x-api-key':key},timeout:12000});const b=d.balance_infos&&d.balance_infos[0];msg.textContent='✅ Key 有效，余额 ¥'+(b?parseFloat(b.total_balance).toFixed(2):'?')+'，'+(d.is_available?'可用':'已用尽');setTimeout(()=>msg.textContent='',6000)}else{const t=await apiFetch('/api/testkey',{method:'GET',headers:{'x-api-key':key},timeout:16000});msg.textContent=t.code?('✅ 接入码有效，今日剩余 '+t.remaining+' 次'):'✅ API 可用（中转地址，无余额查询）';setTimeout(()=>msg.textContent='',6000)}}catch(e){console.error('API Key 测试失败:',e);msg.textContent='❌ '+escape(friendlyErr(e));setTimeout(()=>msg.textContent='',6000)}});const kc2=document.getElementById('dsKeyClear');if(kc2)kc2.addEventListener('click',()=>{if(!confirm('清除已保存的 API Key？'))return;S.settings.dsKey='';save('settings');renderAppSettings();toast('Key 已清除')})}
+function renderAppSettings(){const s=S.settings,el=document.getElementById('appSettingsContent');el.innerHTML=`<div class="setting-group"><div class="setting-group-title">语音</div><div class="setting-card"><div class="s-label">朗读速度</div><div class="spd-grid" style="margin-top:6px">${CFG.speeds.map(sp=>`<button class="spd-chip${s.speed===sp?' active':''}" data-sp="${sp}">${sp}x</button>`).join('')}</div></div><div class="setting-card"><div class="s-label">字体大小</div><div class="s-row" style="margin-top:6px"><input type="range" id="fsSlider" min="${CFG.fsRange[0]}" max="${CFG.fsRange[1]}" value="${s.fontSize}" style="flex:1"><span style="margin-left:10px;font-weight:500;color:var(--blue);min-width:28px">${s.fontSize}</span></div></div></div><div class="setting-group"><div class="setting-group-title">翻译引擎（快速模式）</div>${CFG.models.map(m=>`<div style="padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:6px;cursor:pointer;background:${s.model===m.id?'var(--blue-bg)':'var(--surface)'};border-color:${s.model===m.id?'var(--blue)':'var(--border)'}" data-mdl="${m.id}"><div style="font-size:var(--fs-sm);font-weight:500;margin-bottom:2px;display:flex;justify-content:space-between">${m.name}${s.model===m.id?' <span style=color:var(--blue)>✓</span>':''}</div><div style="font-size:var(--fs-xs);color:var(--text3)">${m.desc}</div></div>`).join('')}</div><div class="setting-group"><div class="setting-group-title">服务器</div><div class="setting-card"><div class="s-label">服务器地址</div><div class="s-desc">深度翻译/字典/课堂已默认走云端服务器，保持为空即可。语音识别需连作者的电脑时，才填电脑局域网地址（如 http://192.168.x.x:8765）</div><input type="text" id="apiBaseInput" value="${s.apiBase||''}" placeholder="默认：云端服务器" style="margin-top:6px;font-size:var(--fs-sm)"><button id="apiBaseSave" style="margin-top:8px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">保存</button><span id="apiBaseMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">接入码</div><div class="setting-card"><div class="s-label">接入码 / API Key</div><div class="s-desc">填管理员发的 7 位数字接入码（推荐，手机上只输数字），或你自己的完整 sk- key。深度翻译、字典、变位、课堂翻译共用</div><input type="password" id="dsKeyInput" value="${s.dsKey||''}" placeholder="接入码（数字）或 sk-..." autocomplete="off" style="margin-top:6px;font-size:var(--fs-sm)"><div style="display:flex;gap:6px;margin-top:8px"><button id="dsKeySave" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">💾 保存</button><button id="dsKeyTest" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">🔍 测试</button>${s.dsKey?'<button id="dsKeyClear" style="flex:1;padding:7px 0;border-radius:6px;font-size:12px;background:var(--surface);color:var(--red);border:1.5px solid var(--red)">🗑 清除</button>':''}</div><span id="dsKeyMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span><div id="quotaLine" style="margin-top:8px;font-size:12px;color:var(--blue);font-weight:600"></div></div></div><div class="setting-group"><div class="setting-group-title">💬 意见反馈</div><div class="setting-card"><textarea id="fbText" rows="3" placeholder="遇到什么问题？想要什么功能？" style="width:100%;margin-top:6px;font-size:var(--fs-sm);padding:8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);box-sizing:border-box;resize:vertical"></textarea><input type="text" id="fbContact" placeholder="联系方式（选填，方便管理员回复）" style="width:100%;margin-top:6px;font-size:var(--fs-sm);padding:8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);box-sizing:border-box"><button id="fbSend" style="margin-top:8px;padding:7px 16px;border-radius:6px;font-size:12px;background:var(--blue);color:#fff;font-weight:600">提交反馈</button><span id="fbMsg" style="font-size:11px;color:var(--text3);margin-left:8px"></span></div></div><div class="setting-group"><div class="setting-group-title">❓ 帮助</div><button id="onboardReplay" style="margin-top:8px;margin-bottom:8px;padding:7px 16px;border-radius:6px;font-size:12px;background:var(--surface);color:var(--blue);border:1.5px solid var(--blue);font-weight:600;display:block">👋 新手指引</button><details class="setting-card"><summary style="font-weight:500;cursor:pointer">深度功能提示"网络不可用"怎么办</summary><div class="s-desc" style="margin-top:6px">先检查手机能否正常上网；再到 设置→接入码 点「🔍 测试」验证接入码是否有效。仍然不行请联系管理员。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">朗读俄语没声音 / 发音怪</summary><div class="s-desc" style="margin-top:6px">系统没装俄语语音包：Windows 设置 → 时间和语言 → 添加俄语 → 勾选"语音" → 重启浏览器。</div></details><details class="setting-card"><summary style="font-weight:500;cursor:pointer">接入码怎么获取</summary><div class="s-desc" style="margin-top:6px">联系管理员购买或领取接入码（一串数字），填到「接入码」并点「🔍 测试」验证。深度翻译、字典、变位、课堂翻译共用一个码。</div></details></div><div class="setting-group"><div class="about-box" style="text-align:center;padding:20px 0;color:var(--text3);font-size:var(--fs-sm);line-height:1.9">俄语学习 v6.3<br>俄·英·中 三语互译 + 高质量字典<br>单词变位标签 · 一词多译 · 句子语法解析<br>走遍俄罗斯 1-4 + 计算机专业俄语<br>CEFR A1-C2 等级考试<br>翻译: MyMemory + LibreTranslate + DeepSeek<br><a href="privacy.html" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">📜 隐私政策</a></div></div>`;const fsl2=document.getElementById('fsSlider');if(fsl2)fsl2.addEventListener('input',function(){applyFont(parseInt(this.value));this.nextElementSibling.textContent=this.value});el.querySelectorAll('.spd-chip').forEach(b=>b.addEventListener('click',function(){el.querySelectorAll('.spd-chip').forEach(x=>x.classList.remove('active'));this.classList.add('active');S.settings.speed=parseFloat(this.dataset.sp);save('settings');toast('速度: '+S.settings.speed+'x')}));el.querySelectorAll('[data-mdl]').forEach(c=>c.addEventListener('click',function(){S.settings.model=this.dataset.mdl;save('settings');renderAppSettings();toast('已切换')}));const kb2=document.getElementById('dsKeySave');if(kb2)kb2.addEventListener('click',()=>{S.settings.dsKey=document.getElementById('dsKeyInput').value.trim();save('settings');document.getElementById('dsKeyMsg').textContent='已保存';setTimeout(()=>document.getElementById('dsKeyMsg').textContent='',2000)});const kt2=document.getElementById('dsKeyTest');if(kt2)kt2.addEventListener('click',async()=>{const key=(document.getElementById('dsKeyInput').value||S.settings.dsKey||'').trim();if(!key){toast('请先填入 API Key');return}const msg=document.getElementById('dsKeyMsg');msg.textContent='测试中…';try{const c=await apiFetch('/api/config',{method:'GET',timeout:8000}).catch(()=>({isOfficial:false}));if(c.isOfficial&&!/^\d{4,8}$/.test(key)){const d=await apiFetch('/api/balance',{method:'GET',headers:{'x-api-key':key},timeout:12000});const b=d.balance_infos&&d.balance_infos[0];msg.textContent='✅ Key 有效，余额 ¥'+(b?parseFloat(b.total_balance).toFixed(2):'?')+'，'+(d.is_available?'可用':'已用尽');setTimeout(()=>msg.textContent='',6000)}else{const t=await apiFetch('/api/testkey',{method:'GET',headers:{'x-api-key':key},timeout:16000});msg.textContent=t.code?('✅ 接入码有效，今日剩余 '+t.remaining+' 次'):'✅ API 可用（中转地址，无余额查询）';setTimeout(()=>msg.textContent='',6000)}}catch(e){console.error('API Key 测试失败:',e);msg.textContent='❌ '+escape(friendlyErr(e));setTimeout(()=>msg.textContent='',6000)}});const kc2=document.getElementById('dsKeyClear');if(kc2)kc2.addEventListener('click',()=>{if(!confirm('清除已保存的 API Key？'))return;S.settings.dsKey='';save('settings');renderAppSettings();toast('Key 已清除')});refreshQuota()}
 renderAppSettings();
-document.addEventListener('click',e=>{const t=e.target;if(t&&t.id==='apiBaseSave'){S.settings.apiBase=(document.getElementById('apiBaseInput')||{value:''}).value.trim();save('settings');const m=document.getElementById('apiBaseMsg');if(m)m.textContent='已保存';setTimeout(()=>{if(m)m.textContent=''},2000)}});
+document.addEventListener('click',e=>{const t=e.target;if(t&&t.id==='apiBaseSave'){S.settings.apiBase=(document.getElementById('apiBaseInput')||{value:''}).value.trim();save('settings');const m=document.getElementById('apiBaseMsg');if(m)m.textContent='已保存';setTimeout(()=>{if(m)m.textContent=''},2000)}if(t&&t.id==='onboardReplay'){showOnboard()}if(t&&t.id==='fbSend'){const tx=document.getElementById('fbText'),ct=document.getElementById('fbContact'),fm=document.getElementById('fbMsg');const v=tx&&tx.value?tx.value.trim():'';if(!v){if(fm)fm.textContent='先写点内容再提交';return}if(fm)fm.textContent='提交中…';apiFetch('/api/feedback',{body:{text:v,contact:ct?ct.value.trim():''},timeout:20000}).then(()=>{tx.value='';if(ct)ct.value='';if(fm)fm.textContent='';toast('✅ 反馈已收到，谢谢！')}).catch(e=>{if(fm)fm.textContent='❌ '+friendlyErr(e)});setTimeout(()=>{if(fm)fm.textContent=''},4000)}if(t&&t.id==='classSaveRecBtn'){if(!CLASS._recBlob){toast('没有可保存的录音');return}const a=document.createElement('a');a.href=URL.createObjectURL(CLASS._recBlob);a.download='课堂录音_'+new Date().toISOString().slice(0,10)+'.'+(classMime.includes('mp4')?'m4a':'webm');document.body.appendChild(a);a.click();setTimeout(()=>{a.remove()},1000);toast('✅ 录音已保存到下载目录')}});
 document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subRes').style.display=id==='res'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none';if(id==='res')pzRenderRes()}));
 
 // ═══ 系统诊断 ═══

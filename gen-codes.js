@@ -11,6 +11,9 @@
 //    node gen-codes.js del 4826159      → 停用某个码
 //    node gen-codes.js key sk-xxx       → 更新服务端 DeepSeek API Key
 //    node gen-codes.js import           → 把本地 codes.json 一键同步到云端（恢复码库）
+//    node gen-codes.js backup           → 把云端码库备份到本地 codes.json
+//    node gen-codes.js feedback         → 查看用户反馈
+//    node gen-codes.js feedback-done <id> → 标记某条反馈已处理
 // ═══════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
@@ -25,6 +28,16 @@ try {
 }
 const API = conf.url.replace(/\/$/, '');
 const H = { 'Authorization': 'Bearer ' + conf.adminToken, 'Content-Type': 'application/json' };
+
+// 把云端码库拉回本地 codes.json（每次生成/停用码后自动执行，保证本地永远有最新备份）
+async function backupLocal() {
+  try {
+    const r = await fetch(API + '/admin/export', { headers: H, signal: AbortSignal.timeout(15000) });
+    const d = await r.json();
+    if (d && d.codes) { fs.writeFileSync(path.join(__dirname, 'codes.json'), JSON.stringify(d, null, 2)); return true; }
+  } catch (e) {}
+  return false;
+}
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -67,6 +80,7 @@ async function main() {
     const d = await r.json();
     if (d.ok) console.log('[OK] 已停用 ' + argv[1] + '（立即生效）');
     else { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
+    if (await backupLocal()) console.log('（本地 codes.json 备份已同步）');
     return;
   }
 
@@ -76,6 +90,39 @@ async function main() {
     const r = await fetch(API + '/admin/import', { method: 'POST', headers: H, body: JSON.stringify(db) });
     const d = await r.json();
     if (d.ok) console.log('[OK] 已把本地 codes.json 的 ' + d.count + ' 个码同步到云端');
+    else { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
+    return;
+  }
+
+  // ── 云端码库备份到本地 codes.json ──
+  if (cmd === 'backup') {
+    if (await backupLocal()) console.log('[OK] 本地 codes.json 已同步为云端最新（每次生成/停用码也会自动备份）');
+    else { console.log('❌ 备份失败'); process.exit(1); }
+    return;
+  }
+
+  // ── 查看用户反馈 ──
+  if (cmd === 'feedback') {
+    const r = await fetch(API + '/admin/feedback', { headers: H });
+    const d = await r.json();
+    if (!d.items) { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
+    if (!d.items.length) { console.log('暂无反馈'); return; }
+    console.log('共 ' + d.total + ' 条（' + d.newCount + ' 条未处理）：');
+    d.items.forEach(f => {
+      const tag = f.status === 'new' ? '🆕' : '✅';
+      console.log('  ' + tag + ' [' + f.id + '] ' + (f.time || '').slice(0, 16).replace('T', ' '));
+      console.log('      ' + f.text + (f.contact ? '\n      联系方式: ' + f.contact : ''));
+    });
+    console.log('处理命令：node gen-codes.js feedback-done <id>');
+    return;
+  }
+
+  // ── 标记反馈已处理 ──
+  if (cmd === 'feedback-done') {
+    if (!argv[1]) { console.log('用法：node gen-codes.js feedback-done <id>'); process.exit(1); }
+    const r = await fetch(API + '/admin/feedback-done', { method: 'POST', headers: H, body: JSON.stringify({ id: argv[1].trim() }) });
+    const d = await r.json();
+    if (d.ok) console.log('[OK] 已标记处理 ' + argv[1]);
     else { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
     return;
   }
@@ -96,6 +143,7 @@ async function main() {
   console.log('[OK] 已生成 ' + d.codes.length + ' 个接入码（每码每日 ' + d.dailyLimit + ' 次' + (tag.length ? '，' + tag.join('，') : '') + '），发给需要的人：');
   d.codes.forEach((e, i) => console.log('  ' + (i + 1) + '. ' + e.code + (e.expiry ? '（至 ' + e.expiry + '）' : '')));
   console.log('提示：node gen-codes.js list 查看；停用用 node gen-codes.js del <码>');
+  if (await backupLocal()) console.log('（本地 codes.json 备份已同步）');
 }
 
 main().catch(e => { console.log('❌ 连不上云端：' + e.message); process.exit(1); });
