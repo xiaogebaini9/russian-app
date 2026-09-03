@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+// 正式签名：CI 从 GitHub Secrets 解出 keystore 后生成 keystore.properties（保证签名一致，用户可覆盖升级）
+def ksPropsFile = rootProject.file("keystore.properties")
+def ksProps = new Properties()
+if (ksPropsFile.exists()) {
+    ksPropsFile.withInputStream { ksProps.load(it) }
+}
+
 android {
     namespace = "com.russian.learn"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +14,8 @@ android {
         applicationId "com.russian.learn"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode (project.findProperty("ciVersionCode") ?: 1) as int
+        versionName (project.findProperty("ciVersionName") ?: "6.4.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +23,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (ksPropsFile.exists()) {
+                storeFile rootProject.file(ksProps['storeFile'])
+                storePassword ksProps['storePassword']
+                keyAlias ksProps['keyAlias']
+                keyPassword ksProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (ksPropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

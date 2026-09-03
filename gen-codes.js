@@ -14,6 +14,8 @@
 //    node gen-codes.js backup           → 把云端码库备份到本地 codes.json
 //    node gen-codes.js feedback         → 查看用户反馈
 //    node gen-codes.js feedback-done <id> → 标记某条反馈已处理
+//    node gen-codes.js plan <邮箱> <天数> [每日次数] → 给登录用户绑套餐
+//    node gen-codes.js users           → 查看注册用户
 // ═══════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
@@ -98,6 +100,33 @@ async function main() {
   if (cmd === 'backup') {
     if (await backupLocal()) console.log('[OK] 本地 codes.json 已同步为云端最新（每次生成/停用码也会自动备份）');
     else { console.log('❌ 备份失败'); process.exit(1); }
+    return;
+  }
+
+  // ── 账号套餐：绑到登录用户的邮箱 ──
+  if (cmd === 'plan') {
+    if (!argv[1] || !argv[2]) { console.log('用法：node gen-codes.js plan <邮箱> <天数> [每日次数]'); process.exit(1); }
+    const r = await fetch(API + '/admin/plan', { method: 'POST', headers: H, body: JSON.stringify({ email: argv[1].trim(), days: parseInt(argv[2]), dailyLimit: parseInt(argv[3] || 100) }) });
+    const d = await r.json();
+    if (d.ok) console.log(`[OK] ${d.email} 套餐：${d.days} 天 × 每天 ${d.dailyLimit} 次（${d.start} 起）`);
+    else { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
+    return;
+  }
+
+  // ── 查看注册用户 ──
+  if (cmd === 'users') {
+    const r = await fetch(API + '/admin/users', { headers: H });
+    const d = await r.json();
+    if (!d.users) { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
+    if (!d.users.length) { console.log('还没有注册用户'); return; }
+    console.log('共 ' + d.users.length + ' 个注册用户：');
+    d.users.forEach(u => {
+      const bits = ['  ' + u.email];
+      if (u.plan_days > 0) bits.push(`套餐 ${u.plan_days}天×${u.plan_daily}/天（${u.plan_start} 起）`);
+      else if (u.trial_start) bits.push(`试用（${u.trial_start} 起）`);
+      bits.push(`今日 ${u.used_count || 0} 次`);
+      console.log(bits.join('  '));
+    });
     return;
   }
 

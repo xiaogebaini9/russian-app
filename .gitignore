@@ -14,3 +14,4 @@ keys.json
 cloud.json
 cloud/.dev.vars
 cloud/.wrangler/
+android/keystore/

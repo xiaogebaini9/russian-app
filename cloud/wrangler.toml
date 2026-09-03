@@ -12,6 +12,12 @@ DS_BASE_URL = "https://api.deepseek.com"
 [ai]
 binding = "AI"
 
+# D1 用户数据库（邮箱账号/套餐/收藏同步）
+[[d1_databases]]
+binding = "DB"
+database_name = "russian-app-db"
+database_id = "fcb4db64-1019-4ec8-8d4d-473c1e01af4b"
+
 # 静态页面：直接托管 www/ 目录（手机浏览器打开根地址即可用，PWA 方式）
 [assets]
 directory = "../www"

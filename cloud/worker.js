@@ -111,9 +111,12 @@ async function resolveTrial(env, deviceId, ip) {
   return { ok: true, key: mk, trial: true, deviceId: did, entry: e, today, limit, trials };
 }
 
-// ── 统一鉴权：有码走码，没码走试用 ──
+// ── 统一鉴权：sk-直通 > 登录账号 > 接入码 > 设备试用 ──
 async function authorize(env, request, body) {
   const raw = String((body && body.key) || '').trim();
+  if (/^sk-/.test(raw)) return await resolveAccess(env, raw);
+  const acct = await resolveAccount(env, request);
+  if (acct) return accountAccess(acct.user, await loadConfig(env));
   if (raw) return await resolveAccess(env, raw);
   return await resolveTrial(env,
     (body && body.deviceId) || request.headers.get('x-device-id'),
@@ -129,6 +132,11 @@ async function countUse(env, info) {
     await env.KV.put(TRIAL_KEY, JSON.stringify(info.trials));
     return;
   }
+  if (info.acct) {
+    const next = info.entry.used[info.today] || 0;
+    await env.DB.prepare('UPDATE users SET used_date=?1, used_count=?2 WHERE email=?3').bind(info.today, next, info.email).run();
+    return;
+  }
   if (!info.code) return;
   info.entry.totalUsed = (info.entry.totalUsed || 0) + 1;
   const db = await loadCodes(env);
@@ -138,6 +146,74 @@ async function countUse(env, info) {
   entry.used[info.today] = (entry.used[info.today] || 0) + 1;
   entry.totalUsed = (entry.totalUsed || 0) + 1;
   await env.KV.put(CODES_KEY, JSON.stringify(db));
+}
+
+// ═══ 邮箱账号体系（D1 存储：注册/登录/套餐/收藏同步）═══
+const SESSION_DAYS = 30;
+
+async function ensureDB(env) {
+  if (env._dbReady) return;
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
+      email TEXT PRIMARY KEY, pass TEXT, salt TEXT, created TEXT,
+      trial_start TEXT, trial_daily INTEGER DEFAULT 25,
+      plan_days INTEGER DEFAULT 0, plan_daily INTEGER DEFAULT 100, plan_start TEXT,
+      used_date TEXT, used_count INTEGER DEFAULT 0, favs TEXT DEFAULT '[]')`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, email TEXT, created TEXT)`)
+  ]);
+  env._dbReady = true;
+}
+function randomHex(bytes) {
+  const a = new Uint8Array(bytes); crypto.getRandomValues(a);
+  return [...a].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function hashPass(pass, saltHex) {
+  const salt = new Uint8Array(saltHex.match(/../g).map(h => parseInt(h, 16)));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 }, key, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 会话 → 账号（无会话返回 null，走码/试用）
+async function resolveAccount(env, request) {
+  const auth = request.headers.get('Authorization') || '';
+  if (!auth.startsWith('Bearer ')) return null;
+  const token = auth.slice(7).trim();
+  if (!/^[a-f0-9]{64}$/.test(token)) return null;
+  await ensureDB(env);
+  const sess = await env.DB.prepare('SELECT email, created FROM sessions WHERE token=?').bind(token).first();
+  if (!sess) return null;
+  if (Date.now() - new Date(sess.created + 'T00:00:00Z').getTime() > SESSION_DAYS * 86400000) {
+    await env.DB.prepare('DELETE FROM sessions WHERE token=?').bind(token).run();
+    return null;
+  }
+  const u = await env.DB.prepare('SELECT * FROM users WHERE email=?').bind(sess.email).first();
+  if (!u) return null;
+  return { user: u, email: sess.email, token: token };
+}
+
+// 账号额度：套餐（管理员绑定）优先，否则注册时继承的设备试用期
+function accountAccess(u, config) {
+  const today = new Date().toISOString().slice(0, 10);
+  const mk = masterKey(config);
+  if (!mk) return { ok: false, status: 500, msg: '服务端还没配置 API Key' };
+  const used = (u.used_date === today) ? (u.used_count || 0) : 0;
+  const entry = { used: { [today]: used } };
+  if (u.plan_days > 0 && u.plan_start) {
+    const expiry = addDaysTo(u.plan_start, u.plan_days);
+    if (today > expiry) return { ok: false, status: 403, msg: `账号套餐已过期（${expiry}），请联系管理员续费` };
+    const limit = u.plan_daily || 100;
+    if (used >= limit) return { ok: false, status: 429, msg: `今日次数已用完（套餐每天 ${limit} 次），明天再来` };
+    return { ok: true, key: mk, acct: true, email: u.email, today, limit, entry };
+  }
+  const t = config.trial || {};
+  const days = Math.max(1, parseInt(t.days) || 3);
+  const limit = Math.max(1, parseInt(t.dailyLimit) || 25);
+  if (!u.trial_start) return { ok: false, status: 403, msg: '账号暂无套餐，请联系管理员购买' };
+  const expiry = addDaysTo(u.trial_start, days);
+  if (today > expiry) return { ok: false, status: 403, msg: '免费试用已结束，请联系管理员购买接入套餐' };
+  if (used >= limit) return { ok: false, status: 429, msg: `今日试用次数已用完（每天 ${limit} 次），购买套餐立即解锁` };
+  return { ok: true, key: mk, acct: true, email: u.email, today, limit, entry };
 }
 
 // ── 缓存（命中不计次数、不调 DeepSeek）──
@@ -360,6 +436,24 @@ async function route(request, env, ctx, path) {
       return json(db);
     }
 
+    // ── 账号套餐：把套餐绑到邮箱（用户登录后即生效）──
+    if (method === 'POST' && path === '/admin/plan') {
+      const body = await readJson(request);
+      const email = String((body && body.email) || '').trim().toLowerCase();
+      const days = Math.max(1, Math.min(3650, parseInt(body && body.days) || 30));
+      const dailyLimit = Math.max(1, Math.min(10000, parseInt(body && body.dailyLimit) || 100));
+      await ensureDB(env);
+      const u = await env.DB.prepare('SELECT email FROM users WHERE email=?').bind(email).first();
+      if (!u) return json({ error: '没有这个邮箱的账号' }, 404);
+      await env.DB.prepare('UPDATE users SET plan_days=?1, plan_daily=?2, plan_start=?3 WHERE email=?4').bind(days, dailyLimit, today(), email).run();
+      return json({ ok: true, email, days, dailyLimit, start: today() });
+    }
+    if (method === 'GET' && path === '/admin/users') {
+      await ensureDB(env);
+      const rs = await env.DB.prepare('SELECT email, created, plan_days, plan_daily, plan_start, trial_start, used_date, used_count FROM users ORDER BY created DESC LIMIT 200').all();
+      return json({ users: rs.results || [] });
+    }
+
     // ── 试用参数（天数/每日次数，实时生效）──
     if (method === 'POST' && path === '/admin/trial') {
       const body = await readJson(request);
@@ -421,7 +515,13 @@ async function route(request, env, ctx, path) {
   if (method === 'GET' && path === '/api/testkey') {
     const rawKey = (request.headers.get('x-api-key') || '').trim();
     if (!rawKey) {
-      // 没填码：报告试用状态
+      // 没填码：登录账号 → 报告账号额度；否则报告设备试用状态
+      const acct = await resolveAccount(env, request);
+      if (acct) {
+        const a = accountAccess(acct.user, await loadConfig(env));
+        if (!a.ok) return json({ error: a.msg, acct: true });
+        return json({ ok: true, acct: true, remaining: remainingOf(a) });
+      }
       const access = await resolveTrial(env, request.headers.get('x-device-id'), request.headers.get('CF-Connecting-IP') || '');
       if (!access.ok) return json({ error: access.msg });
       return json({ ok: true, trial: true, remaining: remainingOf(access) });
@@ -475,6 +575,89 @@ async function route(request, env, ctx, path) {
     } catch (e) {
       return json({ error: '识别失败：' + (e.message || e) }, 500);
     }
+  }
+
+  // ── 邮箱账号：注册 / 登录 / 登出 / 我的信息 ──
+  if (method === 'POST' && path === '/api/auth/register') {
+    const body = await readJson(request);
+    const email = String((body && body.email) || '').trim().toLowerCase();
+    const pass = String((body && body.password) || '');
+    const did = String((body && body.deviceId) || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return json({ error: '邮箱格式不正确' }, 400);
+    if (pass.length < 6) return json({ error: '密码至少 6 位' }, 400);
+    await ensureDB(env);
+    const ex = await env.DB.prepare('SELECT email FROM users WHERE email=?').bind(email).first();
+    if (ex) return json({ error: '该邮箱已注册，请直接登录' }, 409);
+    const salt = randomHex(16);
+    const passHash = await hashPass(pass, salt);
+    // 继承该设备已有的试用起始日，防止换邮箱刷试用期
+    let trialStart = new Date().toISOString().slice(0, 10);
+    try { const tr = await loadTrials(env); if (tr[did] && tr[did].created) trialStart = tr[did].created; } catch (e) {}
+    await env.DB.prepare('INSERT INTO users (email, pass, salt, created, trial_start, trial_daily) VALUES (?1,?2,?3,?4,?5,25)')
+      .bind(email, passHash, salt, today(), trialStart).run();
+    const token = randomHex(32);
+    await env.DB.prepare('INSERT INTO sessions (token, email, created) VALUES (?1,?2,?3)').bind(token, email, today()).run();
+    return json({ ok: true, token, email });
+  }
+
+  if (method === 'POST' && path === '/api/auth/login') {
+    const body = await readJson(request);
+    const email = String((body && body.email) || '').trim().toLowerCase();
+    const pass = String((body && body.password) || '');
+    await ensureDB(env);
+    // 防爆破：10 分钟内同一邮箱错 5 次 → 锁定
+    let fl = {}; try { fl = await env.KV.get('fl:' + email, { type: 'json' }) || { n: 0 }; } catch (e) {}
+    if ((fl.n || 0) >= 5) return json({ error: '错误次数过多，请 10 分钟后再试' }, 423);
+    const u = await env.DB.prepare('SELECT * FROM users WHERE email=?').bind(email).first();
+    if (!u) { await env.KV.put('fl:' + email, JSON.stringify({ n: (fl.n || 0) + 1 }), { expirationTtl: 600 }); return json({ error: '邮箱或密码不正确' }, 401); }
+    const h = await hashPass(pass, u.salt);
+    if (h !== u.pass) { await env.KV.put('fl:' + email, JSON.stringify({ n: (fl.n || 0) + 1 }), { expirationTtl: 600 }); return json({ error: '邮箱或密码不正确' }, 401); }
+    try { await env.KV.delete('fl:' + email); } catch (e) {}
+    const token = randomHex(32);
+    await env.DB.prepare('INSERT INTO sessions (token, email, created) VALUES (?1,?2,?3)').bind(token, email, today()).run();
+    return json({ ok: true, token, email });
+  }
+
+  if (method === 'POST' && path === '/api/auth/logout') {
+    const auth = request.headers.get('Authorization') || '';
+    if (auth.startsWith('Bearer ') && /^[a-f0-9]{64}$/.test(auth.slice(7).trim())) {
+      await ensureDB(env);
+      await env.DB.prepare('DELETE FROM sessions WHERE token=?').bind(auth.slice(7).trim()).run();
+    }
+    return json({ ok: true });
+  }
+
+  if (method === 'GET' && path === '/api/auth/me') {
+    const acct = await resolveAccount(env, request);
+    if (!acct) return json({ error: '未登录' }, 401);
+    const config = await loadConfig(env);
+    const a = accountAccess(acct.user, config);
+    return json({
+      email: acct.email,
+      plan: acct.user.plan_days > 0 ? { days: acct.user.plan_days, daily: acct.user.plan_daily, start: acct.user.plan_start } : null,
+      trial: acct.user.trial_start ? { start: acct.user.trial_start } : null,
+      remaining: a.ok ? remainingOf(a) : 0,
+      ok: a.ok, msg: a.ok ? '' : a.msg
+    });
+  }
+
+  // ── 收藏云同步（登录用户）──
+  if (method === 'GET' && path === '/api/user/favs') {
+    const acct = await resolveAccount(env, request);
+    if (!acct) return json({ error: '未登录' }, 401);
+    let favs = '[]';
+    try { favs = await env.DB.prepare('SELECT favs FROM users WHERE email=?').bind(acct.email).first(); } catch (e) {}
+    return json({ favs: JSON.parse((favs && favs.favs) || '[]') });
+  }
+  if (method === 'POST' && path === '/api/user/favs') {
+    const acct = await resolveAccount(env, request);
+    if (!acct) return json({ error: '未登录' }, 401);
+    const body = await readJson(request);
+    if (!body || !Array.isArray(body.favs)) return json({ error: '格式错误' }, 400);
+    const s = JSON.stringify(body.favs.slice(0, 3000));
+    if (s.length > 900000) return json({ error: '收藏过多' }, 413);
+    await env.DB.prepare('UPDATE users SET favs=?1 WHERE email=?2').bind(s, acct.email).run();
+    return json({ ok: true, count: body.favs.length });
   }
 
   // ── 意见反馈：存 KV，配了 pushplusToken 则微信推送管理员 ──

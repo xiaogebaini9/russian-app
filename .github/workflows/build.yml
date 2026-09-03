@@ -48,16 +48,38 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync
 
-      - name: Build Debug APK
+      - name: Prepare signing (if secrets configured)
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_B64" ] && [ -n "$ANDROID_KEYSTORE_PASS" ]; then
+            mkdir -p android/keystore
+            echo "$ANDROID_KEYSTORE_B64" | base64 -d > android/keystore/release.keystore
+            printf 'storeFile=keystore/release.keystore\nstorePassword=%s\nkeyAlias=russian-app\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASS" "$ANDROID_KEYSTORE_PASS" > android/keystore.properties
+            echo "SIGNED_RELEASE=true" >> $GITHUB_ENV
+            echo "签名密钥已就绪，将构建正式签名版"
+          else
+            echo "未配置签名密钥，回退 debug 版"
+          fi
+
+      - name: Build APK
         run: |
           unset ANDROID_SDK_ROOT
-          cd android && chmod +x gradlew && ./gradlew assembleDebug
+          cd android && chmod +x gradlew
+          if [ "$SIGNED_RELEASE" = "true" ]; then
+            ./gradlew assembleRelease -PciVersionCode=${{ github.run_number }} -PciVersionName=6.4.${{ github.run_number }}
+          else
+            ./gradlew assembleDebug
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: russian-app-debug
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: russian-app-apk
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
       - name: Create Release
@@ -65,6 +87,8 @@ jobs:
         with:
           tag_name: v${{ github.run_number }}
           name: "俄语学习 v${{ github.run_number }}"
-          files: android/app/build/outputs/apk/debug/*.apk
+          files: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
