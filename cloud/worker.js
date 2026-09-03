@@ -698,7 +698,7 @@ async function route(request, env, ctx, path) {
     const access = await authorize(env, request, body);
     if (!access.ok) return json({ error: access.msg }, access.status);
     await countUse(env, access);
-    const d = await callDeepSeek(access.key, [
+    const { parsed, raw, model } = await requestJsonAnalysis(access.key, [
       { role: 'system', content: `你是同声传译专家，处理俄语大学课堂口语。
 
 任务：把老师说的话规整并翻译成中文。
@@ -712,11 +712,9 @@ async function route(request, env, ctx, path) {
 
 如果听不清或文本不完整，original保留原样，translation翻译能听懂的部分，note注明"音频不完整"。` },
       { role: 'user', content: text + (terms ? '\n\n[课程术语表，这些词的中文翻译必须采用：' + terms + ']' : '') }
-    ], 2000, 30000);
-    const raw = d.data.choices?.[0]?.message?.content?.trim() || '';
-    const parsed = extractJson(raw);
+    ], 3000, 30000);
     if (parsed && (parsed.original || parsed.translation)) {
-      parsed._model = d.model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
+      parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
       parsed.remaining = remainingOf(access);
       return json(parsed);
     }
