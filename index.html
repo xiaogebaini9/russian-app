@@ -241,6 +241,7 @@ const devId=()=>{
   if(_devSettled||fromStore)devSave(id); // 启动恢复完成前先不落盘，避免覆盖 IndexedDB 里的真身份
   return id;
 };
+const authHdr=()=>{const s=ls('session','');return s?{Authorization:'Bearer '+s}:{}}; // 二进制请求（语音）带登录会话
 (async()=>{ // 启动时修复设备身份：哪里有真身就用哪里，并补齐三处备份
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){}
   let id=ls('devid','');
@@ -2216,7 +2217,7 @@ function classStart(){
 
 async function classRecognize(blob){
   try{
-    const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:blob,signal:AbortSignal.timeout(120000)});
+    const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(120000)});
     const d=await r.json().catch(()=>({}));
     if(d.error)throw new Error(d.error);
     classSendText(d.text||'', d.confidence);
@@ -2243,7 +2244,7 @@ async function classFinalizeRecording(){
     const failed=classFailedChunks.splice(0);
     for(let i=0;i<failed.length;i++){
       try{
-        const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:failed[i],signal:AbortSignal.timeout(180000)});
+        const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:failed[i],headers:authHdr(),signal:AbortSignal.timeout(180000)});
         const d=await r.json().catch(()=>({}));
         if(!d.error&&d.text)classSendText(d.text,null);
       }catch(e){console.error('HQ重试失败',e.message||e)}
@@ -2292,7 +2293,7 @@ function replayTick(){
 async function replayRecognize(blob){
   const R=CLASS._replay;
   try{
-    const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:blob,signal:AbortSignal.timeout(180000)});
+    const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(180000)});
     const d=await r.json().catch(()=>({}));
     if(d.error)throw new Error(d.error);
     classSendText(d.text||'',null);
@@ -2313,7 +2314,7 @@ function replayFinish(){
   const retry=async()=>{
     if(R.failed.length){if(st)st.textContent='🔁 正在补识 '+R.failed.length+' 段…';
       const f=R.failed.splice(0);
-      for(const b of f){try{const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:b,signal:AbortSignal.timeout(120000)});const d=await r.json().catch(()=>({}));if(!d.error&&d.text)classSendText(d.text,null)}catch(e){}}
+      for(const b of f){try{const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(120000)});const d=await r.json().catch(()=>({}));if(!d.error&&d.text)classSendText(d.text,null)}catch(e){}}
     }
     if(st)st.textContent='📼 回放重翻完成';
     try{R.ctx.close()}catch(e){}
