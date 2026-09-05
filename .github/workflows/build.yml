@@ -68,7 +68,7 @@ jobs:
           unset ANDROID_SDK_ROOT
           cd android && chmod +x gradlew
           if [ "$SIGNED_RELEASE" = "true" ]; then
-            ./gradlew assembleRelease -PciVersionCode=${{ github.run_number }} -PciVersionName=6.4.${{ github.run_number }}
+            ./gradlew assembleRelease --stacktrace -PciVersionCode=${{ github.run_number }} -PciVersionName=6.4.${{ github.run_number }}
           else
             ./gradlew assembleDebug
           fi
