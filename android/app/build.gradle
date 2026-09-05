@@ -6,6 +6,8 @@ def ksProps = new Properties()
 if (ksPropsFile.exists()) {
     ksPropsFile.withInputStream { ksProps.load(it) }
 }
+def ciCode = project.hasProperty("ciVersionCode") ? (project.property("ciVersionCode") as int) : 1
+def ciName = project.hasProperty("ciVersionName") ? (project.property("ciVersionName") as String) : "6.4.0"
 
 android {
     namespace = "com.russian.learn"
@@ -14,8 +16,8 @@ android {
         applicationId "com.russian.learn"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (project.findProperty("ciVersionCode") ?: 1) as int
-        versionName (project.findProperty("ciVersionName") ?: "6.4.0")
+        versionCode ciCode
+        versionName ciName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
