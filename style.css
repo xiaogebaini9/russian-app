@@ -27,6 +27,40 @@
   --radius:16px;--radius-sm:12px;--radius-pill:22px;
   --fs:15px;--fs-sm:13px;--fs-xs:11px;
 }
+/* ═══════════════════════════════════════════════════════
+   换肤主题（2026-09）—— 只覆盖变量值，结构/模糊/圆角不动
+   <html data-theme="ink|amber"> 时生效，默认不挂 = 汐汐玻璃
+   ═══════════════════════════════════════════════════════ */
+/* ⑨ 墨水极简：纯白纸面 + 墨黑主色 + 一条细线，阴影减淡收干净 */
+:root[data-theme="ink"]{
+  --bg-a:#FFFFFF;--bg-b:#F7F7F8;
+  --orb-1:#F2F3F5;--orb-2:#F4F4F6;--orb-3:#FAFAFB;
+  --glass:#FFFFFF;--glass-strong:#FFFFFF;--glass-soft:#FFFFFF;
+  --glass-border:#E6E7EA;
+  --shadow:0 2px 10px rgba(17,17,20,.06);--shadow-sm:0 1px 4px rgba(17,17,20,.05);
+  --bg:#FFFFFF;
+  --surface:#FFFFFF;--card:#FFFFFF;--input:#F7F7F8;
+  --border:#E6E7EA;--border2:rgba(17,17,20,.08);
+  --blue:#111114;--blue2:#3F3F46;
+  --blue-bg:rgba(17,17,20,.05);--blue-bg2:rgba(17,17,20,.09);
+  --text:#111114;--text2:#4B5563;--text3:#9CA3AF;
+  --green:#16A34A;--yellow:#D97706;--red:#DC2626;--pink:#DB2777;
+}
+/* ⑩ 琥珀暖读：台灯暖光 + 奶油卡 + 琥珀主色，低刺激暖色系 */
+:root[data-theme="amber"]{
+  --bg-a:#FBF3E4;--bg-b:#F6EAD3;
+  --orb-1:#F3DFAF;--orb-2:#F5E7C4;--orb-3:#F9EFD9;
+  --glass:rgba(255,249,238,.72);--glass-strong:rgba(255,249,238,.90);--glass-soft:rgba(255,249,238,.62);
+  --glass-border:rgba(214,178,120,.45);
+  --shadow:0 10px 30px rgba(150,110,60,.14);--shadow-sm:0 4px 14px rgba(150,110,60,.10);
+  --bg:#FBF3E4;
+  --surface:#FFF9EF;--card:#FFF9EF;--input:#FFFDF5;
+  --border:rgba(214,178,120,.50);--border2:rgba(150,110,60,.14);
+  --blue:#C2690A;--blue2:#E08A2E;
+  --blue-bg:rgba(194,105,10,.10);--blue-bg2:rgba(194,105,10,.18);
+  --text:#443B30;--text2:#5D5245;--text3:#A1927D;
+  --green:#6F9E63;--yellow:#D9A406;--red:#C2453D;--pink:#D96890;
+}
 html,body{height:100%;overflow:hidden;color:var(--text);font-size:var(--fs);font-family:var(--sans);-webkit-tap-highlight-color:transparent}
 body{background:linear-gradient(168deg,var(--bg-a) 0%,var(--bg-b) 100%)}
 input,textarea{font-family:inherit;font-size:inherit;outline:none;background:var(--input);border:1.5px solid var(--glass-border);color:var(--text);border-radius:var(--radius-sm);padding:10px 14px;width:100%;transition:border-color .2s}
@@ -258,6 +292,14 @@ button{cursor:pointer;border:none;outline:none;font-family:inherit;font-size:inh
 .spd-grid{display:flex;flex-wrap:wrap;gap:4px}
 .spd-chip{padding:5px 12px;border-radius:6px;font-size:12px;color:var(--text3);background:var(--input);border:1px solid var(--border)}
 .spd-chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+/* ── 界面风格选择器（设置页色卡） ── */
+.theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.theme-card{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 6px 8px;text-align:center;cursor:pointer;background:var(--surface);transition:border-color .2s,box-shadow .2s}
+.theme-card.active{border-color:var(--blue);box-shadow:0 0 0 1.5px var(--blue)}
+.theme-card .sw-row{display:flex;gap:3px;justify-content:center;margin-bottom:6px}
+.theme-card .sw{width:14px;height:14px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.10)}
+.theme-card .t-name{font-size:12px;font-weight:600;color:var(--text2)}
+.theme-card .t-check{font-size:10px;color:var(--blue);height:13px;line-height:13px;font-weight:600}
 .mini-chip{font-size:11px;color:var(--blue);background:var(--blue-bg);padding:4px 10px;border-radius:12px}
 .mini-chip.danger{color:var(--red);background:rgba(239,68,68,.08)}
 input[type="range"]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:2px;background:var(--border);outline:none;border:none;padding:0}

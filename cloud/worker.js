@@ -12,6 +12,8 @@
 //    POST /admin/setkey  {key}
 //    POST /admin/import  {dailyLimit, codes}   ← 一次性迁移本地 codes.json 用
 //    GET  /admin/status
+//    GET  /admin/devices                    ← 设备登记清单（防刷额度）
+//    POST /admin/device-block {did, blocked} ← 封禁(true)/解封(false)设备
 //  静态页面（index.html 等）由 [assets] 自动托管，本脚本只处理 /api/ 和 /admin/
 // ═══════════════════════════════════════════════════════════════
 
@@ -79,11 +81,54 @@ function addDaysTo(baseDate, n) {
   return new Date(new Date(baseDate + 'T00:00:00Z').getTime() + n * 86400000).toISOString().slice(0, 10);
 }
 
+// ═══ 设备登记（防刷额度：设备永久留档，管理员可查可封）═══
+// 每台设备最多注册的账号数（防多账号叠加每日额度）
+const MAX_ACC_PER_DEVICE = 2;
+// 每个真实 IP 每天最多注册的账号数（防脚本批量刷号）
+const MAX_REG_PER_IP_DAY = 5;
+// 每台设备最多记录的邮箱数（防字段膨胀）
+const MAX_EMAILS_TRACKED = 20;
+
+// 登记设备并返回其档案；DB 异常时返回 null（登记失败不影响主流程）
+// opts: { regEmail } 注册成功后把邮箱挂到设备；{ loginEmail } 登录成功后记录绑定
+async function recordDevice(env, did, ip, opts) {
+  did = String(did || '').trim();
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(did)) return null;
+  const o = opts || {};
+  try {
+    await ensureDB(env);
+    const row = await env.DB.prepare('SELECT last_seen, ip, emails, logins, blocked FROM devices WHERE did=?').bind(did).first();
+    const td = today();
+    if (!row) {
+      const emails = o.regEmail ? [o.regEmail] : [];
+      const logins = o.loginEmail ? [o.loginEmail] : [];
+      await env.DB.prepare('INSERT INTO devices (did, created, last_seen, ip, emails, logins, blocked) VALUES (?1,?2,?2,?3,?4,?5,0)')
+        .bind(did, td, ip || '', JSON.stringify(emails), JSON.stringify(logins)).run();
+      return { emails, logins, blocked: 0 };
+    }
+    let emails = [], logins = [];
+    try { emails = JSON.parse(row.emails || '[]'); } catch (e) {}
+    try { logins = JSON.parse(row.logins || '[]'); } catch (e) {}
+    if (o.regEmail && emails.length < MAX_EMAILS_TRACKED && !emails.includes(o.regEmail)) emails.push(o.regEmail);
+    if (o.loginEmail && logins.length < MAX_EMAILS_TRACKED && !logins.includes(o.loginEmail)) logins.push(o.loginEmail);
+    const newE = JSON.stringify(emails), newL = JSON.stringify(logins);
+    const changed = row.last_seen !== td || (ip && row.ip !== ip) || newE !== (row.emails || '[]') || newL !== (row.logins || '[]');
+    if (changed) {
+      await env.DB.prepare('UPDATE devices SET last_seen=?1, ip=?2, emails=?3, logins=?4 WHERE did=?5')
+        .bind(td, ip || row.ip || '', newE, newL, did).run();
+    }
+    return { emails, logins, blocked: row.blocked };
+  } catch (e) { return null; }
+}
+
 async function resolveTrial(env, deviceId, ip) {
   const did = String(deviceId || '').trim();
   if (!/^[A-Za-z0-9-]{8,64}$/.test(did)) {
     return { ok: false, status: 403, msg: '请先在设置中填写接入码（管理员发放的数字）。新用户可免费试用 3 天，每天 25 次' };
   }
+  // 顺手登记设备；被封禁的设备不给试用（接入码用户不受影响）
+  const dev = await recordDevice(env, did, ip);
+  if (dev && dev.blocked) return { ok: false, status: 403, msg: '此设备已被限制免费试用，请在设置中填入接入码继续使用' };
   const config = await loadConfig(env);
   const t = config.trial || {};
   const days = Math.max(1, parseInt(t.days) || 3);
@@ -115,12 +160,19 @@ async function resolveTrial(env, deviceId, ip) {
 async function authorize(env, request, body) {
   const raw = String((body && body.key) || '').trim();
   if (/^sk-/.test(raw)) return await resolveAccess(env, raw);
+  const did = String((body && body.deviceId) || request.headers.get('x-device-id') || '').trim();
+  const ip = request.headers.get('CF-Connecting-IP') || '';
   const acct = await resolveAccount(env, request);
-  if (acct) return accountAccess(acct.user, await loadConfig(env));
-  if (raw) return await resolveAccess(env, raw);
-  return await resolveTrial(env,
-    (body && body.deviceId) || request.headers.get('x-device-id'),
-    request.headers.get('CF-Connecting-IP') || '');
+  if (acct) {
+    if (did) await recordDevice(env, did, ip);
+    return accountAccess(acct.user, await loadConfig(env));
+  }
+  if (raw) {
+    if (did) await recordDevice(env, did, ip);
+    return await resolveAccess(env, raw);
+  }
+  // 试用路径在 resolveTrial 内自行登记（含封禁检查）
+  return await resolveTrial(env, did, ip);
 }
 
 // ── 扣次数（sk- 直通不计；接入码和试用分库计）──
@@ -150,6 +202,8 @@ async function countUse(env, info) {
 
 // ═══ 邮箱账号体系（D1 存储：注册/登录/套餐/收藏同步）═══
 const SESSION_DAYS = 30;
+// 登录用户的课堂免费体验量（按句计，75 句 ≈ 15 分钟），终身一次
+const CLASSROOM_TRIAL_SENTENCES = 75;
 
 async function ensureDB(env) {
   if (env._dbReady) return;
@@ -158,9 +212,14 @@ async function ensureDB(env) {
       email TEXT PRIMARY KEY, pass TEXT, salt TEXT, created TEXT,
       trial_start TEXT, trial_daily INTEGER DEFAULT 25,
       plan_days INTEGER DEFAULT 0, plan_daily INTEGER DEFAULT 100, plan_start TEXT,
-      used_date TEXT, used_count INTEGER DEFAULT 0, favs TEXT DEFAULT '[]')`),
-    env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, email TEXT, created TEXT)`)
+      used_date TEXT, used_count INTEGER DEFAULT 0, favs TEXT DEFAULT '[]',
+      classroom_used INTEGER DEFAULT 0)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, email TEXT, created TEXT)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS devices (
+      did TEXT PRIMARY KEY, created TEXT, last_seen TEXT, ip TEXT,
+      emails TEXT DEFAULT '[]', logins TEXT DEFAULT '[]', blocked INTEGER DEFAULT 0)`)
   ]);
+  try { await env.DB.prepare('ALTER TABLE users ADD COLUMN classroom_used INTEGER DEFAULT 0').run(); } catch (e) {}
   env._dbReady = true;
 }
 function randomHex(bytes) {
@@ -504,6 +563,28 @@ async function route(request, env, ctx, path) {
       return json({ ok: true });
     }
 
+    // ── 设备登记：查看 / 封禁（防刷额度）──
+    if (method === 'GET' && path === '/admin/devices') {
+      await ensureDB(env);
+      const rs = await env.DB.prepare('SELECT did, created, last_seen, ip, emails, logins, blocked FROM devices ORDER BY last_seen DESC LIMIT 200').all();
+      const items = (rs.results || []).map(d => {
+        let emails = [], logins = [];
+        try { emails = JSON.parse(d.emails || '[]'); } catch (e) {}
+        try { logins = JSON.parse(d.logins || '[]'); } catch (e) {}
+        return { did: d.did, created: d.created, last_seen: d.last_seen, ip: d.ip, emails, logins, blocked: !!d.blocked };
+      });
+      return json({ total: items.length, blockedCount: items.filter(x => x.blocked).length, items });
+    }
+    if (method === 'POST' && path === '/admin/device-block') {
+      const body = await readJson(request);
+      const did = String((body && body.did) || '').trim();
+      const blocked = (body && body.blocked === false) || (body && body.blocked === 'off') ? 0 : 1;
+      await ensureDB(env);
+      const r = await env.DB.prepare('UPDATE devices SET blocked=?1 WHERE did=?2').bind(blocked, did).run();
+      if (!r.meta || !r.meta.changes) return json({ error: '设备清单里没有这个设备号' }, 404);
+      return json({ ok: true, did, blocked: !!blocked });
+    }
+
     return json({ error: '未知管理接口' }, 404);
   }
 
@@ -562,6 +643,14 @@ async function route(request, env, ctx, path) {
 
   async function voiceSTT(request, env, model) {
     if (!env.AI) return json({ error: '语音识别未启用（缺少 AI 绑定）' }, 500);
+    // 登录用户的课堂体验用尽 → 拦（套餐用户/接入码/匿名不受限）
+    const acct = await resolveAccount(env, request);
+    if (acct) {
+      const u = acct.user;
+      if (!(u.plan_days > 0 && u.plan_start) && (u.classroom_used || 0) >= CLASSROOM_TRIAL_SENTENCES) {
+        return json({ error: '课堂体验已用完（75 句 ≈ 15 分钟），购买套餐后可继续使用', classroomTrial: true }, 403);
+      }
+    }
     const buf = await request.arrayBuffer();
     if (!buf || buf.byteLength === 0) return json({ error: '音频为空' }, 400);
     if (buf.byteLength > 8000000) return json({ error: '音频过大（单段限 8MB）' }, 413);
@@ -583,9 +672,19 @@ async function route(request, env, ctx, path) {
     const email = String((body && body.email) || '').trim().toLowerCase();
     const pass = String((body && body.password) || '');
     const did = String((body && body.deviceId) || '').trim();
+    const ip = request.headers.get('CF-Connecting-IP') || '';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return json({ error: '邮箱格式不正确' }, 400);
     if (pass.length < 6) return json({ error: '密码至少 6 位' }, 400);
     await ensureDB(env);
+    // 防刷闸门：设备封禁 → 每设备账号数 → 每 IP 每日注册数
+    const dev = await recordDevice(env, did, ip);
+    if (dev && dev.blocked) return json({ error: '此设备已被限制注册，请联系管理员' }, 403);
+    if (dev && dev.emails.length >= MAX_ACC_PER_DEVICE) return json({ error: `此设备注册的账号已达上限（${MAX_ACC_PER_DEVICE} 个），请直接登录` }, 403);
+    const regKey = ip ? 'reg:' + today() + ':' + ip : '';
+    if (regKey) {
+      let n = 0; try { n = parseInt(await env.KV.get(regKey)) || 0; } catch (e) {}
+      if (n >= MAX_REG_PER_IP_DAY) return json({ error: '此网络今日注册人数已达上限，请明天再试或直接登录' }, 429);
+    }
     const ex = await env.DB.prepare('SELECT email FROM users WHERE email=?').bind(email).first();
     if (ex) return json({ error: '该邮箱已注册，请直接登录' }, 409);
     const salt = randomHex(16);
@@ -595,6 +694,9 @@ async function route(request, env, ctx, path) {
     try { const tr = await loadTrials(env); if (tr[did] && tr[did].created) trialStart = tr[did].created; } catch (e) {}
     await env.DB.prepare('INSERT INTO users (email, pass, salt, created, trial_start, trial_daily) VALUES (?1,?2,?3,?4,?5,25)')
       .bind(email, passHash, salt, today(), trialStart).run();
+    // 注册成功才计数/挂邮箱，失败的尝试不占额度
+    if (regKey) { try { const n = parseInt(await env.KV.get(regKey)) || 0; await env.KV.put(regKey, String(n + 1), { expirationTtl: 172800 }); } catch (e) {} }
+    await recordDevice(env, did, ip, { regEmail: email });
     const token = randomHex(32);
     await env.DB.prepare('INSERT INTO sessions (token, email, created) VALUES (?1,?2,?3)').bind(token, email, today()).run();
     return json({ ok: true, token, email });
@@ -604,6 +706,8 @@ async function route(request, env, ctx, path) {
     const body = await readJson(request);
     const email = String((body && body.email) || '').trim().toLowerCase();
     const pass = String((body && body.password) || '');
+    const did = String((body && body.deviceId) || '').trim();
+    const ip = request.headers.get('CF-Connecting-IP') || '';
     await ensureDB(env);
     // 防爆破：10 分钟内同一邮箱错 5 次 → 锁定
     let fl = {}; try { fl = await env.KV.get('fl:' + email, { type: 'json' }) || { n: 0 }; } catch (e) {}
@@ -615,6 +719,8 @@ async function route(request, env, ctx, path) {
     try { await env.KV.delete('fl:' + email); } catch (e) {}
     const token = randomHex(32);
     await env.DB.prepare('INSERT INTO sessions (token, email, created) VALUES (?1,?2,?3)').bind(token, email, today()).run();
+    // 记录"该设备登录过该邮箱"（只记录不限制，供管理员发现一机多号）
+    await recordDevice(env, did, ip, { loginEmail: email });
     return json({ ok: true, token, email });
   }
 
@@ -632,12 +738,14 @@ async function route(request, env, ctx, path) {
     if (!acct) return json({ error: '未登录' }, 401);
     const config = await loadConfig(env);
     const a = accountAccess(acct.user, config);
+    const cu = acct.user.classroom_used || 0;
     return json({
       email: acct.email,
       plan: acct.user.plan_days > 0 ? { days: acct.user.plan_days, daily: acct.user.plan_daily, start: acct.user.plan_start } : null,
       trial: acct.user.trial_start ? { start: acct.user.trial_start } : null,
       remaining: a.ok ? remainingOf(a) : 0,
-      ok: a.ok, msg: a.ok ? '' : a.msg
+      ok: a.ok, msg: a.ok ? '' : a.msg,
+      classroom: { used: cu, left: Math.max(0, CLASSROOM_TRIAL_SENTENCES - cu), limit: CLASSROOM_TRIAL_SENTENCES }
     });
   }
 
@@ -878,9 +986,34 @@ async function route(request, env, ctx, path) {
     const text = String(body.text || '');
     const terms = String(body.terms || '').slice(0, 800);
     if (!text.trim()) return json({ error: '文本为空' });
-    const access = await authorize(env, request, body);
+    // 登录用户的课堂走专属逻辑（体验句数/套餐额度）；匿名照旧走接入码/设备试用
+    const acct = await resolveAccount(env, request);
+    let access, classroomLeft = null;
+    if (acct) {
+      const did = String(body.deviceId || request.headers.get('x-device-id') || '').trim();
+      const ip = request.headers.get('CF-Connecting-IP') || '';
+      if (did) await recordDevice(env, did, ip);
+      const u = acct.user;
+      const config = await loadConfig(env);
+      const mk = masterKey(config);
+      if (!mk) return json({ error: '服务端还没配置 API Key' }, 500);
+      if (u.plan_days > 0 && u.plan_start) {
+        const a = accountAccess(u, config);
+        if (!a.ok) return json({ error: a.msg }, a.status);
+        access = a;
+      } else {
+        const used = u.classroom_used || 0;
+        if (used >= CLASSROOM_TRIAL_SENTENCES) {
+          return json({ error: '课堂体验已用完（75 句 ≈ 15 分钟），购买套餐后可继续使用', classroomTrial: true }, 403);
+        }
+        access = { ok: true, key: mk, acct: true, email: acct.email, today: today(), limit: CLASSROOM_TRIAL_SENTENCES, entry: { used: {} }, classroomTrial: true };
+        classroomLeft = CLASSROOM_TRIAL_SENTENCES - used;
+      }
+    } else {
+      access = await authorize(env, request, body);
+    }
     if (!access.ok) return json({ error: access.msg }, access.status);
-    await countUse(env, access);
+    if (!access.classroomTrial) await countUse(env, access);
     const { parsed, raw, model } = await requestJsonAnalysis(access.key, [
       { role: 'system', content: `你是同声传译专家，处理俄语大学课堂口语。
 
@@ -898,7 +1031,13 @@ async function route(request, env, ctx, path) {
     ], 3000, 30000);
     if (parsed && (parsed.original || parsed.translation)) {
       parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
-      parsed.remaining = remainingOf(access);
+      if (access.classroomTrial) {
+        // 课堂体验按句计，不占每日额度
+        await env.DB.prepare('UPDATE users SET classroom_used=classroom_used+1 WHERE email=?').bind(acct.email).run();
+        parsed.classroomLeft = Math.max(0, classroomLeft - 1);
+      } else {
+        parsed.remaining = remainingOf(access);
+      }
       return json(parsed);
     }
     return json({ original: text.trim(), translation: raw, note: '规整失败，直译' });

@@ -16,6 +16,8 @@
 //    node gen-codes.js feedback-done <id> → 标记某条反馈已处理
 //    node gen-codes.js plan <邮箱> <天数> [每日次数] → 给登录用户绑套餐
 //    node gen-codes.js users           → 查看注册用户
+//    node gen-codes.js devices         → 查看设备登记（防刷额度）
+//    node gen-codes.js device-block <设备号> [on|off] → 封禁/解封设备
 // ═══════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
@@ -127,6 +129,35 @@ async function main() {
       bits.push(`今日 ${u.used_count || 0} 次`);
       console.log(bits.join('  '));
     });
+    return;
+  }
+
+  // ── 查看设备登记（防刷额度）──
+  if (cmd === 'devices') {
+    const r = await fetch(API + '/admin/devices', { headers: H });
+    const d = await r.json();
+    if (!d.items) { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
+    if (!d.items.length) { console.log('还没有设备登记记录（用户用过深度功能/注册/登录后出现）'); return; }
+    console.log('共 ' + d.total + ' 台设备（' + d.blockedCount + ' 台已封禁），按最近活跃排序：');
+    d.items.forEach(v => {
+      console.log((v.blocked ? ' ⛔ ' : '    ') + v.did);
+      console.log('      IP ' + (v.ip || '?') + ' · 首次 ' + (v.created || '?') + ' · 最近活跃 ' + (v.last_seen || '?'));
+      if (v.emails.length) console.log('      注册: ' + v.emails.join(', '));
+      const extra = v.logins.filter(e => v.emails.indexOf(e) < 0);
+      if (extra.length) console.log('      登录过: ' + extra.join(', '));
+    });
+    console.log('封禁/解封：node gen-codes.js device-block <设备号> [on|off]');
+    return;
+  }
+
+  // ── 封禁/解封设备（封禁后不给试用、不能再注册账号）──
+  if (cmd === 'device-block') {
+    if (!argv[1]) { console.log('用法：node gen-codes.js device-block <设备号> [on|off]'); process.exit(1); }
+    const on = (argv[2] || 'on').toLowerCase() !== 'off';
+    const r = await fetch(API + '/admin/device-block', { method: 'POST', headers: H, body: JSON.stringify({ did: argv[1].trim(), blocked: on }) });
+    const d = await r.json();
+    if (d.ok) console.log('[OK] 设备 ' + d.did + (d.blocked ? ' 已封禁（不再给试用、不能再注册）' : ' 已解封'));
+    else { console.log('❌ ' + (d.error || r.status)); process.exit(1); }
     return;
   }
 
