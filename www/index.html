@@ -2049,27 +2049,60 @@ function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.ge
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 
 const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0};
-let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[];
+let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[],classSegT0=0;
+// classFailedChunks 的元素是 {b:Blob,ts:该段在录音里的真实时刻}，补识时用它把句子插回原位（不是补到末尾）
 
-function classAddItem(original,translation,note,confidence){
-  const now=new Date();
-  const time=fmtTimeShort(now.getTime());
-  const item={_id:genId(),_ts:now.getTime(),time,original,translation,note:note||'',confidence:(confidence===null||confidence===undefined)?null:confidence};
-  CLASS.items.push(item);
-  if(CLASS.items.length>200)CLASS.items.shift();
+function classAddItem(original,translation,note,confidence,tsMs){
+  // tsMs：这段语音在录音里的真实时刻。回放重翻 / 课堂结束后的补识都会带上它。
+  // 原先一律用 new Date()，于是补识回来的句子时间戳全是"课堂结束的那一刻"，整批堆在时间轴末尾。
+  const ts=(tsMs!=null&&isFinite(tsMs)&&tsMs>0)?tsMs:Date.now();
+  const time=fmtTimeShort(ts);
+  const item={_id:genId(),_ts:ts,time,original,translation,note:note||'',confidence:(confidence===null||confidence===undefined)?null:confidence};
+  // 带真实时刻的补识句按时间插回原位，而不是一律追加到末尾
+  const last=CLASS.items[CLASS.items.length-1];
+  let inserted=false;
+  if(last&&item._ts<last._ts){
+    let k=CLASS.items.length;
+    while(k>0&&CLASS.items[k-1]._ts>item._ts)k--;
+    CLASS.items.splice(k,0,item);inserted=true;
+  }else CLASS.items.push(item);
+  let trimmed=false;
+  if(CLASS.items.length>200){CLASS.items.shift();trimmed=true}
   // 异步写入 IndexedDB，不阻塞字幕渲染
   if(CLASS.sessionId){
     idbStore.put('transcripts',{id:item._id,sessionId:CLASS.sessionId,timestamp:item._ts,original,translation,note:note||'',confidence:item.confidence,star:item.star?1:0}).catch(()=>{});
   }
-  classRender();
+  // 高频路径只追加新节点。只有插入到中间、或裁掉过旧条目（索引整体位移）时才整块重建。
+  if(inserted||trimmed)classRender();else classAppendItem(item);
   if(CLASS.scrollOn!==false){const board=document.getElementById('classBoard');board.scrollTop=board.scrollHeight;}
+}
+
+// 追加一条新字幕：只插入这一个节点，不碰已有节点。
+// 原实现每来一句都执行 el.innerHTML = 全部条目（上限 200 条），而每条都挂着 animation:fadeIn，
+// 结果每出一句新话，屏幕上所有历史句子一起闪一下——一节课累计几百次全量重建，闪屏＋耗电。
+// （正好撞在《开发经验清单》第 10 条：高频重渲染要只重渲染变化的列表）
+function classAppendItem(it){
+  const el=document.getElementById('classBoard');
+  const empty=document.getElementById('classEmpty');
+  const wrap=document.createElement('div');
+  wrap.innerHTML=classItemHTML(it,CLASS.items.length-1);
+  const node=wrap.firstElementChild;
+  if(empty)el.innerHTML='';   // 清掉空状态占位
+  el.appendChild(node);
+  classBindItem(node);        // 只给新节点绑事件
+  document.getElementById('classCount').textContent=CLASS.items.length+' 句';
+  while(el.children.length>200)el.removeChild(el.firstElementChild); // 节点数跟着条目上限走
 }
 
 function classRender(){
   const el=document.getElementById('classBoard');
   document.getElementById('classCount').textContent=CLASS.items.length+' 句';
   if(!CLASS.items.length){el.innerHTML='<div class="empty-state" id="classEmpty">点击"开始录音"，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div>';return}
-  el.innerHTML=CLASS.items.map((it,i)=>`
+  el.innerHTML=CLASS.items.map((it,i)=>classItemHTML(it,i)).join('');
+  el.querySelectorAll('.class-item').forEach(node=>classBindItem(node));
+}
+// 单条字幕的 HTML。索引 i 通过 data-* 落到节点上，供事件绑定回查 CLASS.items。
+function classItemHTML(it,i){return `
     <div class="class-item" style="background:var(--surface);border:${it.star?'1.5px solid var(--yellow)':'1px solid var(--border)'};border-radius:var(--radius);padding:12px;margin-bottom:6px;animation:fadeIn .2s ease">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:10px;color:var(--text3)">${it.time}</span>
@@ -2081,7 +2114,9 @@ function classRender(){
       <div data-edit="${i}" title="点击编辑原文" style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px;cursor:pointer">${it.star?'<span style="color:var(--yellow)">⭐ </span>':''}${escape(it.original)}${it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-weight:400;font-size:13px">⚠️ 识别不准</span>':''}</div>
       <div style="font-size:14px;color:var(--blue);line-height:1.5">${escape(it.translation)}</div>
       ${it.note?`<div style="font-size:11px;color:var(--yellow);margin-top:3px">⚠️ ${escape(it.note)}</div>`:''}
-    </div>`).join('');
+    </div>`}
+// 给一条字幕节点绑定交互（el 可以是整块字幕板，也可以是刚追加的单条）
+function classBindItem(el){
   el.querySelectorAll('.class-play').forEach(b=>{
     b.addEventListener('click',()=>{
       const it=CLASS.items[parseInt(b.dataset.i)];
@@ -2176,6 +2211,54 @@ async function classTranslate(text){
   }
 }
 
+// ─── 屏幕常亮保活（P0）───
+// 课堂是一小时起步的场景：手机搁在桌上，屏幕一锁，WebView 会挂起 AudioContext、节流定时器，
+// MediaRecorder 静默停摆，而界面还写着"🎙️ 聆听中…"——用户整节课都在以为在录，实际白录。
+// Wake Lock API 是标准做法；注意页面隐藏时系统会自动释放锁，切回前台必须重新申请。
+let wakeLockSentinel=null,keepAwakeFallback=null;
+function keepAwakeSupported(){return typeof navigator!=='undefined'&&navigator.wakeLock&&typeof navigator.wakeLock.request==='function'}
+async function keepAwakeOn(){
+  if(wakeLockSentinel)return true;
+  if(keepAwakeSupported()){
+    try{
+      wakeLockSentinel=await navigator.wakeLock.request('screen');
+      wakeLockSentinel.addEventListener('release',()=>{wakeLockSentinel=null});
+      return true;
+    }catch(e){wakeLockSentinel=null;console.warn('屏幕常亮申请失败：',e&&e.message||e)}
+  }
+  // 兜底：不支持 Wake Lock 的旧 WebView，用 1px 静音循环媒体撑住媒体会话
+  try{
+    if(!keepAwakeFallback){
+      const v=document.createElement('video');
+      v.setAttribute('playsinline','');v.setAttribute('aria-hidden','true');
+      v.muted=true;v.loop=true;
+      v.style.cssText='position:fixed;left:-10px;top:-10px;width:1px;height:1px;opacity:0;pointer-events:none';
+      v.src='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
+      document.body.appendChild(v);keepAwakeFallback=v;
+    }
+    await keepAwakeFallback.play();
+    return true;
+  }catch(e){return false}
+}
+function keepAwakeOff(){
+  if(wakeLockSentinel){try{wakeLockSentinel.release()}catch(e){}wakeLockSentinel=null}
+  if(keepAwakeFallback){try{keepAwakeFallback.pause()}catch(e){}}
+}
+// 切回前台时补申请（后台期间系统会释放锁）
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&(CLASS.running||CLASS.replaying))keepAwakeOn();
+});
+
+// ─── 提示条文案：把"已滤掉 N 段""N 段待补识"这类状态带上，不静默吞掉 ───
+function classHintDefault(){
+  let extra='';
+  if(CLASS.dropped)extra+='已滤掉 '+CLASS.dropped+' 段静音误识';
+  const f=classFailedChunks.length;
+  if(f)extra+=(extra?'；':'')+f+' 段识别失败，结束后自动补识';
+  return '说俄语 → 自动识别 → 翻译显示'+(extra?' <span style="color:var(--text3)">（'+extra+'）</span>':'');
+}
+function classHintReset(){const h=document.getElementById('classHint');if(h)h.innerHTML=classHintDefault()}
+
 function classStart(){
   const status=document.getElementById('classStatus');
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
@@ -2201,32 +2284,37 @@ function classStart(){
     document.getElementById('classSaveRecBtn').style.display='none';
     classRecorder.ondataavailable=e=>{if(e.data&&e.data.size){classChunks.push(e.data);classSessionChunks.push(e.data)}};
     classRecorder.onstop=()=>{
-      if(classChunks.length){const blob=new Blob(classChunks,{type:classMime});classChunks=[];classRecognize(blob)}
-      if(CLASS.running){try{classRecorder.start(200)}catch(e){}}
+      if(classChunks.length){const blob=new Blob(classChunks,{type:classMime});classChunks=[];classRecognize(blob,classSegT0)}
+      if(CLASS.running){classSegT0=Date.now();try{classRecorder.start(200)}catch(e){}}
       else{classFinalizeRecording()} // 课堂结束：拼接全程录音 + 失败段HQ重试
     };
+    classSegT0=Date.now();
     classRecorder.start(200);
     CLASS.running=true;classSilenceMs=0;
     document.getElementById('classStartBtn').disabled=true;
     document.getElementById('classStopBtn').disabled=false;
     status.textContent='🎙️ 聆听中…';
-    document.getElementById('classHint').innerHTML='说俄语 → 自动识别 → 翻译显示';
+    classHintReset();
     classSilenceTick();
+    // P0：不申请屏幕常亮，屏幕一锁就是整节课白录
+    keepAwakeOn().then(ok=>{if(ok&&CLASS.running)status.textContent='🎙️ 聆听中…（屏幕保持常亮）'});
   }).catch(()=>{
     status.textContent='❌ 麦克风被拒绝';
     document.getElementById('classHint').innerHTML='浏览器地址栏 🔒 → 网站设置 → 允许麦克风（手机需 HTTPS 或 localhost）';
   });
 }
 
-async function classRecognize(blob){
+async function classRecognize(blob,tsMs){
+  const ts=(tsMs!=null)?tsMs:Date.now();
   try{
     const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(120000)});
     const d=await r.json().catch(()=>({}));
     if(d.error)throw new Error(d.error);
-    classSendText(d.text||'', d.confidence, d);
+    classSendText(d.text||'', d.confidence, Object.assign({},d,{tsMs:ts}));
   }catch(e){
     console.error('语音识别失败',e.message||e);
-    if(classFailedChunks.length<20)classFailedChunks.push(blob); // 记下来，课堂结束用HQ模型重试
+    // 记下这段音频和它在录音里的真实时刻，课堂结束补识时按原位插回
+    if(classFailedChunks.length<20){classFailedChunks.push({b:blob,ts:ts});classHintReset()} // 失败不再静默，提示条上能看到
   }
 }
 
@@ -2243,16 +2331,23 @@ async function classFinalizeRecording(){
   classSessionChunks=[];
   if(classFailedChunks.length){
     const st=document.getElementById('classHint');
-    if(st)st.innerHTML='🔁 正在用高精度模型重试 '+classFailedChunks.length+' 段未识别音频…';
+    if(st)st.innerHTML='🔁 正在用精修模式重试 '+classFailedChunks.length+' 段未识别音频…';
     const failed=classFailedChunks.splice(0);
+    // classStop 已把 CLASS.sessionId 置空，但补识回来的句子仍要挂回本课会话，否则写不进 IndexedDB
+    const prevSid=CLASS.sessionId;
+    CLASS.sessionId=CLASS._recSid||prevSid;
     for(let i=0;i<failed.length;i++){
+      const it=failed[i];
+      const b=(it&&it.b)?it.b:it;        // 兼容旧格式（纯 Blob）
+      const ts=(it&&it.b)?it.ts:undefined;
       try{
-        const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:failed[i],headers:authHdr(),signal:AbortSignal.timeout(180000)});
+        const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(180000)});
         const d=await r.json().catch(()=>({}));
-        if(!d.error&&d.text)classSendText(d.text,null,d);
+        if(!d.error&&d.text)await classSendText(d.text,d.confidence,Object.assign({},d,{tsMs:ts}));
       }catch(e){console.error('HQ重试失败',e.message||e)}
     }
-    if(st)st.innerHTML='说俄语 → 自动识别 → 翻译显示';
+    CLASS.sessionId=prevSid;
+    classHintReset();
   }
 }
 
@@ -2270,19 +2365,21 @@ function replayStart(blob,name){
   CLASS.replaying=true;
   CLASS.sessionId=genId();CLASS._recSid=CLASS.sessionId;CLASS._sessionStart=Date.now();
   CLASS.items=[];CLASS._lastSent='';CLASS.dropped=0;classRender();
-  CLASS._replay={au:au,ctx:ctx,ana:ana,rec:null,chunks:[],mime:classMime,failed:[],sil:0,done:false,segStart:0,ctxText:'',chain:null,name:name||'',finished:false};
+  CLASS._replay={au:au,ctx:ctx,ana:ana,rec:null,chunks:[],mime:classMime,failed:[],sil:0,done:false,segStart:0,ctxText:'',chain:null,name:name||'',finished:false,t0:0};
   let rec;try{rec=new MediaRecorder(st,{mimeType:classMime})}catch(e){toast('回放初始化失败');CLASS.replaying=false;return}
   CLASS._replay.rec=rec;
   rec.ondataavailable=e=>{const R=CLASS._replay;if(R&&e.data&&e.data.size)R.chunks.push(e.data)};
   rec.onstop=()=>{
     const R=CLASS._replay;if(!R)return;
     const chunks=R.chunks;R.chunks=[];
+    const segFrom=R.segStart||0;                       // 本段在录音里的起点（秒）
+    const segTs=replayT0(R)+segFrom*1000;              // → 换算成时间轴上的真实时刻
     // 先续录再识别：原先 await 识别后才续录，识别那几秒播出去的音频会被整段漏掉
     if(!R.done){R.segStart=R.au.currentTime||0;R.sil=0;try{rec.start(200)}catch(e){}}
     if(chunks.length){
       const b=new Blob(chunks,{type:R.mime});
       // 串行链：保证字幕顺序、以及"前文"上下文接力都严格按时间轴
-      R.chain=Promise.resolve(R.chain).then(()=>replayRecognize(b)).catch(()=>{});
+      R.chain=Promise.resolve(R.chain).then(()=>replayRecognize(b,segTs)).catch(()=>{});
     }
     if(R.done)Promise.resolve(R.chain).then(()=>replayFinish());
   };
@@ -2290,6 +2387,8 @@ function replayStart(blob,name){
   au.onended=()=>{if(CLASS.replaying)replayStop()};
   au.play().catch(()=>{});
   const stEl=document.getElementById('classStatus');if(stEl)stEl.textContent='📼 回放重翻中（'+(name||'本课录音')+'），约需原时长…';
+  classHintReset();
+  keepAwakeOn();  // 回放也要跑满原时长，屏幕一锁会中断
   replayTick();
 }
 // ─── 回放切块参数 ───
@@ -2302,6 +2401,16 @@ function replayPrompt(R){
   try{terms=classTermsGet().map(t=>t.ru).filter(Boolean).slice(0,60).join(', ')}catch(e){}
   const ctx=(R&&R.ctxText)?(' '+R.ctxText):'';
   return (terms+ctx).trim().slice(0,900);
+}
+// 回放的时间基准：录音第 0 秒对应的时间戳。
+// 原先一律用 new Date()，补识/重翻出来的句子时间戳全变成"重翻那一刻"，整批堆在末尾、
+// 且彼此间隔全丢。改成按录音内位置换算，句子回到它在课上的真实时刻。
+function replayT0(R){
+  if(R&&R.t0)return R.t0;
+  const dur=(R&&R.au&&isFinite(R.au.duration))?R.au.duration*1000:0;
+  const t0=Date.now()-dur;   // 录音整段结束于"现在"，倒推起点
+  if(R)R.t0=t0;
+  return t0;
 }
 function replayTick(){
   if(!CLASS.replaying)return;
@@ -2316,7 +2425,7 @@ function replayTick(){
   if(st&&R.au.duration)st.textContent='📼 回放重翻中'+(R.name?'（'+R.name+'）':'')+' '+fmtTimeShort(Math.round((R.au.currentTime||0)*1000))+' / '+fmtTimeShort(Math.round(R.au.duration*1000));
   setTimeout(replayTick,200);
 }
-async function replayRecognize(blob){
+async function replayRecognize(blob,tsMs){
   const R=CLASS._replay;
   try{
     const p=replayPrompt(R);
@@ -2326,10 +2435,11 @@ async function replayRecognize(blob){
     if(d.error)throw new Error(d.error);
     // 只留尾部做下一段的上下文，避免提示词越滚越长
     if(d.text&&R)R.ctxText=(R.ctxText+' '+d.text).trim().slice(-300);
-    await classSendText(d.text||'',d.confidence,d);
+    await classSendText(d.text||'',d.confidence,Object.assign({},d,{tsMs:tsMs}));
   }catch(e){
     console.error('回放识别失败',e.message||e);
-    if(R&&R.failed.length<30)R.failed.push(blob); // 精修也失败的段，收尾时用实时模型再补一次
+    // 精修也失败的段，收尾时用实时模型再补一次（带上原始时刻，补回来也要插回原位）
+    if(R&&R.failed.length<30)R.failed.push({b:blob,ts:tsMs});
   }
 }
 function replayStop(){
@@ -2346,17 +2456,21 @@ function replayFinish(){
   const retry=async()=>{
     if(R.failed.length){if(st)st.textContent='🔁 正在补识 '+R.failed.length+' 段…';
       const f=R.failed.splice(0);
-      for(const b of f){
+      for(const it of f){
+        const b=(it&&it.b)?it.b:it;          // 兼容旧格式（纯 Blob）
+        const ts=(it&&it.b)?it.ts:undefined;
         try{
           const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(120000)});
           const d=await r.json().catch(()=>({}));
-          if(!d.error&&d.text)await classSendText(d.text,d.confidence,d);
+          if(!d.error&&d.text)await classSendText(d.text,d.confidence,Object.assign({},d,{tsMs:ts}));
         }catch(e){}
       }
     }
     if(st)st.textContent='📼 回放重翻完成';
     try{R.ctx.close()}catch(e){}
+    keepAwakeOff();
     CLASS._replay=null;
+    classHintReset();
     toast('📼 回放重翻完成');
   };
   retry();
@@ -2398,8 +2512,7 @@ function asrLooksValid(text,meta){
 }
 function asrDropNotify(){
   CLASS.dropped=(CLASS.dropped||0)+1;
-  const h=document.getElementById('classHint');
-  if(h)h.innerHTML='说俄语 → 自动识别 → 翻译显示 <span style="color:var(--text3)">（已滤掉 '+CLASS.dropped+' 段静音误识）</span>';
+  classHintReset();   // 在提示条上累计显示，不静默吞掉
 }
 
 async function classSendText(t,confidence,meta){
@@ -2410,8 +2523,8 @@ async function classSendText(t,confidence,meta){
   document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';
   // 返回 Promise，让回放重翻能串行等待（保证字幕板顺序与时间轴一致）
   return classTranslate(tt).then(r=>{
-    classAddItem(r.original,r.translation,r.note,confidence);
-    document.getElementById('classHint').innerHTML='说俄语 → 自动识别 → 翻译显示';
+    classAddItem(r.original,r.translation,r.note,confidence,(meta&&meta.tsMs)||undefined);
+    classHintReset();
   });
 }
 
@@ -2436,6 +2549,7 @@ function classSilenceTick(){
 
 function classStop(){
   CLASS.running=false;CLASS._lastSent='';classSilenceMs=0;
+  keepAwakeOff();   // 松开屏幕常亮
   // 结束会话：写入结束时间
   if(CLASS.sessionId){
     idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:Date.now(),courseName:''}).catch(()=>{});
