@@ -262,7 +262,7 @@ async function pushFavs(){try{const d=await apiFetch('/api/user/favs',{body:{fav
 async function pullFavs(){try{const d=await apiFetch('/api/user/favs',{method:'GET',timeout:25000});if(Array.isArray(d.favs)&&d.favs.length){const key=f=>f._id||f.ru||f.word||JSON.stringify(f).slice(0,60);const have=new Set(S.favs.map(key));let add=0;d.favs.forEach(f=>{if(!have.has(key(f))){S.favs.push(f);add++}});if(add){ss('favs',S.favs);toast('☁️ 已拉回 '+add+' 条云端收藏')}}}catch(e){}}
 // 课堂体验句数显示（登录用户专属，75 句 ≈ 15 分钟）
 function updateClassLeftUI(n){CLASS._trialLeft=n;const hint=document.getElementById('classHint');if(hint&&ls('session',''))hint.innerHTML='🎬 课堂体验剩余 <b>'+n+'</b> 句（约 '+Math.max(1,Math.round(n/5))+' 分钟）'}
-async function updateClassTrialUI(){try{if(!ls('session',''))return;const m=await apiFetch('/api/auth/me',{method:'GET',timeout:15000});CLASS._trialLeft=m.plan?null:(m.classroom?m.classroom.left:null);const hint=document.getElementById('classHint');if(!m.plan&&m.classroom){if(m.classroom.left<=0){if(hint)hint.innerHTML='<span style="color:var(--red)">课堂体验已用完（75 句 ≈ 15 分钟）——请联系管理员购套餐，或在设置退出登录改用设备试用</span>';const b=document.getElementById('classStartBtn');if(b)b.disabled=true}else if(hint){hint.innerHTML='🎬 课堂体验剩余 <b>'+m.classroom.left+'</b> 句（约 '+Math.max(1,Math.round(m.classroom.left/5))+' 分钟）'}}}catch(e){}}
+async function updateClassTrialUI(){try{if(!ls('session',''))return;const m=await apiFetch('/api/auth/me',{method:'GET',timeout:15000});CLASS._trialLeft=m.plan?null:(m.classroom?m.classroom.left:null);const hint=document.getElementById('classHint');if(!m.plan&&m.classroom){if(m.classroom.left<=0){if(hint)hint.innerHTML='<span style="color:var(--red)">课堂体验已用完（75 句 ≈ 15 分钟）——请联系管理员购套餐，或在设置退出登录改用设备试用</span>';classStartBtnSync()}else if(hint){hint.innerHTML='🎬 课堂体验剩余 <b>'+m.classroom.left+'</b> 句（约 '+Math.max(1,Math.round(m.classroom.left/5))+' 分钟）'}}}catch(e){}}
 
 // 👋 新手指引（首次启动自动弹；设置→帮助可再看）
 function showOnboard(){const el=document.getElementById('onboardOv');if(el)el.style.display='flex';S._obIdx=0;obRender()}
@@ -2091,7 +2091,7 @@ function genId(){return Date.now().toString(36)+Math.random().toString(36).slice
 function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 
-const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0};
+const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0,finalizing:false};
 let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[],classSegT0=0;
 // classFailedChunks 的元素是 {b:Blob,ts:该段在录音里的真实时刻}，补识时用它把句子插回原位（不是补到末尾）
 
@@ -2421,8 +2421,18 @@ function classHintDefault(){
 }
 function classHintReset(){const h=document.getElementById('classHint');if(h)h.innerHTML=classHintDefault()}
 
+// 「开始」按钮的可用状态是三方共管的：录音中(CLASS.running)、收尾中(CLASS.finalizing)、
+// 体验额度用完(CLASS._trialLeft===0)。任何一处单独赋值都会踩到别处，统一从这里算。
+function classStartBtnSync(){
+  const b=document.getElementById('classStartBtn');if(!b)return;
+  b.disabled=!!CLASS.running||!!CLASS.finalizing||CLASS._trialLeft===0;
+}
+
 function classStart(){
   const status=document.getElementById('classStatus');
+  // 上一堂课还在收尾（拼接全程录音 + 补识重试）时不允许开始，否则两边会互相踩：
+  // 新课的残留分片清理会把本课还没读走的落盘分片删掉，补识句也会插进新课的字幕板
+  if(CLASS.finalizing){if(status)status.textContent='⏳ 上一堂课还在保存录音，请稍等…';return}
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     status.textContent='❌ 浏览器不支持';
     document.getElementById('classHint').innerHTML='请用 <b>Chrome 或 Edge</b> 打开本页面（本机 localhost 可直接用麦克风）';
@@ -2455,7 +2465,7 @@ function classStart(){
     classSegT0=Date.now();
     classRecorder.start(200);
     CLASS.running=true;classSilenceMs=0;
-    document.getElementById('classStartBtn').disabled=true;
+    classStartBtnSync();
     document.getElementById('classStopBtn').disabled=false;
     status.textContent='🎙️ 聆听中…';
     classHintReset();
@@ -2504,38 +2514,53 @@ async function classRecognize(blob,tsMs){
 
 // 课堂结束：全程原始录音存 IndexedDB（单独一份，不怕课上翻错）+ 失败段自动用完整版模型重试
 async function classFinalizeRecording(){
-  const hasAudio=classSessionChunks.length>0||classPartSeq>0;
-  if(hasAudio){
-    const blob=await classCollectRecording();
-    if(blob&&blob.size){
-      CLASS._recBlob=blob;
-      const sid=CLASS._recSid||'rec_'+Date.now();
-      idbStore.put('recordings',{id:sid,blob:blob,time:Date.now()}).catch(()=>{});
-      const btn=document.getElementById('classSaveRecBtn');
-      if(btn){btn.style.display='inline-block';const mins=Math.max(1,Math.round(blob.size/600000));btn.textContent='💾 保存课堂录音（约'+mins+'分钟）'}
+  // 整个收尾过程（拼接录音 + 补识重试）可能几十秒到几分钟。期间必须让 classStart 拒绝启动，
+  // 否则新课的 classJanitorRecParts 会把本课还没读走的落盘分片删掉，而且两条流会一起往字幕板里插。
+  try{
+    const hasAudio=classSessionChunks.length>0||classPartSeq>0;
+    if(hasAudio){
+      const blob=await classCollectRecording();
+      if(blob&&blob.size){
+        CLASS._recBlob=blob;
+        const sid=CLASS._recSid||'rec_'+Date.now();
+        idbStore.put('recordings',{id:sid,blob:blob,time:Date.now()}).catch(()=>{});
+        const btn=document.getElementById('classSaveRecBtn');
+        if(btn){btn.style.display='inline-block';const mins=Math.max(1,Math.round(blob.size/600000));btn.textContent='💾 保存课堂录音（约'+mins+'分钟）'}
+      }
     }
-  }
-  // 先等在途的实时识别收尾，再补失败段——否则两条流会交错着往字幕板里插
-  try{await classAsrChain}catch(e){}
-  if(classFailedChunks.length){
-    const st=document.getElementById('classHint');
-    if(st)st.innerHTML='🔁 正在用精修模式重试 '+classFailedChunks.length+' 段未识别音频…';
-    const failed=classFailedChunks.splice(0);
-    // classStop 已把 CLASS.sessionId 置空，但补识回来的句子仍要挂回本课会话，否则写不进 IndexedDB
-    const prevSid=CLASS.sessionId;
-    CLASS.sessionId=CLASS._recSid||prevSid;
-    for(let i=0;i<failed.length;i++){
-      const it=failed[i];
-      const b=(it&&it.b)?it.b:it;        // 兼容旧格式（纯 Blob）
-      const ts=(it&&it.b)?it.ts:undefined;
-      try{
-        const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(180000)});
-        const d=await r.json().catch(()=>({}));
-        if(!d.error&&d.text)await classSendText(d.text,d.confidence,Object.assign({},d,{tsMs:ts}));
-      }catch(e){console.error('HQ重试失败',e.message||e)}
+    // 先等在途的实时识别收尾，再补失败段——否则两条流会交错着往字幕板里插
+    try{await classAsrChain}catch(e){}
+    if(classFailedChunks.length){
+      const st=document.getElementById('classHint');
+      if(st)st.innerHTML='🔁 正在用精修模式重试 '+classFailedChunks.length+' 段未识别音频…';
+      const failed=classFailedChunks.splice(0);
+      // classStop 已把 CLASS.sessionId 置空，但补识回来的句子仍要挂回本课会话，否则写不进 IndexedDB
+      const prevSid=CLASS.sessionId;
+      const mine=CLASS._recSid||prevSid;
+      CLASS.sessionId=mine;
+      for(let i=0;i<failed.length;i++){
+        const it=failed[i];
+        const b=(it&&it.b)?it.b:it;        // 兼容旧格式（纯 Blob）
+        const ts=(it&&it.b)?it.ts:undefined;
+        try{
+          const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(180000)});
+          const d=await r.json().catch(()=>({}));
+          if(!d.error&&d.text)await classSendText(d.text,d.confidence,Object.assign({},d,{tsMs:ts}));
+        }catch(e){console.error('HQ重试失败',e.message||e)}
+      }
+      // 只在没被别人改过时还原：万一收尾期间会话已被换掉，别把新会话的 id 冲掉
+      if(CLASS.sessionId===mine)CLASS.sessionId=prevSid;
+      classHintReset();
     }
-    CLASS.sessionId=prevSid;
-    classHintReset();
+  }catch(e){
+    console.error('课堂收尾失败',e&&e.message||e);
+    toast('⚠️ 收尾时出错，保存的录音可能不完整');
+  }finally{
+    // 无论成功还是出错都必须复位，否则「开始」按钮会永久禁用
+    CLASS.finalizing=false;
+    clearTimeout(CLASS._finTimer);
+    classStartBtnSync();   // 注意：额度用完时这里也会保持禁用（不能无条件放开）
+    const ss2=document.getElementById('classStatus');if(ss2)ss2.textContent='已停止';
   }
 }
 
@@ -2778,9 +2803,14 @@ function classStop(){
   if(classStream){classStream.getTracks().forEach(t=>t.stop());classStream=null}
   if(classAudioCtx){try{classAudioCtx.close()}catch(e){}classAudioCtx=null}
   classAnalyser=null;
-  document.getElementById('classStartBtn').disabled=false;
+  // 收尾（拼接录音 / 补识重试）是异步的，期间先锁住「开始」，避免新课把本课的落盘分片清掉
+  CLASS.finalizing=true;
+  // 兜底：万一 onstop 没触发（麦克风被拔掉等），到点强制解锁，避免「开始」永久禁用
+  clearTimeout(CLASS._finTimer);
+  CLASS._finTimer=setTimeout(()=>{if(CLASS.finalizing){CLASS.finalizing=false;classStartBtnSync()}},600000);
+  classStartBtnSync();
   document.getElementById('classStopBtn').disabled=true;
-  document.getElementById('classStatus').textContent='已停止';
+  document.getElementById('classStatus').textContent='⏳ 正在保存录音…';
 }
 
 // 导出课堂录音。
