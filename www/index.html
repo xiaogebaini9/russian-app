@@ -262,7 +262,7 @@ async function pushFavs(){try{const d=await apiFetch('/api/user/favs',{body:{fav
 async function pullFavs(){try{const d=await apiFetch('/api/user/favs',{method:'GET',timeout:25000});if(Array.isArray(d.favs)&&d.favs.length){const key=f=>f._id||f.ru||f.word||JSON.stringify(f).slice(0,60);const have=new Set(S.favs.map(key));let add=0;d.favs.forEach(f=>{if(!have.has(key(f))){S.favs.push(f);add++}});if(add){ss('favs',S.favs);toast('☁️ 已拉回 '+add+' 条云端收藏')}}}catch(e){}}
 // 课堂体验句数显示（登录用户专属，75 句 ≈ 15 分钟）
 function updateClassLeftUI(n){CLASS._trialLeft=n;const hint=document.getElementById('classHint');if(hint&&ls('session',''))hint.innerHTML='🎬 课堂体验剩余 <b>'+n+'</b> 句（约 '+Math.max(1,Math.round(n/5))+' 分钟）'}
-async function updateClassTrialUI(){try{if(!ls('session',''))return;const m=await apiFetch('/api/auth/me',{method:'GET',timeout:15000});CLASS._trialLeft=m.plan?null:(m.classroom?m.classroom.left:null);const hint=document.getElementById('classHint');if(!m.plan&&m.classroom){if(m.classroom.left<=0){if(hint)hint.innerHTML='<span style="color:var(--red)">课堂体验已用完（75 句 ≈ 15 分钟）——请联系管理员购套餐，或在设置退出登录改用设备试用</span>';classStartBtnSync()}else if(hint){hint.innerHTML='🎬 课堂体验剩余 <b>'+m.classroom.left+'</b> 句（约 '+Math.max(1,Math.round(m.classroom.left/5))+' 分钟）'}}}catch(e){}}
+async function updateClassTrialUI(){try{if(!ls('session',''))return;const m=await apiFetch('/api/auth/me',{method:'GET',timeout:15000});CLASS._trialLeft=m.plan?null:(m.classroom?m.classroom.left:null);const hint=document.getElementById('classHint');if(!m.plan&&m.classroom){if(m.classroom.left<=0){if(hint)hint.innerHTML=classRecNotice()+'<span style="color:var(--red)">课堂体验已用完（75 句 ≈ 15 分钟）——请联系管理员购套餐，或在设置退出登录改用设备试用</span>';classStartBtnSync()}else if(hint){hint.innerHTML=classRecNotice()+'🎬 课堂体验剩余 <b>'+m.classroom.left+'</b> 句（约 '+Math.max(1,Math.round(m.classroom.left/5))+' 分钟）'}}}catch(e){}}
 
 // 👋 新手指引（首次启动自动弹；设置→帮助可再看）
 function showOnboard(){const el=document.getElementById('onboardOv');if(el)el.style.display='flex';S._obIdx=0;obRender()}
@@ -2154,7 +2154,7 @@ async function restoreLastRecording(){
       btn.textContent='💾 保存上一堂课录音（约'+mins+'分钟）';
     }
     const hint=document.getElementById('classHint');
-    if(hint)hint.innerHTML='💾 上一堂课的录音已保留在本机 —— 可点「保存录音」导出，或点「回放重翻」重新识别';
+    if(hint)classHintReset();   // 走统一入口，提示条里会带上"录音已保留"那句
   }catch(e){}
 }
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
@@ -2482,12 +2482,18 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 // ─── 提示条文案：把"已滤掉 N 段""N 段待补识"这类状态带上，不静默吞掉 ───
+// 手上有可导出的课堂录音时，提示条要一直带着这条信息。
+// 登录用户的 updateClassTrialUI 会**整块重写**提示条，所以这里必须被它一起带上，
+// 否则启动时恢复录音的提示会被覆盖掉（两个函数都会拼它，先后顺序就不重要了）。
+function classRecNotice(){
+  return (CLASS._recBlob&&!CLASS.running)?'💾 课堂录音已保留在本机，可点「保存录音」导出<br>':'';
+}
 function classHintDefault(){
   let extra='';
   if(CLASS.dropped)extra+='已滤掉 '+CLASS.dropped+' 段静音误识';
   const f=classFailedChunks.length;
   if(f)extra+=(extra?'；':'')+f+' 段识别失败，结束后自动补识';
-  return '说俄语 → 自动识别 → 翻译显示'+(extra?' <span style="color:var(--text3)">（'+extra+'）</span>':'');
+  return classRecNotice()+'说俄语 → 自动识别 → 翻译显示'+(extra?' <span style="color:var(--text3)">（'+extra+'）</span>':'');
 }
 function classHintReset(){const h=document.getElementById('classHint');if(h)h.innerHTML=classHintDefault()}
 
