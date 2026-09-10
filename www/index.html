@@ -261,7 +261,7 @@ async function refreshQuota(){try{if(ls('session','')){const m=await apiFetch('/
 async function pushFavs(){try{const d=await apiFetch('/api/user/favs',{body:{favs:S.favs},timeout:25000});if(d.ok)toast('☁️ 收藏已同步')}catch(e){}}
 async function pullFavs(){try{const d=await apiFetch('/api/user/favs',{method:'GET',timeout:25000});if(Array.isArray(d.favs)&&d.favs.length){const key=f=>f._id||f.ru||f.word||JSON.stringify(f).slice(0,60);const have=new Set(S.favs.map(key));let add=0;d.favs.forEach(f=>{if(!have.has(key(f))){S.favs.push(f);add++}});if(add){ss('favs',S.favs);toast('☁️ 已拉回 '+add+' 条云端收藏')}}}catch(e){}}
 // 课堂体验句数显示（登录用户专属，75 句 ≈ 15 分钟）
-function updateClassLeftUI(n){CLASS._trialLeft=n;const hint=document.getElementById('classHint');if(hint&&ls('session',''))hint.innerHTML='🎬 课堂体验剩余 <b>'+n+'</b> 句（约 '+Math.max(1,Math.round(n/5))+' 分钟）'}
+function updateClassLeftUI(n){CLASS._trialLeft=n;const hint=document.getElementById('classHint');if(hint&&ls('session',''))hint.innerHTML=classRecNotice()+'🎬 课堂体验剩余 <b>'+n+'</b> 句（约 '+Math.max(1,Math.round(n/5))+' 分钟）'}
 async function updateClassTrialUI(){try{if(!ls('session',''))return;const m=await apiFetch('/api/auth/me',{method:'GET',timeout:15000});CLASS._trialLeft=m.plan?null:(m.classroom?m.classroom.left:null);const hint=document.getElementById('classHint');if(!m.plan&&m.classroom){if(m.classroom.left<=0){if(hint)hint.innerHTML=classRecNotice()+'<span style="color:var(--red)">课堂体验已用完（75 句 ≈ 15 分钟）——请联系管理员购套餐，或在设置退出登录改用设备试用</span>';classStartBtnSync()}else if(hint){hint.innerHTML=classRecNotice()+'🎬 课堂体验剩余 <b>'+m.classroom.left+'</b> 句（约 '+Math.max(1,Math.round(m.classroom.left/5))+' 分钟）'}}}catch(e){}}
 
 // 👋 新手指引（首次启动自动弹；设置→帮助可再看）
