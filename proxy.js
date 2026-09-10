@@ -627,7 +627,9 @@ const server = http.createServer((req, res) => {
   }
 
   // ── 语音识别（本地 Whisper，音频→文字）──
-  if (req.method === 'POST' && url === '/api/voice') {
+  // /api/voice 与 /api/voice-hq 共用同一条本地通道：本机只有一个模型，差别只在
+  // 精修模式会带上 prompt（课程术语表 + 前文）交给 faster-whisper 的 initial_prompt。
+  if (req.method === 'POST' && (url === '/api/voice' || url === '/api/voice-hq')) {
     const chunks = [];
     let size = 0;
     let tooLarge = false;
@@ -644,7 +646,8 @@ const server = http.createServer((req, res) => {
       }
       const audio = Buffer.concat(chunks);
       try {
-        const r = await fetch('http://127.0.0.1:9000/transcribe', {
+        const _qs = req.url.split('?')[1] || '';
+        const r = await fetch('http://127.0.0.1:9000/transcribe' + (_qs ? '?' + _qs : ''), {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream' },
           body: audio,

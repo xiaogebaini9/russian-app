@@ -23,12 +23,16 @@ model = WhisperModel(MODEL_DIR, device='cuda', compute_type='float16')
 print('[stt] 模型加载完成，耗时 %.1f 秒' % (time.time() - _t0), flush=True)
 
 
-def transcribe(data, lang=LANG):
+def transcribe(data, lang=LANG, prompt=None, beam=5):
     fd, path = tempfile.mkstemp(suffix='.webm')
     with os.fdopen(fd, 'wb') as f:
         f.write(data)
     try:
-        segments, info = model.transcribe(path, language=lang, beam_size=5, vad_filter=True)
+        # initial_prompt 用来把课程术语表和前文喂给识别器，让它把专名和术语认对
+        kw = {'language': lang, 'beam_size': beam, 'vad_filter': True}
+        if prompt:
+            kw['initial_prompt'] = prompt
+        segments, info = model.transcribe(path, **kw)
         segs = list(segments)
         text = ''.join(s.text for s in segs).strip()
         probs = [s.avg_logprob for s in segs if getattr(s, 'avg_logprob', None) is not None]
@@ -60,7 +64,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path.startswith('/transcribe'):
             from urllib.parse import urlparse, parse_qs
-            lang = parse_qs(urlparse(self.path).query).get('lang', [LANG])[0]
+            _q = parse_qs(urlparse(self.path).query)
+            lang = _q.get('lang', [LANG])[0]
+            # 精修模式会带 prompt（课程术语表 + 前文）；beam 可选，默认沿用 5
+            prompt = (_q.get('prompt', [''])[0] or '').strip()[:1000] or None
+            try:
+                beam = max(1, min(10, int(_q.get('beam', ['5'])[0])))
+            except (TypeError, ValueError):
+                beam = 5
             length = int(self.headers.get('Content-Length', 0))
             data = self.rfile.read(length)
             if not data:
@@ -68,7 +79,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             t0 = time.time()
             try:
-                r = transcribe(data, lang)
+                r = transcribe(data, lang, prompt, beam)
                 r['elapsed'] = round(time.time() - t0, 2)
                 self._send(200, r)
             except Exception as e:

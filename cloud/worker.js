@@ -637,11 +637,14 @@ async function route(request, env, ctx, path) {
     return json({ ok: true, stt: true, model: 'whisper-large-v3-turbo', device: 'cloud' });
   }
 
-  // ── 云语音识别：实时版（turbo，快）/ 完整版（large-v3，准）──
+  // ── 云语音识别：实时版（实时用，默认参数优先时延）/ 精修版（回放重听用，加宽束搜索 + 上下文）──
+  // 注意：Cloudflare 目录里 large 级只有 turbo（@cf/openai/whisper-large-v3 并不存在，会 404）。
+  // 两条路径的差别不在模型，而在解码参数：精修版 beam_size 更大、并接受 initial_prompt。
   if (method === 'POST' && path === '/api/voice') return voiceSTT(request, env, '@cf/openai/whisper-large-v3-turbo');
-  if (method === 'POST' && path === '/api/voice-hq') return voiceSTT(request, env, '@cf/openai/whisper-large-v3');
+  if (method === 'POST' && path === '/api/voice-hq') return voiceSTT(request, env, '@cf/openai/whisper-large-v3-turbo', { beamSize: 10 });
 
-  async function voiceSTT(request, env, model) {
+  async function voiceSTT(request, env, model, opts) {
+    const o = opts || {};
     if (!env.AI) return json({ error: '语音识别未启用（缺少 AI 绑定）' }, 500);
     // 登录用户的课堂体验用尽 → 拦（套餐用户/接入码/匿名不受限）
     const acct = await resolveAccount(env, request);
@@ -663,14 +666,23 @@ async function route(request, env, ctx, path) {
       // 短音频/底噪片断很容易猜成英语，并从字幕语料里"脑补"出 you / Thank you. 之类套话。
       // vad_filter + hallucination_silence_threshold 直接掐掉静音幻觉的来源，
       // condition_on_previous_text:false 见官方说明，用于防止幻觉在段间循环传染。
-      const res = await env.AI.run(model, {
+      // 语种与上下文提示可由前端用查询串覆盖（回放精修会带上课程术语表和前一段原文）。
+      const q = new URL(request.url).searchParams;
+      const lang = (q.get('lang') || 'ru').slice(0, 8) || 'ru';
+      const prompt = (q.get('prompt') || '').slice(0, 1000);
+      const input = {
         audio: btoa(bin),
-        language: 'ru',
+        language: lang,
         task: 'transcribe',
         vad_filter: true,
         condition_on_previous_text: false,
         hallucination_silence_threshold: 2
-      });
+      };
+      const beam = parseInt(q.get('beam') || '', 10);
+      const bs = (beam >= 1 && beam <= 10) ? beam : o.beamSize;
+      if (bs) input.beam_size = bs;
+      if (prompt) input.initial_prompt = prompt;
+      const res = await env.AI.run(model, input);
       // 注意：顶层没有 language，语言信息在 transcription_info 下；
       // 置信度也不在顶层，要自己从 segments 里取 avg_logprob（前端 -0.8 阈值正是这个语义）
       const info = (res && res.transcription_info) || {};

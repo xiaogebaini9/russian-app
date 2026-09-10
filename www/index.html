@@ -2260,7 +2260,7 @@ async function classFinalizeRecording(){
 function replayStart(blob,name){
   if(CLASS.replaying){toast('回放进行中');return}
   if(CLASS.running)classStop();
-  if(!confirm('开始回放重翻？将按原速重放录音，用最高精度模型重新识别并翻译。\n（重翻的翻译会像课上一样消耗深度额度，每句 1 次）'))return;
+  if(!confirm('开始回放重翻？将按原速重放录音，用精修模式重新识别并翻译。\n\n精修模式：每约 30 秒整段送识别（不再按静音切碎），并把课程术语表 + 前文一起交给模型，识别更准。\n（重翻的翻译仍会像课上一样消耗深度额度）'))return;
   const au=new Audio(URL.createObjectURL(blob));au.preload='auto';
   let st=null;try{st=au.captureStream()}catch(e){}
   if(!st||!st.getAudioTracks().length){toast('此浏览器不支持回放重翻，请用 Chrome');return}
@@ -2270,14 +2270,21 @@ function replayStart(blob,name){
   CLASS.replaying=true;
   CLASS.sessionId=genId();CLASS._recSid=CLASS.sessionId;CLASS._sessionStart=Date.now();
   CLASS.items=[];CLASS._lastSent='';CLASS.dropped=0;classRender();
-  CLASS._replay={au:au,ctx:ctx,ana:ana,rec:null,chunks:[],mime:classMime,failed:[],sil:0,done:false};
+  CLASS._replay={au:au,ctx:ctx,ana:ana,rec:null,chunks:[],mime:classMime,failed:[],sil:0,done:false,segStart:0,ctxText:'',chain:null,name:name||'',finished:false};
   let rec;try{rec=new MediaRecorder(st,{mimeType:classMime})}catch(e){toast('回放初始化失败');CLASS.replaying=false;return}
   CLASS._replay.rec=rec;
   rec.ondataavailable=e=>{const R=CLASS._replay;if(R&&e.data&&e.data.size)R.chunks.push(e.data)};
-  rec.onstop=async()=>{
+  rec.onstop=()=>{
     const R=CLASS._replay;if(!R)return;
-    if(R.chunks.length){const b=new Blob(R.chunks,{type:R.mime});R.chunks=[];await replayRecognize(b)}
-    if(R.done){replayFinish()}else{try{rec.start(200)}catch(e){}}
+    const chunks=R.chunks;R.chunks=[];
+    // 先续录再识别：原先 await 识别后才续录，识别那几秒播出去的音频会被整段漏掉
+    if(!R.done){R.segStart=R.au.currentTime||0;R.sil=0;try{rec.start(200)}catch(e){}}
+    if(chunks.length){
+      const b=new Blob(chunks,{type:R.mime});
+      // 串行链：保证字幕顺序、以及"前文"上下文接力都严格按时间轴
+      R.chain=Promise.resolve(R.chain).then(()=>replayRecognize(b)).catch(()=>{});
+    }
+    if(R.done)Promise.resolve(R.chain).then(()=>replayFinish());
   };
   rec.start(200);
   au.onended=()=>{if(CLASS.replaying)replayStop()};
@@ -2285,39 +2292,67 @@ function replayStart(blob,name){
   const stEl=document.getElementById('classStatus');if(stEl)stEl.textContent='📼 回放重翻中（'+(name||'本课录音')+'），约需原时长…';
   replayTick();
 }
+// ─── 回放切块参数 ───
+// Whisper 是按 ~30 秒窗口训练的，喂给它一两秒的碎片准确率会明显下降。
+// 所以回放不再按静音切碎，而是整块送：满 30 秒硬切；满 20 秒后遇静音可收尾；长静音时 8 秒就收尾。
+const REPLAY_MAX_MS=30000, REPLAY_MIN_MS=20000, REPLAY_IDLE_MS=8000;
+// 精修提示词 = 课程术语表 + 上一段识别出的原文尾部（给模型上下文，专名和术语能认对）
+function replayPrompt(R){
+  let terms='';
+  try{terms=classTermsGet().map(t=>t.ru).filter(Boolean).slice(0,60).join(', ')}catch(e){}
+  const ctx=(R&&R.ctxText)?(' '+R.ctxText):'';
+  return (terms+ctx).trim().slice(0,900);
+}
 function replayTick(){
   if(!CLASS.replaying)return;
   const R=CLASS._replay;if(!R)return;
   const buf=new Uint8Array(R.ana.fftSize);R.ana.getByteTimeDomainData(buf);
   let sum=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v}
-  if(Math.sqrt(sum/buf.length)<0.015){R.sil+=200;if(R.sil>=1200&&R.rec.state==='recording'){R.sil=0;try{R.rec.stop()}catch(e){}}}else R.sil=0;
+  if(Math.sqrt(sum/buf.length)<0.015)R.sil+=200;else R.sil=0;
+  const dur=Math.max(0,((R.au.currentTime||0)-(R.segStart||0))*1000);
+  const cut=(dur>=REPLAY_MAX_MS)||(dur>=REPLAY_MIN_MS&&R.sil>=1200)||(dur>=REPLAY_IDLE_MS&&R.sil>=3000);
+  if(cut&&R.rec&&R.rec.state==='recording'){R.sil=0;try{R.rec.stop()}catch(e){}}
+  const st=document.getElementById('classStatus');
+  if(st&&R.au.duration)st.textContent='📼 回放重翻中'+(R.name?'（'+R.name+'）':'')+' '+fmtTimeShort(Math.round((R.au.currentTime||0)*1000))+' / '+fmtTimeShort(Math.round(R.au.duration*1000));
   setTimeout(replayTick,200);
 }
 async function replayRecognize(blob){
   const R=CLASS._replay;
   try{
-    const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(180000)});
+    const p=replayPrompt(R);
+    const qs='?lang=ru&beam=10'+(p?'&prompt='+encodeURIComponent(p):'');
+    const r=await fetch(API_BASE+'/api/voice-hq'+qs,{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(180000)});
     const d=await r.json().catch(()=>({}));
     if(d.error)throw new Error(d.error);
-    classSendText(d.text||'',null,d);
+    // 只留尾部做下一段的上下文，避免提示词越滚越长
+    if(d.text&&R)R.ctxText=(R.ctxText+' '+d.text).trim().slice(-300);
+    await classSendText(d.text||'',d.confidence,d);
   }catch(e){
     console.error('回放识别失败',e.message||e);
-    if(R&&R.failed.length<30)R.failed.push(blob); // HQ也失败的段，收尾时用turbo再补一次
+    if(R&&R.failed.length<30)R.failed.push(blob); // 精修也失败的段，收尾时用实时模型再补一次
   }
 }
 function replayStop(){
   const R=CLASS._replay;if(!R)return;
   R.done=true;
   try{R.au.pause()}catch(e){}
-  if(R.rec&&R.rec.state==='recording'){try{R.rec.stop()}catch(e){}}else{replayFinish()}
+  if(R.rec&&R.rec.state==='recording'){try{R.rec.stop()}catch(e){}}
+  else{Promise.resolve(R.chain).then(()=>replayFinish())}
 }
 function replayFinish(){
-  const R=CLASS._replay;if(!R)return;CLASS.replaying=false;
+  const R=CLASS._replay;if(!R||R.finished)return;R.finished=true;
+  CLASS.replaying=false;
   const st=document.getElementById('classStatus');
   const retry=async()=>{
     if(R.failed.length){if(st)st.textContent='🔁 正在补识 '+R.failed.length+' 段…';
       const f=R.failed.splice(0);
-      for(const b of f){try{const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(120000)});const d=await r.json().catch(()=>({}));if(!d.error&&d.text)classSendText(d.text,null,d)}catch(e){}}
+      for(const b of f){
+        try{
+          const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(120000)});
+          const d=await r.json().catch(()=>({}));
+          if(!d.error&&d.text)await classSendText(d.text,d.confidence,d);
+        }catch(e){}
+      }
     }
     if(st)st.textContent='📼 回放重翻完成';
     try{R.ctx.close()}catch(e){}
@@ -2373,7 +2408,8 @@ async function classSendText(t,confidence,meta){
   if(!asrLooksValid(tt,meta)){CLASS._lastSent=tt;asrDropNotify();return;}
   CLASS._lastSent=tt;
   document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';
-  classTranslate(tt).then(r=>{
+  // 返回 Promise，让回放重翻能串行等待（保证字幕板顺序与时间轴一致）
+  return classTranslate(tt).then(r=>{
     classAddItem(r.original,r.translation,r.note,confidence);
     document.getElementById('classHint').innerHTML='说俄语 → 自动识别 → 翻译显示';
   });
