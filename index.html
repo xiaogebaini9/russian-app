@@ -2048,7 +2048,7 @@ function genId(){return Date.now().toString(36)+Math.random().toString(36).slice
 function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 
-const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true};
+const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0};
 let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[];
 
 function classAddItem(original,translation,note,confidence){
@@ -2197,7 +2197,7 @@ function classStart(){
     srcNode.connect(classAnalyser);
     classMime=MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')?'audio/mp4;codecs=mp4a.40.2':(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm');
     classRecorder=new MediaRecorder(stream,{mimeType:classMime});
-    classChunks=[];classSessionChunks=[];classFailedChunks=[];CLASS._recBlob=null;
+    classChunks=[];classSessionChunks=[];classFailedChunks=[];CLASS._recBlob=null;CLASS._lastSent='';CLASS.dropped=0;
     document.getElementById('classSaveRecBtn').style.display='none';
     classRecorder.ondataavailable=e=>{if(e.data&&e.data.size){classChunks.push(e.data);classSessionChunks.push(e.data)}};
     classRecorder.onstop=()=>{
@@ -2223,7 +2223,7 @@ async function classRecognize(blob){
     const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(120000)});
     const d=await r.json().catch(()=>({}));
     if(d.error)throw new Error(d.error);
-    classSendText(d.text||'', d.confidence);
+    classSendText(d.text||'', d.confidence, d);
   }catch(e){
     console.error('语音识别失败',e.message||e);
     if(classFailedChunks.length<20)classFailedChunks.push(blob); // 记下来，课堂结束用HQ模型重试
@@ -2249,7 +2249,7 @@ async function classFinalizeRecording(){
       try{
         const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:failed[i],headers:authHdr(),signal:AbortSignal.timeout(180000)});
         const d=await r.json().catch(()=>({}));
-        if(!d.error&&d.text)classSendText(d.text,null);
+        if(!d.error&&d.text)classSendText(d.text,null,d);
       }catch(e){console.error('HQ重试失败',e.message||e)}
     }
     if(st)st.innerHTML='说俄语 → 自动识别 → 翻译显示';
@@ -2269,7 +2269,7 @@ function replayStart(blob,name){
   const ana=ctx.createAnalyser();ana.fftSize=1024;srcN.connect(ana);
   CLASS.replaying=true;
   CLASS.sessionId=genId();CLASS._recSid=CLASS.sessionId;CLASS._sessionStart=Date.now();
-  CLASS.items=[];CLASS._lastSent='';classRender();
+  CLASS.items=[];CLASS._lastSent='';CLASS.dropped=0;classRender();
   CLASS._replay={au:au,ctx:ctx,ana:ana,rec:null,chunks:[],mime:classMime,failed:[],sil:0,done:false};
   let rec;try{rec=new MediaRecorder(st,{mimeType:classMime})}catch(e){toast('回放初始化失败');CLASS.replaying=false;return}
   CLASS._replay.rec=rec;
@@ -2299,7 +2299,7 @@ async function replayRecognize(blob){
     const r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(180000)});
     const d=await r.json().catch(()=>({}));
     if(d.error)throw new Error(d.error);
-    classSendText(d.text||'',null);
+    classSendText(d.text||'',null,d);
   }catch(e){
     console.error('回放识别失败',e.message||e);
     if(R&&R.failed.length<30)R.failed.push(blob); // HQ也失败的段，收尾时用turbo再补一次
@@ -2317,7 +2317,7 @@ function replayFinish(){
   const retry=async()=>{
     if(R.failed.length){if(st)st.textContent='🔁 正在补识 '+R.failed.length+' 段…';
       const f=R.failed.splice(0);
-      for(const b of f){try{const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(120000)});const d=await r.json().catch(()=>({}));if(!d.error&&d.text)classSendText(d.text,null)}catch(e){}}
+      for(const b of f){try{const r=await fetch(API_BASE+'/api/voice',{method:'POST',body:b,headers:authHdr(),signal:AbortSignal.timeout(120000)});const d=await r.json().catch(()=>({}));if(!d.error&&d.text)classSendText(d.text,null,d)}catch(e){}}
     }
     if(st)st.textContent='📼 回放重翻完成';
     try{R.ctx.close()}catch(e){}
@@ -2338,9 +2338,39 @@ async function updateClassEngine(){
   updateClassTrialUI(); // 登录用户显示课堂体验剩余，用尽则引导购套餐
 }
 
-async function classSendText(t,confidence){
+// ─── 语音识别可信度闸门 ───
+// Whisper 在静音/底噪片断上会把训练语料（大量字幕）里的高频套话"脑补"出来：
+// you / Thank you. / Thanks for watching! / Продолжение следует ……
+// 这些会被当成正文一路送进翻译，所以在收口处统一拦掉，不让它进字幕板。
+const ASR_NOISE=/^(you|yeah|yep|okay|ok|thank you|thanks|thanks for watching|thank you for watching|bye|please subscribe|subscribe|продолжение следует.*|субтитры.*|спасибо за просмотр.*|до встречи|ээ+|мм+|аа+|ah+|uh+|oh+|hmm+)$/;
+function asrNormalize(s){return (s||'').trim().toLowerCase().replace(/[.,!?;:…"'“”‘’\-—()\[\]]/g,'').replace(/\s+/g,' ').trim()}
+function asrLooksValid(text,meta){
+  const raw=(text||'').trim();
+  if(!raw)return false;
+  const m=meta||{};
+  if(typeof m.noSpeech==='number'&&m.noSpeech>0.6)return false;            // 后端明确报"这段几乎没人说话"
+  const norm=asrNormalize(raw);
+  if(!norm)return false;
+  if(ASR_NOISE.test(norm))return false;                                    // 命中字幕套话黑名单
+  if(!/[a-zа-яё0-9]/i.test(raw))return false;                              // 纯符号/语气噪声
+  const hasCyr=/[а-яё]/i.test(raw);
+  if(!hasCyr){
+    const words=norm.split(' ').filter(Boolean);
+    if(words.length<=4)return false;                                       // 俄语课堂里无西里尔字母的短句 → 幻听
+    if(m.language&&m.language!=='ru'&&words.length<=8)return false;        // 语种判定也不是俄语；放宽到 8 词以免误伤老师念的英文例句
+  }
+  return true;
+}
+function asrDropNotify(){
+  CLASS.dropped=(CLASS.dropped||0)+1;
+  const h=document.getElementById('classHint');
+  if(h)h.innerHTML='说俄语 → 自动识别 → 翻译显示 <span style="color:var(--text3)">（已滤掉 '+CLASS.dropped+' 段静音误识）</span>';
+}
+
+async function classSendText(t,confidence,meta){
   const tt=(t||'').trim();
   if(!tt||tt===CLASS._lastSent)return;
+  if(!asrLooksValid(tt,meta)){CLASS._lastSent=tt;asrDropNotify();return;}
   CLASS._lastSent=tt;
   document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';
   classTranslate(tt).then(r=>{

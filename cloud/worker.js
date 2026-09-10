@@ -659,8 +659,37 @@ async function route(request, env, ctx, path) {
       const u = new Uint8Array(buf);
       let bin = '';
       for (let i = 0; i < u.length; i++) bin += String.fromCharCode(u[i]);
-      const res = await env.AI.run(model, { audio: btoa(bin) });
-      return json({ text: (res.text || '').trim(), language: res.language || '' });
+      // 课堂是固定俄语场景：不指定 language 时 Whisper 会对每一段独立自动猜语种，
+      // 短音频/底噪片断很容易猜成英语，并从字幕语料里"脑补"出 you / Thank you. 之类套话。
+      // vad_filter + hallucination_silence_threshold 直接掐掉静音幻觉的来源，
+      // condition_on_previous_text:false 见官方说明，用于防止幻觉在段间循环传染。
+      const res = await env.AI.run(model, {
+        audio: btoa(bin),
+        language: 'ru',
+        task: 'transcribe',
+        vad_filter: true,
+        condition_on_previous_text: false,
+        hallucination_silence_threshold: 2
+      });
+      // 注意：顶层没有 language，语言信息在 transcription_info 下；
+      // 置信度也不在顶层，要自己从 segments 里取 avg_logprob（前端 -0.8 阈值正是这个语义）
+      const info = (res && res.transcription_info) || {};
+      const segs = (res && Array.isArray(res.segments)) ? res.segments : [];
+      const num = (v, d) => (typeof v === 'number' && isFinite(v)) ? v : d;
+      const confidence = segs.length
+        ? segs.reduce((m, s) => Math.min(m, num(s.avg_logprob, 0)), 0)
+        : 0;
+      const noSpeech = segs.length
+        ? segs.reduce((m, s) => Math.max(m, num(s.no_speech_prob, 0)), 0)
+        : 0;
+      return json({
+        text: (res && res.text ? res.text : '').trim(),
+        language: info.language || '',
+        languageProb: num(info.language_probability, 0),
+        confidence: confidence,
+        noSpeech: noSpeech,
+        segments: segs.length
+      });
     } catch (e) {
       return json({ error: '识别失败：' + (e.message || e) }, 500);
     }
@@ -1015,16 +1044,20 @@ async function route(request, env, ctx, path) {
     if (!access.ok) return json({ error: access.msg }, access.status);
     if (!access.classroomTrial) await countUse(env, access);
     const { parsed, raw, model } = await requestJsonAnalysis(access.key, [
-      { role: 'system', content: `你是同声传译专家，处理俄语大学课堂口语。
+      { role: 'system', content: `你是同声传译专家，处理大学课堂的实时语音转写文本（以俄语为主）。
 
 任务：把老师说的话规整并翻译成中文。
 
 两步处理（都在一个回答里完成）：
 1. 规整：去掉口语填充词（ну, вот, так сказать, как бы, значит），修正不完整句和重复，保留专业术语
-2. 翻译：把规整后的俄语翻译成简洁的中文，术语准确（语言学/文学术语按学界通用译法），适合实时阅读
+2. 翻译：把规整后的原文翻译成简洁的中文，术语准确（语言学/文学术语按学界通用译法），适合实时阅读
+
+重要：不要预设输入一定是俄语。若输入并非俄语（例如零碎的英文单词、语音识别噪声），
+按它实际的语言理解；若它只是无意义碎片、单词残片或明显是识别噪声，
+则 original 保留原样、translation 留空字符串、note 写"疑似识别噪声"，不要硬凑成一句俄语翻译。
 
 严格按以下JSON格式返回（不要markdown代码块，只返回纯JSON）：
-{"original":"规整后的俄语原文","translation":"中文翻译","note":"术语注释（如有难译术语，无则空字符串）"}
+{"original":"规整后的原文","translation":"中文翻译","note":"术语注释（如有难译术语，无则空字符串）"}
 
 如果听不清或文本不完整，original保留原样，translation翻译能听懂的部分，note注明"音频不完整"。` },
       { role: 'user', content: text + (terms ? '\n\n[课程术语表，这些词的中文翻译必须采用：' + terms + ']' : '') }
