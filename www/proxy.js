@@ -14,6 +14,9 @@ const ROOT = __dirname; // russian-app 目录
 // ⚡ 单词分析内存缓存（同词二次查询秒回）
 const analysisCache = new Map();
 
+// ⚡ 句子解析内存缓存（同句二次秒回，不计额度）
+const sentenceCache = new Map();
+
 // 请求体上限 1MB，防止超大请求滥用
 const MAX_BODY = 1000000;
 
@@ -42,6 +45,60 @@ function readBody(req) {
     req.on('end', () => done(body));
     req.on('error', () => done(null));
   });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  接入码系统：真 key 藏在服务端（keys.json），用户只持 7 位数字码
+//  codes.json: { dailyLimit: 100, codes: { "4826159": { name, used: { 日期: 次数 } } } }
+//  管理命令：node gen-codes.js（生成/key/list/del）
+// ═══════════════════════════════════════════════════════════════
+const CODES_FILE = path.join(__dirname, 'codes.json');
+const KEYS_FILE = path.join(__dirname, 'keys.json');
+
+function loadCodes() {
+  try { return JSON.parse(fs.readFileSync(CODES_FILE, 'utf8')); }
+  catch { return { dailyLimit: 100, codes: {} }; }
+}
+function saveCodes(db) {
+  try { fs.writeFileSync(CODES_FILE, JSON.stringify(db, null, 2)); } catch (e) { log('codes.json 写入失败:', e.message); }
+}
+function loadMasterKey() {
+  try { return (JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')).key || '').trim(); }
+  catch { return ''; }
+}
+
+// raw = 用户在设置里填的内容：完整 sk- key 直通（兼容旧用法）；4~8 位数字码查名单
+function resolveAccess(raw) {
+  const k = String(raw || '').trim();
+  if (/^sk-/.test(k)) return { ok: true, key: k };
+  if (!/^\d{4,8}$/.test(k)) return { ok: false, status: 403, msg: '请先在设置中填写接入码（管理员发放的数字）或 API Key' };
+  const db = loadCodes();
+  const entry = db.codes && db.codes[k];
+  if (!entry) return { ok: false, status: 403, msg: '接入码无效，请联系管理员' };
+  const today = new Date().toISOString().slice(0, 10);
+  const used = (entry.used && entry.used[today]) || 0;
+  const limit = db.dailyLimit || 100;
+  if (used >= limit) return { ok: false, status: 429, msg: `今日额度已用完（每码每天 ${limit} 次），明天再来` };
+  const master = loadMasterKey();
+  if (!master) return { ok: false, status: 500, msg: '服务端还没配置 API Key，请管理员运行 node gen-codes.js key sk-xxx' };
+  return { ok: true, key: master, code: k, entry, today, limit };
+}
+
+// 请求通过验证即计一次额度（按尝试计，防重试刷量）；sk- 直通不计
+function countUse(info) {
+  if (!info || !info.code) return;
+  const db = loadCodes();
+  const entry = db.codes && db.codes[info.code];
+  if (!entry) return;
+  entry.used = entry.used || {};
+  entry.used[info.today] = (entry.used[info.today] || 0) + 1;
+  saveCodes(db);
+}
+
+// 各接口通用的拒绝响应（JSON，前端 friendlyErr 会原样显示）
+function deny(res, access) {
+  res.writeHead(access.status || 403, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: access.msg }));
 }
 
 // ⚡ DeepSeek 调用（模型回退：第一个模型失败时自动试下一个）
@@ -184,9 +241,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── Key 测试（转发给上游真实接口，成功/失败原文透传，前端据此显示）──
+  // ── Key 测试（接入码走本地验证不耗额度；完整 key 透传上游）──
   if (req.method === 'GET' && url === '/api/testkey') {
-    const key = req.headers['x-api-key'] || '';
+    const rawKey = String(req.headers['x-api-key'] || '').trim();
+    if (/^\d{4,8}$/.test(rawKey)) {
+      const access = resolveAccess(rawKey);
+      if (!access.ok) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: access.msg }));
+        return;
+      }
+      const used = (access.entry.used && access.entry.used[access.today]) || 0;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, code: true, remaining: Math.max(0, access.limit - used) }));
+      return;
+    }
+    const key = rawKey;
     fetch(`${DEEPSEEK}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
@@ -224,7 +294,12 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, src, tgt, text } = JSON.parse(body);
+        const parsed = JSON.parse(body);
+        const access = resolveAccess(parsed.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const { src, tgt, text } = parsed;
         const NAMES={ru:'俄语',en:'英语','zh-CN':'中文'};
         const srcName=NAMES[src]||src;
         const tgtName=NAMES[tgt]||tgt;
@@ -261,9 +336,19 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, word } = JSON.parse(body);
+        const reqBody = JSON.parse(body);
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const { word, lang } = reqBody;
+        const isEnDict = lang === 'en';
         const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
-          { role: 'system', content: `你是专业的俄语词典编纂专家。请为给定的俄语单词提供高质量的词典释义。
+          { role: 'system', content: isEnDict ? `你是英汉词典专家。给定英语单词或短语，只返回纯JSON（不要markdown代码块），字段结构：
+{"word":"查询的词","stress":"音标 /.../ ",
+"pos":"词性（中文：名词/动词/形容词/副词/短语）",
+"meanings":[{"index":1,"chinese":"中文释义","explanation":"一句话补充：常用搭配/语域/用法","example":{"ru":"地道英文例句","cn":"例句中文翻译"}}]}
+规则：meanings 给 2-3 个常用义项；例句自然地道；example 里的 ru 字段固定放英文例句（系统显示用）。` : `你是专业的俄语词典编纂专家。请为给定的俄语单词提供高质量的词典释义。
 
 请按以下JSON格式返回（不要包含markdown代码块标记，只返回纯JSON）：
 
@@ -317,14 +402,19 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, word } = JSON.parse(body);
-        // ⚡ 内存缓存：同一单词第二次查询秒回
+        const reqBody = JSON.parse(body);
+        const { word } = reqBody;
+        // ⚡ 内存缓存：同一单词第二次查询秒回（缓存命中不计额度）
         const cached = analysisCache.get(word);
         if (cached) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(cached));
           return;
         }
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
         const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
           { role: 'system', content: `你是俄语语法分析专家。给定俄语单词，只返回纯JSON（不要markdown代码块）：
 
@@ -356,6 +446,116 @@ const server = http.createServer((req, res) => {
   }
 
   // ── 课堂翻译（口语规整 + 学术翻译，一次调用）──
+  // ── 句子解析（结构/关键点/语法点/直译/仿造句；思维链模型，token预算3000）──
+  if (req.method === 'POST' && url === '/api/sentence-analysis') {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
+      try {
+        const reqBody = JSON.parse(body);
+        const { text } = reqBody;
+        if (!text || !text.trim()) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '文本为空' }));
+          return;
+        }
+        const sLang = reqBody.lang === 'en' ? 'en' : 'ru';
+        const cached = sentenceCache.get(sLang + text);
+        if (cached) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(cached));
+          return;
+        }
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
+          { role: 'system', content: sLang === 'en' ? `You are an English grammar teacher for Chinese learners. The user gives an English sentence. Return pure JSON only (no markdown):
+{"structure":"用中文一两句说明句子成分与主句框架",
+"keyPoints":[{"word":"句中出现的形式","base":"原形/词典形","why":"为什么用这个形式（时态/语态/冠词/介词/搭配），用中文一句话讲透"}],
+"grammar":["本句核心语法点，每条一句话（中文）"],
+"literal":"若英语语序与中文差异大，给逐词直译；否则空串",
+"patterns":["换主题保留同款结构的仿造句1","仿造句2"]}
+规则：keyPoints 只挑 3-6 个最关键的词；讲解一律用简体中文；不要逐词罗列虚词。` : `你是面向中文学习者的俄语语法讲解专家。用户给一个俄语句子，只返回纯JSON（不要markdown代码块）：
+{"structure":"用主语/谓语/补语/状语标注句子成分，一两句话",
+"keyPoints":[{"word":"句中出现的形式","base":"原形","why":"为什么用这个形式（格/体/时态/支配关系），一句话讲透"}],
+"grammar":["本句核心语法点，每条一句话"],
+"literal":"若俄语语序与中文差异大，给逐字直译；否则空串",
+"patterns":["换主题但保留同款结构的仿造例句1","仿造例句2"]}
+规则：keyPoints只挑3-6个最关键的词；简体中文讲解，语法术语准确；不要逐词罗列虚词。` },
+          { role: 'user', content: text }
+        ], 3000, 120000);
+        if (parsed) {
+          parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
+          sentenceCache.set(sLang + text, parsed);
+          if (sentenceCache.size > 300) { // 防无限膨胀，删最旧的1/3
+            const del = Array.from(sentenceCache.keys()).slice(0, 100);
+            del.forEach(k => sentenceCache.delete(k));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(parsed));
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'JSON解析失败' }));
+        }
+      } catch (e) {
+        log('ERROR', url, e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // ── AI 出题（DeepSeek 按级别/主题生成四选一练习，接入码计费）──
+  if (req.method === 'POST' && url === '/api/ai-quiz') {
+    readBody(req).then(async (body) => {
+      if (body === null) {
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '请求内容过大，已拒绝' }));
+        return;
+      }
+      try {
+        const reqBody = JSON.parse(body);
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
+        const lang = reqBody.lang === 'en' ? 'en' : 'ru';
+        const level = String(reqBody.level || 'A2').slice(0, 4);
+        const count = Math.min(10, Math.max(5, parseInt(reqBody.count) || 10));
+        const topic = String(reqBody.topic || '').slice(0, 120) || '综合复习';
+        const langName = lang === 'en' ? '英语' : '俄语';
+        const { parsed, raw, model, snippet } = await requestJsonAnalysis(key, [
+          { role: 'system', content: `你是面向中文学习者的${langName}出题专家。根据级别与主题出四选一练习题，只返回纯JSON（不要markdown代码块）：
+{"questions":[{"tag":"语法或词汇或情景交际","q":"题干（${langName}）","opts":["选项A","选项B","选项C","选项D"],"ans":0,"explain":"一句话解析（中文）"}]}
+规则：恰好 ${count} 道题；ans 是正确选项下标（0-3），各题分布随机；每题四个选项只有一个正确；难度贴合 ${level} 级；题目围绕给定主题；解析用中文。` },
+          { role: 'user', content: `级别：${level}\n主题/难点：${topic}\n出题数量：${count}` }
+        ], 3000, 120000);
+        let qs = (parsed && Array.isArray(parsed.questions)) ? parsed.questions : [];
+        qs = qs.filter(q => q && q.q && Array.isArray(q.opts) && q.opts.length === 4 && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < 4)
+               .map(q => ({ tag: ['语法','词汇','情景交际'].includes(q.tag) ? q.tag : '语法', q: String(q.q), opts: q.opts.map(String), ans: q.ans, explain: String(q.explain || '') }));
+        if (qs.length) {
+          log('AI-QUIZ', level, topic, '->', qs.length, '题 by', model);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ questions: qs, _model: model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat' }));
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ raw: raw, snippet: snippet, error: 'AI 出题解析失败，请重试' }));
+        }
+      } catch (e) {
+        log('ERROR', url, e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
   if (req.method === 'POST' && url === '/api/class-translate') {
     readBody(req).then(async (body) => {
       if (body === null) {
@@ -364,12 +564,18 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        const { key, text } = JSON.parse(body);
+        const reqBody = JSON.parse(body);
+        const { text } = reqBody;
+        const terms = String(reqBody.terms || '').slice(0, 800);
         if (!text || !text.trim()) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: '文本为空' }));
           return;
         }
+        const access = resolveAccess(reqBody.key);
+        if (!access.ok) return deny(res, access);
+        countUse(access);
+        const key = access.key;
         const d = await callDeepSeek(key, [
           { role: 'system', content: `你是同声传译专家，处理俄语大学课堂口语。
 
@@ -383,7 +589,7 @@ const server = http.createServer((req, res) => {
 {"original":"规整后的俄语原文","translation":"中文翻译","note":"术语注释（如有难译术语，无则空字符串）"}
 
 如果听不清或文本不完整，original保留原样，translation翻译能听懂的部分，note注明"音频不完整"。` },
-          { role: 'user', content: text }
+          { role: 'user', content: text + (terms ? '\n\n[课程术语表，这些词的中文翻译必须采用：' + terms + ']' : '') }
         ], 2000, 30000);
         const raw = d.data.choices?.[0]?.message?.content?.trim() || '';
         const parsed = extractJson(raw);

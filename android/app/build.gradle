@@ -7,7 +7,7 @@ if (ksPropsFile.exists()) {
     ksPropsFile.withInputStream { ksProps.load(it) }
 }
 def ciCode = project.hasProperty("ciVersionCode") ? (project.property("ciVersionCode") as int) : 1
-def ciName = project.hasProperty("ciVersionName") ? (project.property("ciVersionName") as String) : "6.4.0"
+def ciName = project.hasProperty("ciVersionName") ? (project.property("ciVersionName") as String) : "6.5.0"
 
 android {
     namespace = "com.russian.learn"
