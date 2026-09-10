@@ -2019,7 +2019,12 @@ window.idbStore=(function(){
           st.createIndex('sessionId','sessionId',{unique:false});
         }
       };
-      rq.onsuccess=()=>{_db=rq.result;res(_db)};
+      rq.onsuccess=()=>{
+        const db=rq.result;
+        // 别的标签页要升级时主动让路，避免把对方永久阻塞
+        db.onversionchange=()=>{try{db.close()}catch(e){};_db=null};
+        _db=db;res(db);
+      };
       rq.onerror=()=>rej(rq.error);
     });
   }
@@ -2045,31 +2050,38 @@ window.idbStore=(function(){
     byIndex:(store,idx,key)=>run(store,'readonly',os=>os.index(idx).getAll(key)),
   };
 })();
-// 课堂全程录音的分片暂存库。
+// 课堂全程录音的暂存库：parts（落盘分片，拼装后即删）+ recordings（整堂课录音）。
 // 特意用**单独的数据库**、而不是给 russian_app 升版本：升级已存在的库时，
-// 若另一个标签页还持有旧连接会一直阻塞（IndexedDB 的经典坑），而这个库只有本页在用，
-// 首次创建不可能被阻塞。分片拼回完整录音后即删，不长期占空间。
+// 若另一个标签页还持有旧连接会一直阻塞（IndexedDB 的经典坑），而这个库只有本页在用。
+// 另外两处都挂 onversionchange 主动断开，这样即使开了多个标签页也不会把升级卡死。
 window.recParts=(function(){
-  const DB='russian_app_rec',ST='parts';
+  const DB='russian_app_rec',ST='parts',RST='recordings',VER=2;
   let _db=null;
   function open(){
     if(_db)return Promise.resolve(_db);
     return new Promise((res,rej)=>{
-      const rq=indexedDB.open(DB,1);
+      const rq=indexedDB.open(DB,VER);
       rq.onupgradeneeded=()=>{
-        const db=rq.result;
+        const db=rq.result;   // oldVersion 用不上：两个存储都按"不存在才建"处理，天然幂等
         if(!db.objectStoreNames.contains(ST)){
           const s=db.createObjectStore(ST,{keyPath:'id'});
           s.createIndex('sessionId','sessionId',{unique:false});
         }
+        if(!db.objectStoreNames.contains(RST))db.createObjectStore(RST,{keyPath:'id'});
       };
-      rq.onsuccess=()=>{_db=rq.result;res(_db)};
+      rq.onsuccess=()=>{
+        const db=rq.result;
+        // 别的标签页要升级时主动让路，否则会把对方永久阻塞
+        db.onversionchange=()=>{try{db.close()}catch(e){};_db=null};
+        _db=db;res(db);
+      };
       rq.onerror=()=>rej(rq.error);
+      rq.onblocked=()=>rej(new Error('录音库被其他标签页占用，请关掉本应用的其他标签页后重试'));
     });
   }
-  function run(mode,fn){
+  function run(store,mode,fn){
     return open().then(db=>new Promise((res,rej)=>{
-      const t=db.transaction(ST,mode),os=t.objectStore(ST);
+      const t=db.transaction(store,mode),os=t.objectStore(store);
       let out;
       t.oncomplete=()=>res(out);
       t.onerror=()=>rej(t.error);
@@ -2081,17 +2093,75 @@ window.recParts=(function(){
     }));
   }
   return{
-    put:(v)=>run('readwrite',os=>os.put(v)),
-    bySession:(sid)=>run('readonly',os=>os.index('sessionId').getAll(sid)),
-    keys:()=>run('readonly',os=>os.getAllKeys()),
-    del:(id)=>run('readwrite',os=>os.delete(id)),
+    // ── 分片 ──
+    put:(v)=>run(ST,'readwrite',os=>os.put(v)),
+    bySession:(sid)=>run(ST,'readonly',os=>os.index('sessionId').getAll(sid)),
+    keys:()=>run(ST,'readonly',os=>os.getAllKeys()),
+    del:(id)=>run(ST,'readwrite',os=>os.delete(id)),
+    // ── 整堂课录音 ──
+    putRec:(v)=>run(RST,'readwrite',os=>os.put(v)),
+    getRec:(id)=>run(RST,'readonly',os=>os.get(id)),
+    listRecs:()=>run(RST,'readonly',os=>os.getAll()),
+    delRec:(id)=>run(RST,'readwrite',os=>os.delete(id)),
+    _dbName:DB,
   };
 })();
+// 录音保留策略：留最近若干节 + 总量上限，超了从最旧的删。最新一条永远保留。
+const REC_KEEP_MAX=8,REC_TOTAL_MAX=150*1024*1024;
+async function recPartsTrim(){
+  try{
+    const list=(await recParts.listRecs())||[];
+    list.sort((a,b)=>(b.time||0)-(a.time||0));      // 新的在前
+    let total=0;const drop=[];
+    list.forEach((r,i)=>{
+      const sz=r.size||0;
+      if(i===0){total=sz;return}                     // 最新一条无条件留下
+      if(i>=REC_KEEP_MAX||total+sz>REC_TOTAL_MAX){drop.push(r.id);return}
+      total+=sz;
+    });
+    for(const id of drop)await recParts.delRec(id).catch(()=>{});
+    return drop.length;
+  }catch(e){return 0}
+}
+// 整堂课录音真正落盘。之前这里写的是 idbStore.put('recordings',...)，但 russian_app
+// 根本没建这个存储，每次都是 NotFoundError 且被 catch 吞掉 —— 等于录音只活在内存里，
+// 用户在点「保存录音」之前关掉 App 就永久没了。
+async function saveClassRecording(sid,blob){
+  try{
+    await recParts.putRec({id:sid,time:Date.now(),size:blob.size,blob:blob});
+    await recPartsTrim();
+    return true;
+  }catch(e){
+    console.warn('录音持久化失败（本次会话内仍可保存/回放）',e&&e.message||e);
+    return false;
+  }
+}
+// 启动时把最近一次的课堂录音捡回来。这正是"关掉 App 就永久丢"的那个场景：
+// 之前录音只活在内存里，用户没来得及点「保存录音」就关了页面，就再也找不回来了。
+async function restoreLastRecording(){
+  try{
+    const list=(await recParts.listRecs())||[];
+    if(!list.length)return;
+    list.sort((a,b)=>(b.time||0)-(a.time||0));
+    const last=list[0];
+    if(!last||!last.blob||!last.blob.size)return;
+    CLASS._recBlob=last.blob;
+    CLASS._recStoredSid=last.id;
+    const btn=document.getElementById('classSaveRecBtn');
+    if(btn){
+      const mins=Math.max(1,Math.round(last.blob.size/600000));
+      btn.style.display='inline-block';
+      btn.textContent='💾 保存上一堂课录音（约'+mins+'分钟）';
+    }
+    const hint=document.getElementById('classHint');
+    if(hint)hint.innerHTML='💾 上一堂课的录音已保留在本机 —— 可点「保存录音」导出，或点「回放重翻」重新识别';
+  }catch(e){}
+}
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
 function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 
-const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0,finalizing:false};
+const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0,finalizing:false,_recStoredSid:null};
 let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[],classSegT0=0;
 // classFailedChunks 的元素是 {b:Blob,ts:该段在录音里的真实时刻}，补识时用它把句子插回原位（不是补到末尾）
 
@@ -2452,7 +2522,7 @@ function classStart(){
     srcNode.connect(classAnalyser);
     classMime=MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')?'audio/mp4;codecs=mp4a.40.2':(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm');
     classRecorder=new MediaRecorder(stream,{mimeType:classMime});
-    classChunks=[];classSessionChunks=[];classFailedChunks=[];CLASS._recBlob=null;CLASS._lastSent='';CLASS.dropped=0;
+    classChunks=[];classSessionChunks=[];classFailedChunks=[];CLASS._recBlob=null;CLASS._recStoredSid=null;CLASS._lastSent='';CLASS.dropped=0;
     classMemBytes=0;classPartSeq=0;classPartsFlushed=0;classPartsBroken=false;classPartFlush=Promise.resolve();
     classJanitorRecParts(CLASS._recSid);   // 清掉上次异常退出残留的分片
     document.getElementById('classSaveRecBtn').style.display='none';
@@ -2523,7 +2593,10 @@ async function classFinalizeRecording(){
       if(blob&&blob.size){
         CLASS._recBlob=blob;
         const sid=CLASS._recSid||'rec_'+Date.now();
-        idbStore.put('recordings',{id:sid,blob:blob,time:Date.now()}).catch(()=>{});
+        CLASS._recStoredSid=sid;
+        // 真存一份：用户常常在点「保存录音」之前就关掉 App，只留在内存里等于没存。
+        // 存进 russian_app_rec（独立库），不碰 russian_app 的版本号。
+        saveClassRecording(sid,blob);
         const btn=document.getElementById('classSaveRecBtn');
         if(btn){btn.style.display='inline-block';const mins=Math.max(1,Math.round(blob.size/600000));btn.textContent='💾 保存课堂录音（约'+mins+'分钟）'}
       }
@@ -2857,6 +2930,8 @@ async function classClear(){
     for(const it of CLASS.items){if(it._id)await idbStore.del('transcripts',it._id).catch(()=>{})}
     const left=await idbStore.byIndex('transcripts','sessionId',sid).catch(()=>[]);
     if(!(left&&left.length))await idbStore.del('sessions',sid).catch(()=>{});
+    await recParts.delRec(sid).catch(()=>{});   // 录音跟着这节课一起删
+    if(CLASS._recStoredSid===sid){CLASS._recBlob=null;CLASS._recStoredSid=null;const b=document.getElementById('classSaveRecBtn');if(b)b.style.display='none'}
     CLASS._clearedSid=sid;
     toast('已清空（含本节课历史记录）');
   }
@@ -2941,6 +3016,8 @@ document.getElementById('classBoard').addEventListener('click',async e=>{
     if(!confirm('删除这节课的全部记录？'))return;
     await idbStore.del('sessions',sid).catch(()=>{});
     await Promise.all(items.map(it=>idbStore.del('transcripts',it.id).catch(()=>{})));
+    await recParts.delRec(sid).catch(()=>{});   // 录音跟着这节课一起删
+    if(CLASS._recStoredSid===sid){CLASS._recBlob=null;CLASS._recStoredSid=null;const b=document.getElementById('classSaveRecBtn');if(b)b.style.display='none'}
     classHistRender();
   }
 });
@@ -3060,6 +3137,7 @@ function init(){
   updateDictBtnVisibility();
   if(window.speechSynthesis){refreshVoices();window.speechSynthesis.onvoiceschanged=refreshVoices}
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+  restoreLastRecording();   // 把上一堂课没来得及导出的录音捡回来
   updateClassEngine(); // 探测识别引擎状态（本地 Whisper GPU / Web Speech 兜底）
 }
 init();
