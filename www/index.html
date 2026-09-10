@@ -2045,6 +2045,48 @@ window.idbStore=(function(){
     byIndex:(store,idx,key)=>run(store,'readonly',os=>os.index(idx).getAll(key)),
   };
 })();
+// 课堂全程录音的分片暂存库。
+// 特意用**单独的数据库**、而不是给 russian_app 升版本：升级已存在的库时，
+// 若另一个标签页还持有旧连接会一直阻塞（IndexedDB 的经典坑），而这个库只有本页在用，
+// 首次创建不可能被阻塞。分片拼回完整录音后即删，不长期占空间。
+window.recParts=(function(){
+  const DB='russian_app_rec',ST='parts';
+  let _db=null;
+  function open(){
+    if(_db)return Promise.resolve(_db);
+    return new Promise((res,rej)=>{
+      const rq=indexedDB.open(DB,1);
+      rq.onupgradeneeded=()=>{
+        const db=rq.result;
+        if(!db.objectStoreNames.contains(ST)){
+          const s=db.createObjectStore(ST,{keyPath:'id'});
+          s.createIndex('sessionId','sessionId',{unique:false});
+        }
+      };
+      rq.onsuccess=()=>{_db=rq.result;res(_db)};
+      rq.onerror=()=>rej(rq.error);
+    });
+  }
+  function run(mode,fn){
+    return open().then(db=>new Promise((res,rej)=>{
+      const t=db.transaction(ST,mode),os=t.objectStore(ST);
+      let out;
+      t.oncomplete=()=>res(out);
+      t.onerror=()=>rej(t.error);
+      t.onabort=()=>rej(t.error);
+      let r;
+      try{r=fn(os)}catch(e){rej(e);return}
+      r.onsuccess=()=>{out=r.result};
+      r.onerror=()=>rej(r.error);
+    }));
+  }
+  return{
+    put:(v)=>run('readwrite',os=>os.put(v)),
+    bySession:(sid)=>run('readonly',os=>os.index('sessionId').getAll(sid)),
+    keys:()=>run('readonly',os=>os.getAllKeys()),
+    del:(id)=>run('readwrite',os=>os.delete(id)),
+  };
+})();
 function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
 function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
@@ -2052,6 +2094,56 @@ function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padSt
 const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0};
 let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[],classSegT0=0;
 // classFailedChunks 的元素是 {b:Blob,ts:该段在录音里的真实时刻}，补识时用它把句子插回原位（不是补到末尾）
+
+// ─── 全程录音的落盘暂存 ───
+// 原先 classSessionChunks 把整堂课的音频一直堆在内存里：90 分钟的课约 55MB，
+// 最后 new Blob(...) 还要再复制一份，手机（尤其 WebView）很容易 OOM。
+// 现在内存里最多留 8MB，超出的按批打成 Blob 落到 IndexedDB 分片库，课堂结束时按序读回拼装。
+// 落盘失败也不丢音频：整批退回内存，之后不再尝试（顺序仍然连续）
+const CLASS_MEM_MAX=8*1024*1024;
+// 一直在讲话、始终没有 1200ms 静音时，实时段会无限增长 —— 客户端 120s 超时和服务端 8MB
+// 都会先炸，整段内容就白录了。给一个硬上限，到点切一刀。
+const CLASS_SEG_MAX_MS=60000;
+let classMemBytes=0,classPartSeq=0,classPartsFlushed=0,classPartsBroken=false,classPartFlush=Promise.resolve();
+function classStashChunk(b){
+  classSessionChunks.push(b);classMemBytes+=(b.size||0);
+  if(classPartsBroken||classMemBytes<CLASS_MEM_MAX)return;
+  const batch=classSessionChunks;classSessionChunks=[];classMemBytes=0;
+  const sid=CLASS._recSid;
+  const seq=classPartSeq++;
+  classPartFlush=classPartFlush.then(()=>{
+    if(classPartsBroken)throw new Error('已降级为纯内存，跳过');
+    return recParts.put({id:sid+'_'+String(seq).padStart(6,'0'),sessionId:sid,seq:seq,blob:new Blob(batch,{type:classMime})})
+      .then(()=>{classPartsFlushed++});
+  }).catch(()=>{
+    classPartsBroken=true;                                  // 之后不再落盘，保证顺序连续
+    classSessionChunks=batch.concat(classSessionChunks);     // 退回内存：宁可占内存也不丢音频
+    classMemBytes+=batch.reduce((n,x)=>n+(x.size||0),0);
+  });
+}
+// 收集整堂课的音频片段：先落盘的分片（按 seq 排好），再接内存里的尾巴
+async function classCollectRecording(){
+  const sid=CLASS._recSid;
+  let parts=[];
+  if(classPartSeq>0){
+    try{parts=await classPartFlush.then(()=>recParts.bySession(sid))}catch(e){parts=[]}
+    parts=(parts||[]).slice().sort((a,b)=>a.seq-b.seq);
+  }
+  const list=parts.map(p=>p.blob).concat(classSessionChunks);
+  for(const p of parts){try{await recParts.del(p.id)}catch(e){}}   // 已拼进 Blob，删掉释放空间
+  const incomplete=classPartsFlushed>0&&parts.length<classPartsFlushed;
+  const blob=new Blob(list,{type:classMime});
+  classSessionChunks=[];classMemBytes=0;classPartSeq=0;classPartsFlushed=0;classPartsBroken=false;
+  if(incomplete)toast('⚠️ 部分录音分片读取失败，保存的录音可能不完整');
+  return blob;
+}
+// 清掉上次没消费完的分片（例如中途强杀 App），避免静默占空间
+async function classJanitorRecParts(keepSid){
+  try{
+    const keys=await recParts.keys();
+    for(const k of keys){if(!String(k).startsWith(keepSid+'_'))await recParts.del(k)}
+  }catch(e){}
+}
 
 function classAddItem(original,translation,note,confidence,tsMs){
   // tsMs：这段语音在录音里的真实时刻。回放重翻 / 课堂结束后的补识都会带上它。
@@ -2351,8 +2443,10 @@ function classStart(){
     classMime=MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')?'audio/mp4;codecs=mp4a.40.2':(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm');
     classRecorder=new MediaRecorder(stream,{mimeType:classMime});
     classChunks=[];classSessionChunks=[];classFailedChunks=[];CLASS._recBlob=null;CLASS._lastSent='';CLASS.dropped=0;
+    classMemBytes=0;classPartSeq=0;classPartsFlushed=0;classPartsBroken=false;classPartFlush=Promise.resolve();
+    classJanitorRecParts(CLASS._recSid);   // 清掉上次异常退出残留的分片
     document.getElementById('classSaveRecBtn').style.display='none';
-    classRecorder.ondataavailable=e=>{if(e.data&&e.data.size){classChunks.push(e.data);classSessionChunks.push(e.data)}};
+    classRecorder.ondataavailable=e=>{if(e.data&&e.data.size){classChunks.push(e.data);classStashChunk(e.data)}};
     classRecorder.onstop=()=>{
       if(classChunks.length){const blob=new Blob(classChunks,{type:classMime});classChunks=[];classQueueRecognize(blob,classSegT0)}
       if(CLASS.running){classSegT0=Date.now();try{classRecorder.start(200)}catch(e){}}
@@ -2410,15 +2504,17 @@ async function classRecognize(blob,tsMs){
 
 // 课堂结束：全程原始录音存 IndexedDB（单独一份，不怕课上翻错）+ 失败段自动用完整版模型重试
 async function classFinalizeRecording(){
-  if(classSessionChunks.length){
-    const blob=new Blob(classSessionChunks,{type:classMime});
-    CLASS._recBlob=blob;
-    const sid=CLASS._recSid||'rec_'+Date.now();
-    idbStore.put('recordings',{id:sid,blob:blob,time:Date.now()}).catch(()=>{});
-    const btn=document.getElementById('classSaveRecBtn');
-    if(btn){btn.style.display='inline-block';const mins=Math.max(1,Math.round(blob.size/600000));btn.textContent='💾 保存课堂录音（约'+mins+'分钟）'}
+  const hasAudio=classSessionChunks.length>0||classPartSeq>0;
+  if(hasAudio){
+    const blob=await classCollectRecording();
+    if(blob&&blob.size){
+      CLASS._recBlob=blob;
+      const sid=CLASS._recSid||'rec_'+Date.now();
+      idbStore.put('recordings',{id:sid,blob:blob,time:Date.now()}).catch(()=>{});
+      const btn=document.getElementById('classSaveRecBtn');
+      if(btn){btn.style.display='inline-block';const mins=Math.max(1,Math.round(blob.size/600000));btn.textContent='💾 保存课堂录音（约'+mins+'分钟）'}
+    }
   }
-  classSessionChunks=[];
   // 先等在途的实时识别收尾，再补失败段——否则两条流会交错着往字幕板里插
   try{await classAsrChain}catch(e){}
   if(classFailedChunks.length){
@@ -2660,6 +2756,12 @@ function classSilenceTick(){
   }else{
     classSilenceMs=0;
   }
+  // 硬上限：连读不停（一直没有 1200ms 静音）时按 60 秒切一刀。
+  // 否则这一段的 blob 会一路涨到客户端 120s 超时 / 服务端 8MB 上限而整段丢失。
+  if(classSegT0&&Date.now()-classSegT0>=CLASS_SEG_MAX_MS&&classRecorder&&classRecorder.state==='recording'){
+    classSilenceMs=0;
+    try{classRecorder.stop()}catch(e){}
+  }
   setTimeout(classSilenceTick,200);
 }
 
@@ -2679,6 +2781,33 @@ function classStop(){
   document.getElementById('classStartBtn').disabled=false;
   document.getElementById('classStopBtn').disabled=true;
   document.getElementById('classStatus').textContent='已停止';
+}
+
+// 导出课堂录音。
+// 手机上（尤其 Capacitor 的 WebView）`<a download>` 经常不生效，而 Web Share API 能把文件
+// 交给系统的"保存到文件 / 网盘 / 微信"等入口，且不需要引入任何原生插件。
+// 所以优先走分享，不支持或分享失败再退回下载。
+async function classExportRecording(){
+  if(!CLASS._recBlob){toast('没有可保存的录音');return}
+  const ext=classMime.includes('mp4')?'m4a':'webm';
+  const name='课堂录音_'+new Date().toISOString().slice(0,10)+'.'+ext;
+  try{
+    const file=new File([CLASS._recBlob],name,{type:CLASS._recBlob.type||classMime});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:name});
+      toast('已交给系统分享（录音同时存在本机，不会丢）');
+      return;
+    }
+  }catch(e){
+    if(e&&e.name==='AbortError')return;   // 用户自己取消，不再退回去触发下载
+  }
+  try{
+    const url=URL.createObjectURL(CLASS._recBlob);
+    const a=document.createElement('a');a.href=url;a.download=name;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000);
+    toast('✅ 录音已保存到下载目录');
+  }catch(e){toast('导出失败：'+((e&&e.message)||e))}
 }
 
 function classSave(){
@@ -2846,7 +2975,7 @@ function applyTheme(id){
 }
 function curTheme(){return document.documentElement.getAttribute('data-theme')||'xixi'}
 renderAppSettings();
-document.addEventListener('click',e=>{const t=e.target;if(t&&t.id==='apiBaseSave'){S.settings.apiBase=(document.getElementById('apiBaseInput')||{value:''}).value.trim();save('settings');const m=document.getElementById('apiBaseMsg');if(m)m.textContent='已保存';setTimeout(()=>{if(m)m.textContent=''},2000)}if(t&&t.id==='onboardReplay'){showOnboard()}if(t&&t.id==='fbSend'){const tx=document.getElementById('fbText'),ct=document.getElementById('fbContact'),fm=document.getElementById('fbMsg');const v=tx&&tx.value?tx.value.trim():'';if(!v){if(fm)fm.textContent='先写点内容再提交';return}if(fm)fm.textContent='提交中…';apiFetch('/api/feedback',{body:{text:v,contact:ct?ct.value.trim():''},timeout:20000}).then(()=>{tx.value='';if(ct)ct.value='';if(fm)fm.textContent='';toast('✅ 反馈已收到，谢谢！')}).catch(e=>{if(fm)fm.textContent='❌ '+friendlyErr(e)});setTimeout(()=>{if(fm)fm.textContent=''},4000)}if(t&&t.id==='classSaveRecBtn'){if(!CLASS._recBlob){toast('没有可保存的录音');return}const a=document.createElement('a');a.href=URL.createObjectURL(CLASS._recBlob);a.download='课堂录音_'+new Date().toISOString().slice(0,10)+'.'+(classMime.includes('mp4')?'m4a':'webm');document.body.appendChild(a);a.click();setTimeout(()=>{a.remove()},1000);toast('✅ 录音已保存到下载目录')}if(t&&t.id==='classReplayBtn'){if(CLASS.replaying){toast('回放进行中');return}if(CLASS._recBlob){if(confirm('用刚结束这堂课的录音直接重翻？\n\n（点「取消」可选择录音文件）')){replayStart(CLASS._recBlob,'');return}}document.getElementById('classReplayFile').click()}if(t&&(t.id==='loginBtn'||t.id==='regBtn')){const em=(document.getElementById('loginEmail')||{}).value||'',pw=(document.getElementById('loginPass')||{}).value||'',fm=document.getElementById('loginMsg');const reg=t.id==='regBtn';if(!em.trim()||pw.length<6){if(fm)fm.textContent=reg?'请填邮箱 + 6 位以上密码':'请填邮箱和密码';return}if(fm)fm.textContent=reg?'注册中…':'登录中…';apiFetch('/api/auth/'+(reg?'register':'login'),{body:{email:em.trim(),password:pw,deviceId:devId()},timeout:30000}).then(d=>{ss('session',d.token);ss('email',d.email);S.quota=undefined;if(fm)fm.textContent='';toast(reg?'✅ 注册成功，已登录':'✅ 登录成功');pullFavs();refreshQuota();renderAppSettings()}).catch(e=>{if(fm)fm.textContent='❌ '+friendlyErr(e)})}if(t&&t.id==='logoutBtn'){apiFetch('/api/auth/logout',{method:'POST',timeout:15000}).catch(()=>{});ss('session','');ss('email','');S.quota=undefined;renderAppSettings();refreshQuota();toast('已退出登录')}});
+document.addEventListener('click',e=>{const t=e.target;if(t&&t.id==='apiBaseSave'){S.settings.apiBase=(document.getElementById('apiBaseInput')||{value:''}).value.trim();save('settings');const m=document.getElementById('apiBaseMsg');if(m)m.textContent='已保存';setTimeout(()=>{if(m)m.textContent=''},2000)}if(t&&t.id==='onboardReplay'){showOnboard()}if(t&&t.id==='fbSend'){const tx=document.getElementById('fbText'),ct=document.getElementById('fbContact'),fm=document.getElementById('fbMsg');const v=tx&&tx.value?tx.value.trim():'';if(!v){if(fm)fm.textContent='先写点内容再提交';return}if(fm)fm.textContent='提交中…';apiFetch('/api/feedback',{body:{text:v,contact:ct?ct.value.trim():''},timeout:20000}).then(()=>{tx.value='';if(ct)ct.value='';if(fm)fm.textContent='';toast('✅ 反馈已收到，谢谢！')}).catch(e=>{if(fm)fm.textContent='❌ '+friendlyErr(e)});setTimeout(()=>{if(fm)fm.textContent=''},4000)}if(t&&t.id==='classSaveRecBtn'){classExportRecording()}if(t&&t.id==='classReplayBtn'){if(CLASS.replaying){toast('回放进行中');return}if(CLASS._recBlob){if(confirm('用刚结束这堂课的录音直接重翻？\n\n（点「取消」可选择录音文件）')){replayStart(CLASS._recBlob,'');return}}document.getElementById('classReplayFile').click()}if(t&&(t.id==='loginBtn'||t.id==='regBtn')){const em=(document.getElementById('loginEmail')||{}).value||'',pw=(document.getElementById('loginPass')||{}).value||'',fm=document.getElementById('loginMsg');const reg=t.id==='regBtn';if(!em.trim()||pw.length<6){if(fm)fm.textContent=reg?'请填邮箱 + 6 位以上密码':'请填邮箱和密码';return}if(fm)fm.textContent=reg?'注册中…':'登录中…';apiFetch('/api/auth/'+(reg?'register':'login'),{body:{email:em.trim(),password:pw,deviceId:devId()},timeout:30000}).then(d=>{ss('session',d.token);ss('email',d.email);S.quota=undefined;if(fm)fm.textContent='';toast(reg?'✅ 注册成功，已登录':'✅ 登录成功');pullFavs();refreshQuota();renderAppSettings()}).catch(e=>{if(fm)fm.textContent='❌ '+friendlyErr(e)})}if(t&&t.id==='logoutBtn'){apiFetch('/api/auth/logout',{method:'POST',timeout:15000}).catch(()=>{});ss('session','');ss('email','');S.quota=undefined;renderAppSettings();refreshQuota();toast('已退出登录')}});
 document.querySelectorAll('#sMore .sub-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#sMore .sub-tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');const id=b.dataset.more;document.getElementById('subFav').style.display=id==='fav'?'block':'none';document.getElementById('subRes').style.display=id==='res'?'block':'none';document.getElementById('subAppSettings').style.display=id==='app-settings'?'block':'none';if(id==='res')pzRenderRes()}));
 
 // ═══ 系统诊断 ═══
