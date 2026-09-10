@@ -125,6 +125,7 @@ if(t==='ink'||t==='amber'){
           <button id="classTermsBtn" class="mini-chip">📖 术语</button>
           <button id="classScrollBtn" class="mini-chip">⏸ 滚动</button>
           <button id="classHistBtn" class="mini-chip">📚 历史</button>
+          <button id="classCalBtn" class="mini-chip">🎚 校准</button>
           <span style="font-size:11px;color:var(--text3)" id="classCount">0 句</span>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -260,8 +261,8 @@ async function refreshQuota(){try{if(ls('session','')){const m=await apiFetch('/
 async function pushFavs(){try{const d=await apiFetch('/api/user/favs',{body:{favs:S.favs},timeout:25000});if(d.ok)toast('☁️ 收藏已同步')}catch(e){}}
 async function pullFavs(){try{const d=await apiFetch('/api/user/favs',{method:'GET',timeout:25000});if(Array.isArray(d.favs)&&d.favs.length){const key=f=>f._id||f.ru||f.word||JSON.stringify(f).slice(0,60);const have=new Set(S.favs.map(key));let add=0;d.favs.forEach(f=>{if(!have.has(key(f))){S.favs.push(f);add++}});if(add){ss('favs',S.favs);toast('☁️ 已拉回 '+add+' 条云端收藏')}}}catch(e){}}
 // 课堂体验句数显示（登录用户专属，75 句 ≈ 15 分钟）
-function updateClassLeftUI(n){const hint=document.getElementById('classHint');if(hint&&ls('session',''))hint.innerHTML='🎬 课堂体验剩余 <b>'+n+'</b> 句（约 '+Math.max(1,Math.round(n/5))+' 分钟）'}
-async function updateClassTrialUI(){try{if(!ls('session',''))return;const m=await apiFetch('/api/auth/me',{method:'GET',timeout:15000});const hint=document.getElementById('classHint');if(!m.plan&&m.classroom){if(m.classroom.left<=0){if(hint)hint.innerHTML='<span style="color:var(--red)">课堂体验已用完（75 句 ≈ 15 分钟）——请联系管理员购套餐，或在设置退出登录改用设备试用</span>';const b=document.getElementById('classStartBtn');if(b)b.disabled=true}else if(hint){hint.innerHTML='🎬 课堂体验剩余 <b>'+m.classroom.left+'</b> 句（约 '+Math.max(1,Math.round(m.classroom.left/5))+' 分钟）'}}}catch(e){}}
+function updateClassLeftUI(n){CLASS._trialLeft=n;const hint=document.getElementById('classHint');if(hint&&ls('session',''))hint.innerHTML='🎬 课堂体验剩余 <b>'+n+'</b> 句（约 '+Math.max(1,Math.round(n/5))+' 分钟）'}
+async function updateClassTrialUI(){try{if(!ls('session',''))return;const m=await apiFetch('/api/auth/me',{method:'GET',timeout:15000});CLASS._trialLeft=m.plan?null:(m.classroom?m.classroom.left:null);const hint=document.getElementById('classHint');if(!m.plan&&m.classroom){if(m.classroom.left<=0){if(hint)hint.innerHTML='<span style="color:var(--red)">课堂体验已用完（75 句 ≈ 15 分钟）——请联系管理员购套餐，或在设置退出登录改用设备试用</span>';const b=document.getElementById('classStartBtn');if(b)b.disabled=true}else if(hint){hint.innerHTML='🎬 课堂体验剩余 <b>'+m.classroom.left+'</b> 句（约 '+Math.max(1,Math.round(m.classroom.left/5))+' 分钟）'}}}catch(e){}}
 
 // 👋 新手指引（首次启动自动弹；设置→帮助可再看）
 function showOnboard(){const el=document.getElementById('onboardOv');if(el)el.style.display='flex';S._obIdx=0;obRender()}
@@ -2204,10 +2205,79 @@ function classEditItem(i){
 
 async function classTranslate(text){
   try{
-    const d=await apiFetch('/api/class-translate',{body:{key:S.settings.dsKey,text,terms:classTermsGet().map(t=>t.ru+'='+t.cn).join('; ').slice(0,800)},timeout:90000});
+    const d=await apiFetch('/api/class-translate',{body:{key:S.settings.dsKey,text,terms:classTermsJoin(classTermsGet().map(t=>t.ru+'='+t.cn),'; ',800)},timeout:90000});
     return{original:d.original||text,translation:d.translation||'',note:d.note||''};
   }catch(e){
     return{original:text,translation:'（翻译失败: '+friendlyErr(e)+'）',note:''};
+  }
+}
+
+// ─── 静音门限（可校准）───
+// 原先 rms<0.015 和 1200ms 是写死的常量，出现在两处（实时与回放）。
+// 教室底噪（空调/翻书/邻座）常年高于 0.015 → 静音门永不触发，一整节课会被切成一大块；
+// 反过来老师轻声或停顿短时，1200ms 又会把句子腰斩。所以给一个"实测环境噪声 → 定门限"的入口。
+const CLASS_GATE_DEFAULT=0.015,CLASS_SIL_DEFAULT=1200;
+let _gateCache=null,_silCache=null;
+function classGate(){
+  if(_gateCache==null){
+    const v=parseFloat(ls('classGate',0));
+    _gateCache=(isFinite(v)&&v>0)?Math.min(0.08,Math.max(0.005,v)):CLASS_GATE_DEFAULT;
+  }
+  return _gateCache;
+}
+function classSilMs(){
+  if(_silCache==null){
+    const v=parseInt(ls('classSil',0),10);
+    _silCache=(isFinite(v)&&v>=400&&v<=3000)?v:CLASS_SIL_DEFAULT;
+  }
+  return _silCache;
+}
+function classCalUi(){
+  const b=document.getElementById('classCalBtn');
+  if(b)b.title='当前静音门限 '+classGate()+'（默认 '+CLASS_GATE_DEFAULT+'）／静音判定 '+classSilMs()+'ms\n点击：保持安静 2 秒，重新采集环境噪声';
+}
+let classCalibrating=false;
+async function classCalibrate(){
+  if(classCalibrating){toast('正在校准，请稍候');return}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('浏览器不支持麦克风');return}
+  classCalibrating=true;
+  const btn=document.getElementById('classCalBtn'),hint=document.getElementById('classHint');
+  let own=null,tmpCtx=null,ana=null;
+  try{
+    if(classAnalyser&&classAudioCtx){ana=classAnalyser}      // 正在录音：直接借用现有分析器
+    else{                                                     // 没在录音：临时开一路麦克风
+      own=await navigator.mediaDevices.getUserMedia({audio:true});
+      tmpCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const srcN=tmpCtx.createMediaStreamSource(own);
+      ana=tmpCtx.createAnalyser();ana.fftSize=1024;srcN.connect(ana);
+    }
+    if(btn)btn.textContent='🎚 采集中…';
+    if(hint)hint.innerHTML='🎚 正在采集环境噪声，请<b>保持安静</b> 2 秒…';
+    const vals=[],t0=Date.now();
+    while(Date.now()-t0<2000){
+      const buf=new Uint8Array(ana.fftSize);ana.getByteTimeDomainData(buf);
+      let sum=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v}
+      vals.push(Math.sqrt(sum/buf.length));
+      await new Promise(r=>setTimeout(r,100));
+    }
+    vals.sort((a,b)=>a-b);
+    const med=vals[Math.floor(vals.length/2)]||0;
+    // 取中位数的 2.6 倍：对偶发的咳嗽/翻书不敏感；下限 0.01 防止极安静的教室把门限压到 0
+    const gate=+Math.min(0.06,Math.max(0.01,med*2.6)).toFixed(4);
+    // 底噪越高，人声与噪声的间隔越短，静音判定也跟着放缓一点
+    const sil=Math.round(Math.min(2000,Math.max(700,CLASS_SIL_DEFAULT*(gate/CLASS_GATE_DEFAULT))));
+    _gateCache=gate;_silCache=sil;ss('classGate',gate);ss('classSil',sil);
+    classCalUi();
+    if(hint)hint.innerHTML='✅ 已校准：静音门限 <b>'+gate+'</b>（环境噪声中位值 '+med.toFixed(4)+' ×2.6）／静音判定 '+sil+'ms';
+    toast('环境噪声已校准');
+  }catch(e){
+    toast('校准失败：'+((e&&e.message)||e));
+    if(hint)classHintReset();
+  }finally{
+    if(own)own.getTracks().forEach(t=>t.stop());
+    if(tmpCtx){try{tmpCtx.close()}catch(e){}}
+    if(btn)btn.textContent='🎚 校准';
+    classCalibrating=false;
   }
 }
 
@@ -2284,7 +2354,7 @@ function classStart(){
     document.getElementById('classSaveRecBtn').style.display='none';
     classRecorder.ondataavailable=e=>{if(e.data&&e.data.size){classChunks.push(e.data);classSessionChunks.push(e.data)}};
     classRecorder.onstop=()=>{
-      if(classChunks.length){const blob=new Blob(classChunks,{type:classMime});classChunks=[];classRecognize(blob,classSegT0)}
+      if(classChunks.length){const blob=new Blob(classChunks,{type:classMime});classChunks=[];classQueueRecognize(blob,classSegT0)}
       if(CLASS.running){classSegT0=Date.now();try{classRecorder.start(200)}catch(e){}}
       else{classFinalizeRecording()} // 课堂结束：拼接全程录音 + 失败段HQ重试
     };
@@ -2304,6 +2374,26 @@ function classStart(){
   });
 }
 
+// ─── 识别并发节流 ───
+// 原先 classRecognize 是 fire-and-forget：网络一差就会有多路上传同时在飞，
+// 没有并发上限、没有队列、没有背压，端上内存和服务端都吃不消。
+// 现在串成一条链（同一时刻只有 1 个在飞）；排队超过上限就转交"课后补识"——
+// 音频不丢，只是延后到课堂结束用精修模式再跑（那边本来就带真实时刻，会插回原位）。
+const CLASS_ASR_BACKLOG_MAX=6,CLASS_FAILED_MAX=30;
+let classAsrChain=Promise.resolve(),classAsrBacklog=0;
+function classQueueRecognize(blob,ts){
+  if(classAsrBacklog>=CLASS_ASR_BACKLOG_MAX){
+    if(classFailedChunks.length<CLASS_FAILED_MAX)classFailedChunks.push({b:blob,ts:ts});
+    classHintReset();
+    return;
+  }
+  classAsrBacklog++;
+  classAsrChain=classAsrChain
+    .then(()=>classRecognize(blob,ts))
+    .catch(()=>{})
+    .then(()=>{classAsrBacklog=Math.max(0,classAsrBacklog-1)});
+}
+
 async function classRecognize(blob,tsMs){
   const ts=(tsMs!=null)?tsMs:Date.now();
   try{
@@ -2314,7 +2404,7 @@ async function classRecognize(blob,tsMs){
   }catch(e){
     console.error('语音识别失败',e.message||e);
     // 记下这段音频和它在录音里的真实时刻，课堂结束补识时按原位插回
-    if(classFailedChunks.length<20){classFailedChunks.push({b:blob,ts:ts});classHintReset()} // 失败不再静默，提示条上能看到
+    if(classFailedChunks.length<CLASS_FAILED_MAX){classFailedChunks.push({b:blob,ts:ts});classHintReset()} // 失败不再静默，提示条上能看到
   }
 }
 
@@ -2329,6 +2419,8 @@ async function classFinalizeRecording(){
     if(btn){btn.style.display='inline-block';const mins=Math.max(1,Math.round(blob.size/600000));btn.textContent='💾 保存课堂录音（约'+mins+'分钟）'}
   }
   classSessionChunks=[];
+  // 先等在途的实时识别收尾，再补失败段——否则两条流会交错着往字幕板里插
+  try{await classAsrChain}catch(e){}
   if(classFailedChunks.length){
     const st=document.getElementById('classHint');
     if(st)st.innerHTML='🔁 正在用精修模式重试 '+classFailedChunks.length+' 段未识别音频…';
@@ -2352,11 +2444,28 @@ async function classFinalizeRecording(){
 }
 
 // ═══ 📼 回放模式：把课堂录音重新听一遍，用高精度模型生成精校版记录 ═══
-function replayStart(blob,name){
+async function replayStart(blob,name){
   if(CLASS.replaying){toast('回放进行中');return}
   if(CLASS.running)classStop();
-  if(!confirm('开始回放重翻？将按原速重放录音，用精修模式重新识别并翻译。\n\n精修模式：每约 30 秒整段送识别（不再按静音切碎），并把课程术语表 + 前文一起交给模型，识别更准。\n（重翻的翻译仍会像课上一样消耗深度额度）'))return;
-  const au=new Audio(URL.createObjectURL(blob));au.preload='auto';
+  const auUrl=URL.createObjectURL(blob);
+  const au=new Audio(auUrl);au.preload='auto';
+  // 先拿到时长才能给出额度预估：原先只说"会消耗额度"，用户没法判断值不值得跑一遍
+  try{
+    await new Promise(res=>{
+      let done=false;const fin=()=>{if(done)return;done=true;res()};
+      au.addEventListener('loadedmetadata',fin,{once:true});
+      au.addEventListener('durationchange',fin,{once:true});
+      setTimeout(fin,4000);
+    });
+  }catch(e){}
+  const dur=isFinite(au.duration)?au.duration:0;
+  const est=dur?Math.max(1,Math.ceil(dur/25)):0;   // 约 30 秒一段，按 25 秒保守估
+  const left=(CLASS._trialLeft!=null)?CLASS._trialLeft:null;
+  let msg='开始回放重翻？将按原速重放录音，用精修模式重新识别并翻译。\n\n精修模式：每约 30 秒整段送识别（不再按静音切碎），并把课程术语表 + 前文一起交给模型，识别更准。';
+  if(est)msg+='\n\n本段录音约 '+fmtTimeShort(Math.round(dur*1000))+'，预计送出约 '+est+' 段，每段翻译计 1 句额度';
+  if(left!=null){msg+='（当前课堂体验剩余 '+left+' 句）';if(left<est)msg+='——额度不够，用完会中断翻译';}
+  msg+='。';
+  if(!confirm(msg)){try{URL.revokeObjectURL(auUrl)}catch(e){}return}
   let st=null;try{st=au.captureStream()}catch(e){}
   if(!st||!st.getAudioTracks().length){toast('此浏览器不支持回放重翻，请用 Chrome');return}
   const ctx=new (window.AudioContext||window.webkitAudioContext)();
@@ -2397,10 +2506,16 @@ function replayStart(blob,name){
 const REPLAY_MAX_MS=30000, REPLAY_MIN_MS=20000, REPLAY_IDLE_MS=8000;
 // 精修提示词 = 课程术语表 + 上一段识别出的原文尾部（给模型上下文，专名和术语能认对）
 function replayPrompt(R){
+  // Whisper 的 initial_prompt 只有 224 token 的额度（俄语约 2~3 字符/token），
+  // 给到 400 字符左右比较稳；术语优先，剩下的空间才给前文，两段都按分隔符整取、不切半截词。
   let terms='';
-  try{terms=classTermsGet().map(t=>t.ru).filter(Boolean).slice(0,60).join(', ')}catch(e){}
-  const ctx=(R&&R.ctxText)?(' '+R.ctxText):'';
-  return (terms+ctx).trim().slice(0,900);
+  try{terms=classTermsJoin(classTermsGet().map(t=>t.ru).filter(Boolean).slice(0,60),', ',260)}catch(e){}
+  let ctx=(R&&R.ctxText)?R.ctxText.trim():'';
+  if(ctx){
+    const room=400-terms.length-(terms?1:0);
+    ctx=room>20?((terms?' ':'')+ctx.slice(-room)):'';
+  }
+  return (terms+ctx).trim();
 }
 // 回放的时间基准：录音第 0 秒对应的时间戳。
 // 原先一律用 new Date()，补识/重翻出来的句子时间戳全变成"重翻那一刻"，整批堆在末尾、
@@ -2417,9 +2532,10 @@ function replayTick(){
   const R=CLASS._replay;if(!R)return;
   const buf=new Uint8Array(R.ana.fftSize);R.ana.getByteTimeDomainData(buf);
   let sum=0;for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v}
-  if(Math.sqrt(sum/buf.length)<0.015)R.sil+=200;else R.sil=0;
+  if(Math.sqrt(sum/buf.length)<classGate())R.sil+=200;else R.sil=0;
   const dur=Math.max(0,((R.au.currentTime||0)-(R.segStart||0))*1000);
-  const cut=(dur>=REPLAY_MAX_MS)||(dur>=REPLAY_MIN_MS&&R.sil>=1200)||(dur>=REPLAY_IDLE_MS&&R.sil>=3000);
+  const silMs=classSilMs();
+  const cut=(dur>=REPLAY_MAX_MS)||(dur>=REPLAY_MIN_MS&&R.sil>=silMs)||(dur>=REPLAY_IDLE_MS&&R.sil>=silMs*2.5);
   if(cut&&R.rec&&R.rec.state==='recording'){R.sil=0;try{R.rec.stop()}catch(e){}}
   const st=document.getElementById('classStatus');
   if(st&&R.au.duration)st.textContent='📼 回放重翻中'+(R.name?'（'+R.name+'）':'')+' '+fmtTimeShort(Math.round((R.au.currentTime||0)*1000))+' / '+fmtTimeShort(Math.round(R.au.duration*1000));
@@ -2535,9 +2651,9 @@ function classSilenceTick(){
   let sum=0;
   for(let i=0;i<buf.length;i++){const v=(buf[i]-128)/128;sum+=v*v}
   const rms=Math.sqrt(sum/buf.length);
-  if(rms<0.015){
+  if(rms<classGate()){
     classSilenceMs+=200;
-    if(classSilenceMs>=1200&&classRecorder&&classRecorder.state==='recording'){
+    if(classSilenceMs>=classSilMs()&&classRecorder&&classRecorder.state==='recording'){
       classSilenceMs=0;
       try{classRecorder.stop()}catch(e){} // onstop 里识别并自动重开
     }
@@ -2572,8 +2688,19 @@ function classSave(){
   navigator.clipboard.writeText(text).then(()=>toast('已复制到剪贴板')).catch(()=>toast('复制失败'));
 }
 
-function classClear(){
-  if(CLASS.items.length&&!confirm('清空当前字幕板？'))return;
+async function classClear(){
+  if(!CLASS.items.length){if(classHistMode)classHistRender();else classRender();return}
+  if(!confirm('清空当前字幕板？'))return;
+  // 屏幕上的句子其实已经写进 IndexedDB 了，只清屏的话去「历史」还能看到——语义含糊。
+  // 所以再问一次：连记录一起删，还是只清屏。
+  const sid=CLASS.sessionId||CLASS._recSid;
+  if(sid&&confirm('这些句子已存入「历史」记录。\n\n确定 = 连本节课的记录一起删除（不可恢复）\n取消 = 只清空屏幕，历史里仍然保留')){
+    for(const it of CLASS.items){if(it._id)await idbStore.del('transcripts',it._id).catch(()=>{})}
+    const left=await idbStore.byIndex('transcripts','sessionId',sid).catch(()=>[]);
+    if(!(left&&left.length))await idbStore.del('sessions',sid).catch(()=>{});
+    CLASS._clearedSid=sid;
+    toast('已清空（含本节课历史记录）');
+  }
   CLASS.items=[];
   if(classHistMode)classHistRender();else classRender();
 }
@@ -2663,9 +2790,24 @@ document.getElementById('classHistBtn').addEventListener('click',()=>setClassHis
 
 document.getElementById('classStartBtn').addEventListener('click',classStart);
 document.getElementById('classStopBtn').addEventListener('click',classStop);
+document.getElementById('classCalBtn').addEventListener('click',classCalibrate);
+classCalUi();
 document.getElementById('classSaveBtn').addEventListener('click',classSave);
 document.getElementById('classClearBtn').addEventListener('click',classClear);
 document.getElementById('classScrollBtn').addEventListener('click',()=>{CLASS.scrollOn=!CLASS.scrollOn;document.getElementById('classScrollBtn').textContent=CLASS.scrollOn?'⏸ 滚动':'▶ 已暂停';toast(CLASS.scrollOn?'自动滚动已恢复':'自动滚动已暂停')});
+// 按分隔符拼术语并卡上限。原先 join(...).slice(0,800) 可能正好切在一个术语中间，
+// 送进提示词就成了半截词，而用户完全不知道被截了——改为整条装不下就停。
+function classTermsJoin(list,sep,maxLen){
+  let out='';
+  for(const it of (list||[])){
+    const p=String(it==null?'':it).trim();
+    if(!p)continue;
+    if(!out){if(p.length>maxLen)return p.slice(0,maxLen);out=p;continue}
+    if(out.length+sep.length+p.length>maxLen)break;
+    out+=sep+p;
+  }
+  return out;
+}
 const classTermsGet=()=>ls('classTerms',[]);
 function classTermsRender(){
   const box=document.getElementById('classTermsList');if(!box)return;

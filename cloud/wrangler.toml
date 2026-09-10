@@ -4,6 +4,13 @@ name = "russian-app-proxy"
 main = "worker.js"
 compatibility_date = "2026-08-15"
 
+# 自定义域名：把整个 aimisi.top 绑到本 Worker（网页 + API 同域）
+# 位置很重要：routes 必须写在所有 [table] / [[table]] 之前，否则会被解析进上面那张表，
+# wrangler 会报 "Unexpected fields found in kv_namespaces[0]: routes"（路由仍可能生效，但配置是错的）
+routes = [
+  { pattern = "aimisi.top", custom_domain = true }
+]
+
 # DeepSeek 上游地址（如需中转改这里后重新 deploy）
 [vars]
 DS_BASE_URL = "https://api.deepseek.com"
@@ -25,8 +32,3 @@ directory = "../www"
 [[kv_namespaces]]
 binding = "KV"
 id = "e67311413df842de8188a7cc014a300f"
-
-# 自定义域名：把整个 aimisi.top 绑到本 Worker（网页 + API 同域）
-routes = [
-  { pattern = "aimisi.top", custom_domain = true }
-]
