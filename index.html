@@ -304,10 +304,32 @@ document.getElementById('srcLangBtn').addEventListener('click',e=>{e.stopPropaga
 document.querySelectorAll('#srcPopup button').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.langSrc=b.dataset.lang;if(S.langSrc===S.langTgt)S.langTgt=S.langSrc==='zh-CN'?'ru':'zh-CN';updateLangUI();document.getElementById('srcPopup').classList.remove('show');if(document.getElementById('trInput').value.trim())doTranslate()}));
 document.getElementById('tgtLangBtn').addEventListener('click',e=>{e.stopPropagation();document.getElementById('tgtPopup').classList.toggle('show');document.getElementById('srcPopup').classList.remove('show')});
 document.querySelectorAll('#tgtPopup button').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();S.langTgt=b.dataset.lang;if(S.langSrc===S.langTgt)S.langSrc=S.langTgt==='zh-CN'?'ru':'zh-CN';updateLangUI();document.getElementById('tgtPopup').classList.remove('show');if(document.getElementById('trInput').value.trim())doTranslate()}));
-document.getElementById('swapLang').addEventListener('click',()=>{const t=document.getElementById('trInput').value.trim();if(t){const d=detectLang(t);if(d==='ru'||d==='en'||d==='zh-CN'){const all=['ru','en','zh-CN'];S.langSrc=d;S.langTgt=all.find(l=>l!==d&&l!==S.langTgt)||(d==='zh-CN'?'en':'zh-CN')}else{[S.langSrc,S.langTgt]=[S.langTgt,S.langSrc]}}else{[S.langSrc,S.langTgt]=[S.langTgt,S.langSrc]}updateLangUI();if(t)doTranslate()});
+// ⇄ 交换：有译文时把译文搬进输入框、源/目标对调（同 Google 翻译语义），
+// 这样输入内容的语言永远等于新源语言，不会出现「源是俄语、译文出英语」的方向错乱。
+// 无译文（空输入 / 还没翻出结果）时才退回单纯的源目标互换。
+document.getElementById('swapLang').addEventListener('click',()=>{
+  const inp=document.getElementById('trInput'),t=inp.value.trim();
+  const tr=(S.result&&S.result.text)?String(S.result.text).trim():'';
+  if(t&&tr){
+    const prevSrc=S.langSrc;
+    inp.value=tr;
+    S.langSrc=S.langTgt;S.langTgt=prevSrc;
+    S.result=null;
+    document.getElementById('btnSpeak').disabled=true;
+    document.getElementById('charCount').textContent=inp.value.length;
+    updateLangUI();
+    doTranslate();
+  }else{
+    [S.langSrc,S.langTgt]=[S.langTgt,S.langSrc];
+    updateLangUI();
+    if(t)doTranslate();
+  }
+});
 document.addEventListener('click',()=>{document.getElementById('srcPopup').classList.remove('show');document.getElementById('tgtPopup').classList.remove('show')});
 function detectLang(t){if(/[а-яА-ЯёЁ]/.test(t))return'ru';if(/[一-鿿]/.test(t))return'zh-CN';return'en'}
-function autoSrcLang(t){const d=detectLang(t);if(S.langSrc!==d&&(d==='ru'||d==='en'||d==='zh-CN')){S.langSrc=d;updateLangUI()}}
+// 输入语言自动跟随内容。若跟随后源语言等于当前目标语言，把目标语言挪走，
+// 否则会退化出「俄语→俄语」这种翻不出结果的方向（旧版本曾在历史里存下这种状态）。
+function autoSrcLang(t){const d=detectLang(t);if(d!=='ru'&&d!=='en'&&d!=='zh-CN')return;const prev=S.langSrc;if(prev===d&&S.langTgt!==d)return;S.langSrc=d;if(S.langTgt===d)S.langTgt=(prev&&prev!==d)?prev:(d==='zh-CN'?'en':'zh-CN');updateLangUI()}
 
 function applyFont(v){const r=document.documentElement;r.style.setProperty('--fs',v+'px');r.style.setProperty('--fs-sm',Math.max(11,v-3)+'px');r.style.setProperty('--fs-xs',Math.max(9,v-5)+'px');S.settings.fontSize=v;save('settings')}
 
