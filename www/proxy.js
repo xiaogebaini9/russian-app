@@ -698,12 +698,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── 静态文件 ──
-  let filePath = url === '/' ? '/index.html' : url;
-  // 安全：防止目录遍历
-  filePath = path.normalize(filePath).replace(/^(\.\.(\/|\\|$))+/, '');
-  const fullPath = path.join(ROOT, filePath);
-
+  // ── 静态文件（白名单制：只放行页面资源；密钥/配置/.git 等一律 404）──
+  // 审计 P0-1 (2026-09-16)：此前任意存在的文件都可下载，keys.json/cloud.json/codes.json/.dev.vars 曾暴露
+  const STATIC_WHITELIST = ['/', '/index.html', '/style.css', '/sw.js', '/manifest.json',
+    '/privacy.html', '/clear-cache.html', '/voice-test.html', '/widget.html'];
+  if (!STATIC_WHITELIST.includes(url)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Not found');
+    return;
+  }
+  const fullPath = path.join(ROOT, url === '/' ? 'index.html' : url);
   const ext = path.extname(fullPath);
   const contentType = MIME[ext] || 'application/octet-stream';
 
