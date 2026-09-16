@@ -3030,16 +3030,7 @@ function classSegTextFor(seq,field){
   return its.map((it,i)=>field==='ru'?it.original:(it.translation||'')).filter(Boolean).join('\n\n');
 }
 // 段事件委托
-// 创建表单：开始录制
-document.getElementById('classNewGo').addEventListener('click',()=>{
-  const d=document.getElementById('classNewDate').value||new Date().toISOString().slice(0,10);
-  const sel=document.querySelector('#classNewTypes .class-type-btn[data-sel]');
-  const nm=document.getElementById('classNewName').value.trim();
-  CLASS.meta={date:d,type:sel?sel.dataset.t:'',name:nm};
-  document.getElementById('classNewForm').style.display='none';
-  classStart();
-});
-document.getElementById('classNewCancel').addEventListener('click',()=>{document.getElementById('classNewForm').style.display='none'});
+// v3：创建表单已在录制页 class-recorder.html，此处移除
 
 // 场次详情视图（从历史列表点标题进入）
 // ═══ 课堂 v3：主页（正方形卡网格 + 长按调色）═══
@@ -3209,33 +3200,8 @@ async function classOpenSessionDetail(sid){
   }));
 }
 
-document.getElementById('classSegs').addEventListener('click',async e=>{
-  const t=e.target.closest('button');if(!t)return;
-  const seq=parseInt(t.dataset.segcopyRu||t.dataset.segcopyCn||t.dataset.segplay||t.dataset.segexp);
-  if(isNaN(seq))return;
-  if(t.dataset.segcopyRu!==undefined){
-    const txt=classSegTextFor(seq,'ru');
-    if(!txt){toast('本段还没有原文');return}
-    navigator.clipboard.writeText(txt).then(()=>toast('已复制 录音'+seq+' 原文')).catch(()=>toast('复制失败'));
-  }else if(t.dataset.segcopyCn!==undefined){
-    const txt=classSegTextFor(seq,'cn');
-    if(!txt){toast('译文还没出来（段末批量翻译）');return}
-    navigator.clipboard.writeText(txt).then(()=>toast('已复制 录音'+seq+' 译文')).catch(()=>toast('复制失败'));
-  }else if(t.dataset.segplay!==undefined){
-    const seg=await recParts.getSeg((CLASS._recSid||'')+'_s'+String(seq).padStart(3,'0'));
-    if(!seg){toast('本段音频不在本机');return}
-    try{if(window._segAudio)window._segAudio.pause()}catch(err){}
-    window._segAudio=new Audio(URL.createObjectURL(seg.blob));window._segAudio.play();
-  }else if(t.dataset.segexp!==undefined){
-    const seg=await recParts.getSeg((CLASS._recSid||'')+'_s'+String(seq).padStart(3,'0'));
-    if(!seg){toast('本段音频不在本机');return}
-    const ext=(classMime||'').indexOf('mp4')>=0?'m4a':'webm';
-    const name='录音'+seq+'_'+new Date(seg.t0||Date.now()).toISOString().slice(0,10)+'.'+ext;
-    const file=new File([seg.blob],name,{type:seg.blob.type||classMime});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(err){if(err&&err.name==='AbortError')return}}
-    const url=URL.createObjectURL(seg.blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000);
-  }
-});
+// v3：段卡事件已移至 class-recorder.html（此处为 v2 残留，删除）
+
 // 创建表单逻辑
 function classNewFormInit(){
   const wrap=document.getElementById('classNewTypes');if(!wrap)return;
@@ -3364,30 +3330,8 @@ async function classHistRender(){
   el.innerHTML=html;
 }
 // 事件委托：课堂历史里的 返回/播放/复制/导出/删除 一次绑定
-document.getElementById('classBoard').addEventListener('click',async e=>{
-  const sessT=e.target.closest('[data-clsess]');
-  if(sessT){classOpenSessionDetail(sessT.dataset.clsess);return}
-  const t=e.target.closest('#classBackLive,.mini-chip');
-  if(!t)return;
-  if(t.id==='classBackLive'){setClassHist(false);return}
-  const sid=t.dataset.sid,act=t.dataset.act;
-  if(!sid)return;
-  const {sessions,byS}=await classHistData();
-  const session=sessions.find(s=>s.id===sid);
-  const items=byS[sid]||[];
-  if(act==='play'){const it=items[parseInt(t.dataset.i)];if(it)speak(it.original,'ru',.9)}
-  else if(act==='copy'){navigator.clipboard.writeText(classItemsToText(items)).then(()=>toast('已复制')).catch(()=>toast('复制失败'))}
-  else if(act==='md'){downloadMd('课堂记录_'+fmtTime(session.startTime).replace(/[: ]/g,'-')+'.md',classItemsToMarkdown(session,items));toast('已导出 Markdown')}
-  else if(act==='del'){
-    if(!confirm('删除这节课的全部记录？'))return;
-    await idbStore.del('sessions',sid).catch(()=>{});
-    await Promise.all(items.map(it=>idbStore.del('transcripts',it.id).catch(()=>{})));
-    await recParts.delRec(sid).catch(()=>{});
-    await recParts.delSegs(sid).catch(()=>{});   // 录音跟着这节课一起删
-    if(CLASS._recStoredSid===sid){CLASS._recBlob=null;CLASS._recStoredSid=null;const b=document.getElementById('classSaveRecBtn');if(b)b.style.display='none'}
-    classHomeRender();
-  }
-});
+// v3：历史板事件已由主页网格取代
+
 
 // v3：录制相关按钮已整体迁往 class-recorder.html；主页只保留网格/详情/调色
 // 按分隔符拼术语并卡上限。原先 join(...).slice(0,800) 可能正好切在一个术语中间，
@@ -3411,14 +3355,7 @@ function classTermsRender(){
   box.querySelectorAll('.class-term-del').forEach(b=>b.addEventListener('click',()=>{const a=classTermsGet();a.splice(parseInt(b.dataset.i),1);ss('classTerms',a);classTermsRender()}));
 }
 // v3：术语面板移至 class-recorder.html
-document.getElementById('classTermAdd').addEventListener('click',()=>{
-  const ru=document.getElementById('classTermRu').value.trim(),cn=document.getElementById('classTermCn').value.trim();
-  if(!ru||!cn){toast('两边都要填');return}
-  const a=classTermsGet();if(a.some(x=>x.ru===ru)){toast('该术语已存在');return}
-  a.push({ru,cn});ss('classTerms',a);
-  document.getElementById('classTermRu').value='';document.getElementById('classTermCn').value='';
-  classTermsRender();toast('术语已添加，翻译即刻生效');
-});
+// v3：术语添加已在录制页
 
 // ═══════════════════════════════════════════════════════════════
 //  APP SETTINGS
