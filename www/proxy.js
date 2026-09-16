@@ -671,6 +671,35 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── GigaAM PoC：双引擎同源样本对比（M4）──
+  if (req.method === 'GET' && url === '/api/poc-gigaam') {
+    (async () => {
+      try {
+        const fs2 = require('fs');
+        const wavPath = path.join(__dirname, 'whisper', 'test_en.wav');
+        if (!fs2.existsSync(wavPath)) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: '样本音频不存在' })); return; }
+        const buf = fs2.readFileSync(wavPath);
+        const run = async (engine) => {
+          const t = Date.now();
+          const r = await fetch('http://127.0.0.1:9000/transcribe?engine=' + engine, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: buf, signal: AbortSignal.timeout(180000) });
+          const d = await r.json();
+          if (d.error) throw new Error(d.error);
+          return { name: engine === 'gigaam' ? 'GigaAM v3 (ONNX)' : 'Whisper turbo (本机)', text: d.text || '', elapsed: (Date.now() - t) / 1000, confidence: d.confidence === null ? '—' : d.confidence };
+        };
+        const results = [];
+        results.push(await run('whisper'));
+        results.push(await run('gigaam'));
+        const withCf = results.find(r => typeof r.confidence === 'number');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, sample: 'test_en.wav (' + buf.length + ' bytes)', results }));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'PoC 失败：' + (e.message || e) + '（确认本机 whisper/stt_server.py 在运行）' }));
+      }
+    })();
+    return;
+  }
+
   // ── 系统自检 ──
   if (req.method === 'GET' && url === '/api/diagnose') {
     (async () => {
