@@ -15,3 +15,5 @@ cloud.json
 cloud/.dev.vars
 cloud/.wrangler/
 android/keystore/
+# 本地归档（audit P2-3 移出的历史 backup/archive）
+../russian-app-archive/
