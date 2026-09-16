@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>语音翻译模型选型对比 · 2026-09</title>
+<style>
+  :root{--bg:#fafbfb;--ink:#1a1d21;--ink2:#4a5158;--ink3:#6e7681;--hair:#d9dde2;--hair2:#e8ebef;--navy:#1e3a5f;--navy-ink:#16324f;--mono:"Consolas","SF Mono",monospace;--sans:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.65}
+  .canvas{max-width:1080px;margin:0 auto;padding:52px 36px 72px}
+  .kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  h1{font-size:36px;line-height:1.12;letter-spacing:-.02em;font-weight:600;margin:12px 0 10px}
+  .sub{font-size:16px;color:var(--ink2);max-width:720px}
+  .meta{margin:16px 0 0;display:flex;flex-wrap:wrap;gap:6px 26px;font-family:var(--mono);font-size:12px;color:var(--ink3)}
+  section{margin-top:44px}
+  .sec{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+  .no{font-family:var(--mono);font-size:12px;color:var(--navy)}
+  h2{font-size:21px;font-weight:600}
+  .rule{flex:1;height:1px;background:var(--hair)}
+  p{max-width:780px;color:var(--ink2);margin-top:8px}
+  p b,li b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0 6px}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink);font-weight:600}
+  td{padding:9px 10px 9px 0;border-bottom:1px solid var(--hair2);vertical-align:top;color:var(--ink2)}
+  td.k{color:var(--ink);font-weight:500;white-space:nowrap}
+  td .mono{font-family:var(--mono);font-size:11.5px}
+  tr.hl td{background:#eef2f7}
+  .verdict{border:1px solid var(--ink);padding:20px 22px;margin:18px 0}
+  .verdict h3{font-size:16px;font-weight:600;margin-bottom:8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;background:var(--hair);border:1px solid var(--hair);margin:16px 0}
+  .cell{background:var(--bg);padding:14px 16px}
+  .cell .t{font-weight:600;font-size:13.5px;color:var(--ink)}
+  .cell .d{font-size:12.5px;color:var(--ink2);margin-top:4px}
+  ul{margin:10px 0 4px 18px;max-width:760px}
+  li{color:var(--ink2);margin-top:5px}
+  .colo{margin-top:50px;padding-top:18px;border-top:2px solid var(--ink);font-size:12px;color:var(--ink3)}
+  .colo p{max-width:none;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="kicker">选型调研 · 课堂语音翻译链路（俄语 ASR → 中文翻译）</div>
+  <h1>要不要换模型：三档对比</h1>
+  <p class="sub">结论先行：翻译环节不用换——DeepSeek 在中文输出质量榜领先且价格最低，课堂规模下每次翻译成本约 1–3 厘钱；语音识别短期不用换——Whisper turbo 是多语言开源里综合最优，俄语专用升档可等 GigaAM v3 本机 PoC。本文给出免费 / 性价比 / 收费三档的可换项、真实价格与触发条件。</p>
+  <div class="meta"><span>调研日期 <b>2026-09-16</b></span><span>当前栈 <b>Whisper large-v3-turbo + DeepSeek V4 Flash</b></span><span>场景 <b>课堂 1–4h 俄语语音 → 中文</b></span></div>
+
+  <section>
+    <div class="sec"><span class="no">01</span><h2>你现在的链路在什么水平</h2><span class="rule"></span></div>
+    <table>
+      <tr><th>环节</th><th>现状</th><th>俄语/中文质量基准</th><th>成本（4 小时课堂）</th></tr>
+      <tr class="hl"><td class="k">语音识别</td><td>Whisper large-v3-turbo（Cloudflare Workers AI 免费额度 / 本机 CUDA）</td><td>俄语 WER ≈ <span class="mono">12.5%</span>（HSE 基准：large-v3 12.45% / turbo 12.51%，几乎持平）</td><td>¥0（免费额度内）</td></tr>
+      <tr class="hl"><td class="k">翻译</td><td>DeepSeek V4 Flash → deepseek-chat 回退；Llama-3.3-70B 免费兜底</td><td>简体中文输出质量 LLM 榜第一（Alconost 2026-05 基准）；术语/口语规整/JSON 模式全支持</td><td>约 ¥0.05–0.15（估算，批量按段后更低）</td></tr>
+    </table>
+    <p>两个环节都已经处在"开源免费档的最优解"或"全市场最低价"上。换模型的收益空间：俄语识别 WER 还有 <b>2–4 倍</b>的下探余地（换俄语专用模型），翻译质量上限提升有限且都要付美元。</p>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">02</span><h2>语音识别（俄语 ASR）三档对比</h2><span class="rule"></span></div>
+    <table>
+      <tr><th>档位</th><th>方案</th><th>俄语质量</th><th>价格</th><th>国内可达</th><th>接入成本</th></tr>
+      <tr class="hl"><td class="k">免费档<br>（现状=最优）</td><td>Whisper turbo：Cloudflare Workers AI 免费额度 + 本机 faster-whisper CUDA</td><td>WER ≈ 12.5%；术语注入/防幻听参数已调好</td><td>¥0（CF 每日免费 neurons；本机走自己显卡）</td><td>✅ Cloudflare 国内可达</td><td>0（已上线）</td></tr>
+      <tr><td class="k">性价比档<br>（俄语特化）</td><td><b>GigaAM v3</b>（Sber 开源，俄语专用）本机部署，与 Whisper 并跑</td><td>俄语 WER 比 Whisper 好 <b>≈2–4 倍</b>（70 万小时俄语预训练）；电话音/非典型语音鲁棒性官方数据强；仅俄语、无翻译、无多语言</td><td>¥0 开源自部署；本机 RNNT 版很轻，3060 无压力</td><td>✅ 本地运行无网络依赖</td><td>中：改 stt_server 支持双模型 + PoC 实测 WER</td></tr>
+      <tr><td class="k">收费档</td><td>Deepgram Nova-3（流式）／AssemblyAI Universal-3.5 Pro（批）／OpenAI gpt-4o-transcribe</td><td>英文 WER 5–10% 区间；<b>俄语 WER 官方未公布，需实测</b>；支持关键词注入但术语系统不如现在的 prompt 注入深</td><td>Nova-3 ≈ $0.0043–0.0048/min（≈$0.26–0.29/h）；AAI $0.21/h（2026-08 降价）；4o-transcribe $0.006/min。4h 课 $0.84–1.44</td><td>⚠️ 三家均为美国 API，国内直连不稳定，需代理中转</td><td>中高：新 SDK + 计费 + 中转部署</td></tr>
+      <tr><td class="k">国产 wildcard</td><td>智谱 GLM-ASR-2512（已开源 + API）</td><td>中文 CER 领先；多语种官方称领先，<b>俄语实测数据未获取</b>（定价页本次抓取失败，缺口标注）</td><td>API 定价待核实；开源可自部署</td><td>✅ 国内原生</td><td>中：PoC 后决定</td></tr>
+    </table>
+    <p><b>判断</b>：免费档（现状）没有可换的必要——你在零成本上已经拿下了开源多语言模型里俄语最好的档位之一。真正值得做的动作是 GigaAM v3 本机 PoC：它只做一件事（俄语→文字）但把俄语错误率再压 2–4 倍，且与现有 faster-whisper 管道共存（stt_server 双模型，设置页加开关）。商业 API 档对你<b>当前场景不成立</b>：花钱买不到已验证的俄语收益，还引入国内可达性风险。</p>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">03</span><h2>翻译（俄→中）三档对比</h2><span class="rule"></span></div>
+    <table>
+      <tr><th>档位</th><th>方案</th><th>中文质量</th><th>价格</th><th>结论</th></tr>
+      <tr class="hl"><td class="k">性价比档<br>（现状=最优）</td><td>DeepSeek V4 Flash</td><td>简体中文输出 LLM 榜第一（中文先验优势）；JSON 模式 + 术语表 + 噪声识别已深度集成</td><td>$0.14/M 输入、$0.28/M 输出（离峰更低）；课堂级用量几乎免费</td><td><b>不换</b></td></tr>
+      <tr><td class="k">免费档</td><td>MyMemory / LibreTranslate / Google gtx / Workers AI Llama-70B（四级兜底已上线）</td><td>机翻水平，直译腔、无术语控制、无口语规整</td><td>¥0</td><td>已定位为兜底层，不承担主翻译</td></tr>
+      <tr><td class="k">收费档</td><td>GPT-4o / Claude / Gemini；DeepL Pro</td><td>GPT-4o 技术文档类强；DeepL 欧洲语对最强但<b>俄→中不构成优势</b>；LLM 中文普遍不敌 DeepSeek</td><td>GPT-4o-mini $0.15/M 输入起，正档数倍于 DeepSeek；DeepL ≈ $25+/百万字符</td><td>无收益，仅当 DeepSeek 长期不稳定时备选</td></tr>
+    </table>
+    <p><b>判断</b>：翻译环节 DeepSeek 就是当前市场的"性价比档天花板"——中文输出质量第一 + 全场最低价 + 你的提示词工程（规整/术语/防噪声）全押在它身上。换任何一家都是花钱买质量下降。唯一值得留的保险丝是厂商级回退（比如配置一家国产 LLM 做灾难备胎），优先级低于 GigaAM PoC。</p>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">04</span><h2>决策建议</h2><span class="rule"></span></div>
+    <div class="verdict">
+      <h3>现在换吗？—— 不换。做两件低成本的事：</h3>
+      <ul>
+        <li><b>翻译：维持 DeepSeek</b>。等 5 分钟分段方案落地后按段批量翻译，成本再降一半，译文质量还会因为"整段上下文"更好。</li>
+        <li><b>识别：排期 GigaAM v3 本机 PoC（半天）</b>。下载 RNNT 版 → stt_server 加双模型开关 → 用你的真实课堂录音跑同段对比（WER 抽查 + 幻听率 + 速度）→ 数据说话：赢就上"本机高质量档"，输就继续 Whisper。</li>
+        <li><b>商业 API 档：观察不动</b>。触发条件只有两个——用户规模大到本机/CF 免费额度不够用，或出现"必须云端流式低延迟"的新需求；届时优先测国内可达的 GLM-ASR，而不是美国三家的中转。</li>
+      </ul>
+    </div>
+    <div class="grid">
+      <div class="cell"><div class="t">免费档 = 现状</div><div class="d">Whisper turbo（CF 免费+本机）+ 四级免费翻译兜底。¥0 成本已把开源多语言方案做到位。</div></div>
+      <div class="cell"><div class="t">性价比档 = 现状 + GigaAM PoC</div><div class="d">翻译不动（已是天花板）；俄语 ASR 用开源专用模型再压 2–4 倍 WER，零 API 成本。</div></div>
+      <div class="cell"><div class="t">收费档 = 观察位</div><div class="d">Deepgram/AssemblyAI/4o-transcribe 俄语未验证 + 国内不可达；GLM-ASR 待定价核实。当前无付费理由。</div></div>
+    </div>
+  </section>
+
+  <div class="colo">
+    <p><b>来源与缺口</b>：俄语 WER 基准来自 HSE 本地模型评测（Whisper large-v3 12.45% / turbo 12.51%）与 vc.ru 2025-11 GigaAM v3 报道（对 Whisper ≈4 倍优势、障碍语音 20.6% vs 59.3%）；GigaAM 训练数据（70 万小时）来自 Habr 2026-06 与 salute-developers/GigaAM 官方仓库。商用 API 定价：Deepgram Nova-3 $0.0043–0.0048/min、AssemblyAI Universal-3.5 Pro $0.21/h（2026-08 降价）、gpt-4o-transcribe $0.006/min（Retell 2026-09-03、VexaScribe 2026、DigitalApplied 2026-08 多源一致）；英文 WER 来自 AssemblyAI 官方基准页。翻译质量榜：Alconost 2026-05（DeepSeek 简体中文第一）、IntlPull 2026-01（DeepL 欧洲语对最强）。DeepSeek 定价：官方 api-docs.deepseek.com + CloudZero/TLDL 2026-07（V4 Flash $0.14/M 输入）。Cloudflare Workers AI 免费额度（每日 10,000 neurons）已直接核实官方定价页。<b>缺口</b>：商业 API 的俄语 WER 无公开基准（需实测）；GLM-ASR 俄语质量与 API 定价页本次未抓取成功（连接被重置），如考虑该档需补查。</p>
+  </div>
+</div>
+</body>
+</html>

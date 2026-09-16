@@ -1069,6 +1069,7 @@ async function route(request, env, ctx, path) {
     if (body === undefined) return json({ error: '请求体格式错误' }, 400);
     const text = String(body.text || '');
     const terms = String(body.terms || '').slice(0, 800);
+    const batch = !!body.batch; // 课堂 v2：按段批量（一次调用翻译整段，1 次额度）
     if (!text.trim()) return json({ error: '文本为空' });
     // 登录用户的课堂走专属逻辑（体验句数/套餐额度）；匿名照旧走接入码/设备试用
     const acct = await resolveAccount(env, request);
@@ -1115,8 +1116,8 @@ async function route(request, env, ctx, path) {
 {"original":"规整后的原文","translation":"中文翻译","note":"术语注释（如有难译术语，无则空字符串）"}
 
 如果听不清或文本不完整，original保留原样，translation翻译能听懂的部分，note注明"音频不完整"。` },
-      { role: 'user', content: text + (terms ? '\n\n[课程术语表，这些词的中文翻译必须采用：' + terms + ']' : '') }
-    ], 3000, 30000);
+      { role: 'user', content: (batch ? '[批翻译模式]输入是多行俄语（每行一句）。逐行翻译：输出同样行数的中文，第 i 行对应第 i 行，不要合并、不要增删行。\n\n' : '') + text + (terms ? '\n\n[课程术语表，这些词的中文翻译必须采用：' + terms + ']' : '') + (batch ? '\n\n[上下文]前文参考（只用于理解指代，不要翻译输出）：\n' + String(body.context || '').slice(0, 600) : '') }
+    ], batch ? 6000 : 3000, 60000);
     if (parsed && (parsed.original || parsed.translation)) {
       parsed._model = model === 'deepseek-v4-flash' ? 'DeepSeek V4 Flash' : 'DeepSeek Chat';
       if (access.classroomTrial) {

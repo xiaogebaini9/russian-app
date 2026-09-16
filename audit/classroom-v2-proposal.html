@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>课堂录音 · 5 分钟分段方案</title>
+<style>
+  :root{--bg:#fafbfb;--ink:#1a1d21;--ink2:#4a5158;--ink3:#6e7681;--hair:#d9dde2;--hair2:#e8ebef;--navy:#1e3a5f;--navy-ink:#16324f;--mono:"Consolas","SF Mono",monospace;--sans:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.65}
+  .canvas{max-width:1040px;margin:0 auto;padding:52px 36px 72px}
+  .kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.02em;font-weight:600;margin:12px 0 10px}
+  .sub{font-size:16px;color:var(--ink2);max-width:680px}
+  .meta{margin:18px 0 0;display:flex;flex-wrap:wrap;gap:6px 26px;font-family:var(--mono);font-size:12px;color:var(--ink3)}
+  section{margin-top:44px}
+  .sec{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+  .no{font-family:var(--mono);font-size:12px;color:var(--navy)}
+  h2{font-size:21px;font-weight:600}
+  .rule{flex:1;height:1px;background:var(--hair)}
+  p{max-width:760px;color:var(--ink2);margin-top:8px}
+  p b, li b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0 6px}
+  th{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:8px 12px 8px 0;border-bottom:1px solid var(--ink);font-weight:600}
+  td{padding:9px 12px 9px 0;border-bottom:1px solid var(--hair2);vertical-align:top;color:var(--ink2)}
+  td.k{color:var(--ink);font-weight:500;white-space:nowrap}
+  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 7px;border:1px solid var(--navy);color:var(--navy-ink);white-space:nowrap}
+  .tag.dim{border-color:var(--hair);color:var(--ink3)}
+  .tag.fill{background:var(--navy);border-color:var(--navy);color:#fafbfb}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;background:var(--hair);border:1px solid var(--hair);margin:16px 0}
+  .cell{background:var(--bg);padding:14px 16px}
+  .cell .t{font-weight:600;font-size:13.5px;color:var(--ink)}
+  .cell .d{font-size:12.5px;color:var(--ink2);margin-top:4px}
+  .flow{border-left:1px solid var(--hair);margin:16px 0}
+  .step{display:flex;gap:18px;padding:12px 0 12px 22px;border-bottom:1px solid var(--hair2);position:relative}
+  .step::before{content:"";position:absolute;left:-3px;top:19px;width:5px;height:5px;background:var(--navy)}
+  .step .w{flex:0 0 70px;font-family:var(--mono);font-size:11.5px;color:var(--navy);padding-top:2px}
+  .step .b b{font-size:14px}
+  .step .b .d{font-size:13px;color:var(--ink3);margin-top:2px}
+  .warn{border:1px solid var(--ink);padding:18px 20px;margin:16px 0}
+  .warn h3{font-size:15px;font-weight:600;margin-bottom:6px}
+  .warn p{max-width:none}
+  .colo{margin-top:52px;padding-top:18px;border-top:2px solid var(--ink);font-size:12px;color:var(--ink3)}
+  code{font-family:var(--mono);font-size:12.5px;background:#eef1f4;padding:1px 5px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="kicker">功能方案 · 课堂录音 v2 · <span style="color:var(--navy)">先方案后实施</span></div>
+  <h1>课堂 5 分钟分段翻译</h1>
+  <p class="sub">按「新建翻译 → 记录日期与课程类型 → 5 分钟一段自动切 → 每段可独立复制/导出 → 本地保存」重做课堂录音；一场课上限 4 小时（48 段）。本文同时回答：现有每个功能的作用、语音模型的质量评估。</p>
+  <div class="meta"><span>对象 <b>russian-app 课堂模块</b></span><span>现状基线 <b>commit 0191055</b></span><span>日期 <b>2026-09-16</b></span></div>
+
+  <section>
+    <div class="sec"><span class="no">01</span><h2>现状：一堂课最长能录多久</h2><span class="rule"></span></div>
+    <p>代码里<b>没有硬性时长上限</b>——理论上可以一直录。但真实上限由四个隐性约束决定：</p>
+    <table>
+      <tr><th>约束</th><th>数值</th><th>后果</th></tr>
+      <tr><td class="k">字幕板句数</td><td>最多保留 200 句（超出丢弃最旧）</td><td>一堂 4 小时课约 500–1000 句，屏幕上看不到一半</td></tr>
+      <tr><td class="k">全程录音收尾</td><td>结束时把全部分片拼成一个 Blob（4h ≈ 140MB）</td><td>手机上有 OOM 风险，收尾可能几十秒到卡死</td></tr>
+      <tr><td class="k">翻译配额</td><td>接入码 100 次/日；登录体验 75 句/终身</td><td>逐句翻译下 4 小时课必然超额停翻</td></tr>
+      <tr><td class="k">识别积压</td><td>同时只允许 6 段在飞，积压 >6 转课后补识（上限 30 段）</td><td>网络差时大量句子只能课后补</td></tr>
+    </table>
+    <p>结论：<b>现状舒适区约 1–1.5 小时</b>；要稳定支持 4 小时，必须分段——这正是本方案的核心。</p>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">02</span><h2>现有功能逐个讲解</h2><span class="rule"></span></div>
+    <div class="grid">
+      <div class="cell"><div class="t">🎙️ 开始录音 / ⏹ 停止</div><div class="d">启动/结束整堂课。录满 60 秒或静音 1.2 秒自动切一段送去识别；停止后自动把全程录音存进本机 IndexedDB，并对失败段用精修模式重试。</div></div>
+      <div class="cell"><div class="t">📖 术语</div><div class="d">维护「俄语术语 → 中文译法」表（最多 60 条）。注入识别与翻译两个环节，保证«морфология»这类专名整节课译法统一。</div></div>
+      <div class="cell"><div class="t">⏸ 滚动</div><div class="d">暂停/恢复字幕板自动滚动。想往上回看某句时点一下，滚到底自动恢复。</div></div>
+      <div class="cell"><div class="t">📚 历史</div><div class="d">字幕板 ↔ 历史页切换。历史按场次列出：展开可回看逐句、🔊 朗读原文、📋 复制全文、⬇️ 导出 Markdown、🗑 删除（连录音一起删）。</div></div>
+      <div class="cell"><div class="t">🎚 校准</div><div class="d">静音门限校准：点开始后采样教室底噪几秒，太吵的环境调高门限防"幻听"，太安静调低防漏句。</div></div>
+      <div class="cell"><div class="t">💾 复制本课记录</div><div class="d">把当前字幕板的「序号+时间+原文+译文+警示」整体复制到剪贴板，贴进微信/备忘录。</div></div>
+      <div class="cell"><div class="t">📼 回放重翻</div><div class="d">选一段录音文件（或本课录音），按 20–30 秒大块重新用精修模式（beam=10 + 术语 + 前文上下文）翻译，补回实时模式的漏句。</div></div>
+      <div class="cell"><div class="t">🧹 清空</div><div class="d">两层确认：只清屏幕 / 连本节课历史与录音一起删（不可恢复）。</div></div>
+      <div class="cell"><div class="t">💾 保存课堂录音</div><div class="d">课堂结束后出现。把全程录音（m4a/webm）通过系统分享或下载导出到手机本地。</div></div>
+      <div class="cell"><div class="t">状态区</div><div class="d">识别引擎（☁️ 云 Whisper / 💻 本地）、句数、剩余额度、屏幕常亮提示、失败重试进度。</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">03</span><h2>语音模型质量与稳定性评估</h2><span class="rule"></span></div>
+    <table>
+      <tr><th>环节</th><th>用的什么</th><th>质量判断</th><th>稳定性判断</th></tr>
+      <tr><td class="k">语音识别</td><td>Whisper large-v3-turbo（云端 Workers AI；本机同款 CUDA 版）</td><td><b>良好但非顶级</b>。turbo 是蒸馏模型，清晰近讲俄语错误率低；远场、多人插话、专业术语场景明显变差。置信度 &lt; -0.8 的句已自动标 ⚠️。静音幻听（you / Thank you）已用 VAD + 固定俄语 + 反幻觉参数根治。</td><td>好。免费、无单机依赖；固定 language=ru 后不再猜语种；vad_filter + condition_on_previous_text=false 防幻觉传染。</td></tr>
+      <tr><td class="k">翻译</td><td>DeepSeek V4 Flash（主）→ deepseek-chat（备）；另有 Llama-3.3-70B 免费兜底（今天新增）</td><td><b>强项</b>。规整口语 + 术语统一 + 噪声识别一条 prompt 完成；长难句偶有直译腔，课堂场景足够。</td><td>中。DeepSeek 是单点（有模型回退无厂商回退）；按次计费，长课配额是硬约束。</td></tr>
+      <tr><td class="k">精修重试</td><td>beam=10 + 术语 + 前文 prompt</td><td>比实时档明显更准，适合课后兜底。</td><td>好。失败段课后自动重跑，不丢内容。</td></tr>
+    </table>
+    <p><b>总评</b>：参数层经过 11+ 轮实战修复（见 开发经验清单.md），课堂场景达到了"能整节课用"的水平；天花板在 <b>手机麦克风拾音距离</b>（建议放讲台方向 3 米内）与 <b>翻译配额</b>。最大的结构风险是"超长单场"——一次收尾失败可能威胁整堂课的产出，分段化正好解决。</p>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">04</span><h2>方案：新建翻译 + 5 分钟分段</h2><span class="rule"></span></div>
+
+    <div class="flow">
+      <div class="step"><div class="w">入口</div><div class="b"><b>「➕ 开始创建新翻译」替换现在的裸「开始录音」</b><div class="d">弹出创建卡：日期（默认今天）、课程类型（预设：语法 / 听力 / 口语 / 阅读 / 写作 / 文学 + 自定义输入）、课程名（可选）。确认后进入录制页，顶栏常显「日期 · 类型 · 已录时长」。</div></div></div>
+      <div class="step"><div class="w">录制中</div><div class="b"><b>识别与字幕照旧（60 秒 VAD 细粒度），新增 5 分钟"录音文件"硬切</b><div class="d">每满 300 秒把该窗口的音频落成一条分段记录「录音N」（N=1,2,3…），字幕按时间戳归入所属段。正在录的段显示进度条与倒计时。段与段切换无感（识别链不中断）。</div></div></div>
+      <div class="step"><div class="w">每段完成</div><div class="b"><b>「录音1」卡片出现在字幕板上方</b><div class="d">卡片含：时间段（14:05–14:10）、句数、🀄 复制原文（该段全部俄语原文）、🀄 复制译文（该段全部中文）、▶ 试听本段音频、⬇️ 导出本段音频文件（m4a，系统分享/下载到本地）。</div></div></div>
+      <div class="step"><div class="w">配额</div><div class="b"><b>翻译从"逐句计费"改为"按段批量计费"（默认）</b><div class="d">每段结束时把整段原文一次性翻译（1 次额度产出全段译文），4 小时 = 48 次额度，稳稳落在 100 次/日之内。逐句实时翻译保留为设置项（适合短课）。段内先出俄语原文，段末中文刷新——延时可接受（≤5 分钟）。</div></div></div>
+      <div class="step"><div class="w">上限</div><div class="b"><b>一场课 4 小时硬上限（48 段）</b><div class="d">3h50min 起每 10 分钟提醒；4 小时自动收尾并提示"请创建新翻译继续"。分段化后单段最大 5 分钟，收尾不再有大 Blob 拼接，OOM 风险消除。</div></div></div>
+      <div class="step"><div class="w">界面</div><div class="b"><b>《课堂录音》改版为三层</b><div class="d">列表页（所有场次卡：日期·类型·时长·段数·句数，进入/复制/导出/删除）→ 详情页（该场分段列表 + 完整字幕）→ 录制页（现行字幕板 + 段卡 + 元信息栏）。历史按钮保留，作为详情页的快捷入口。</div></div></div>
+      <div class="step"><div class="w">本地保存</div><div class="b"><b>数据全部落 IndexedDB（现有 russian_app_rec 库扩展）</b><div class="d">sessions 表加 date / courseType / courseName（字段已预留）/ segments[]；新增 segments 表存每段音频 Blob（≤5 分钟 ≈ 3–7MB/段）。整场导出 = 逐段导出或导出 Markdown 全文。</div></div></div>
+    </div>
+
+    <div class="warn">
+      <h3>关键取舍说明</h3>
+      <p>① <b>为什么按段批量翻译而不是继续逐句</b>：逐句是配额杀手（4h≈600+ 次 > 100/日），批量后 4h=48 次；代价是译文延迟最多 5 分钟。② <b>为什么录音文件切 5 分钟而识别仍按 60 秒</b>：识别粒度影响的是准确率与时效，存储粒度影响的是可靠性与管理，两者解耦改动最小、互不拖累。③ <b>不自动上传</b>：音频与文本全程只存本机，导出动作由用户触发，与现有隐私声明一致。</p>
+    </div>
+
+    <p><b>工作量预估</b>：数据模型 + 创建表单 + 5 分钟切分 + 段卡 UI ≈ 1.5–2 天；批量翻译改造 ≈ 0.5 天；界面三层改版与回归 ≈ 1 天。建议一次发版走完，灰度顺序：先列表/详情页（纯增量）→ 再切分逻辑 → 最后切批量翻译。</p>
+  </section>
+
+
+  <section>
+    <div class="sec" style="margin-top:44px"><span class="no" style="font-family:Consolas,monospace;font-size:12px;color:var(--navy)">05</span><h2 style="font-size:21px;font-weight:600">边界切分与质量保障（Q&amp;A）</h2><span style="flex:1;height:1px;background:var(--hair)"></span></div>
+    <p style="max-width:780px;color:var(--ink2)">问：5 分钟硬切会不会漏单词、拉低翻译质量？答：<b>不会</b>——5 分钟只切「录音文件」的存储分桶，识别与翻译走的是另一条「静音切分」的流。两条流的关系与三条真实风险如下。</p>
+    <table style="margin-top:12px">
+      <tr><th>风险</th><th>场景</th><th>对策（已纳入实现）</th></tr>
+      <tr><td class="k">60 秒兜底硬切</td><td>连续讲话 60 秒无停顿，边界句可能被切在从句中间</td><td>改「软切窗口」：满 50 秒后等第一个静音点再切（上限 60 秒）</td></tr>
+      <tr><td class="k">段文件首尾 ±200ms</td><td>导出的录音1 开头/结尾半秒不干净</td><td>仅影响试听；导出时按静音数据对齐切点</td></tr>
+      <tr><td class="k">段边界丢上下文</td><td>«Это третий случай…» 指代上一段的案例</td><td>批量翻译自动携带前段最后 2–3 句作上下文（复用回放精修的前文注入机制）</td></tr>
+    </table>
+    <p style="max-width:780px;color:var(--ink2)">既有保险继续生效：术语表全程注入（专名词跨段译法不变）；置信度 &lt;-0.8 自动标 ⚠️，课后回放用 beam=10 精修兜底。</p>
+  </section>
+  <div class="colo">基于 commit 0191055 代码现状（CLASS_SEG_MAX_MS=60000、classStashChunk 分片、sessions.courseName 已预留）制定 · 2026-09-16 · 确认后实施</div>
+</div>
+</body>
+</html>

@@ -133,6 +133,22 @@ if(t==='ink'||t==='amber'){
           <button id="classStopBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--input);color:var(--text2);border:1.5px solid var(--border)" disabled>⏹ 停止</button>
           <button id="classSaveRecBtn" style="display:none;flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:12px;font-weight:700;background:var(--green);color:#fff;border:none">💾 保存录音</button>
         </div>
+        <!-- 课堂 v2：创建新翻译表单（点 classNewBtn 展开） -->
+        <div id="classNewForm" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:8px">➕ 创建新翻译</div>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <input id="classNewDate" type="date" style="flex:1;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
+            <input id="classNewName" placeholder="课程名（可选）" style="flex:1.4;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
+          </div>
+          <div id="classNewTypes" class="class-type-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px">
+            <button id="classNewGo" style="flex:1;padding:9px 0;border-radius:8px;font-size:12.5px;font-weight:700;background:var(--blue);color:#fff;border:none;cursor:pointer">开始录制</button>
+            <button id="classNewCancel" style="padding:9px 14px;border-radius:8px;font-size:12px;background:var(--input);color:var(--text2);border:1.5px solid var(--border);cursor:pointer">取消</button>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:6px">每 5 分钟自动存一条「录音N」，一堂课最长 4 小时（48 段）</div>
+        </div>
+        <!-- 课堂 v2：段卡列表（录音N） -->
+        <div id="classSegs" style="display:none;margin-bottom:8px"></div>
         <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:6px" id="classHint">
           说俄语 → 自动转文字 → 翻译显示。识别引擎：<b id="classEngine">检测中…</b>
         </div>
@@ -2081,7 +2097,7 @@ window.idbStore=(function(){
 // 若另一个标签页还持有旧连接会一直阻塞（IndexedDB 的经典坑），而这个库只有本页在用。
 // 另外两处都挂 onversionchange 主动断开，这样即使开了多个标签页也不会把升级卡死。
 window.recParts=(function(){
-  const DB='russian_app_rec',ST='parts',RST='recordings',VER=2;
+  const DB='russian_app_rec',ST='parts',RST='recordings',SG='segs',VER=3;
   let _db=null;
   function open(){
     if(_db)return Promise.resolve(_db);
@@ -2094,6 +2110,7 @@ window.recParts=(function(){
           s.createIndex('sessionId','sessionId',{unique:false});
         }
         if(!db.objectStoreNames.contains(RST))db.createObjectStore(RST,{keyPath:'id'});
+        if(!db.objectStoreNames.contains(SG)){const sg=db.createObjectStore(SG,{keyPath:'id'});sg.createIndex('sessionId','sessionId',{unique:false});}
       };
       rq.onsuccess=()=>{
         const db=rq.result;
@@ -2129,6 +2146,11 @@ window.recParts=(function(){
     getRec:(id)=>run(RST,'readonly',os=>os.get(id)),
     listRecs:()=>run(RST,'readonly',os=>os.getAll()),
     delRec:(id)=>run(RST,'readwrite',os=>os.delete(id)),
+    // ── 课堂 v2：分段库（segs）──
+    putSeg:(v)=>run(SG,'readwrite',os=>os.put(v)),
+    getSeg:(id)=>run(SG,'readonly',os=>os.get(id)),
+    segBySession:(sid)=>run(SG,'readonly',os=>os.index('sessionId').getAll(sid)),
+    delSegs:(sid)=>run(SG,'readwrite',os=>{const rr=os.index('sessionId').getAll(sid);rr.onsuccess=()=>{(rr.result||[]).forEach(x=>os.delete(x.id))}}),
     _dbName:DB,
   };
 })();
@@ -2187,7 +2209,16 @@ function genId(){return Date.now().toString(36)+Math.random().toString(36).slice
 function fmtTime(ts){const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function fmtTimeShort(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')}
 
-const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0,finalizing:false,_recStoredSid:null};
+const CLASS={running:false,rec:null,items:[],pending:'',sessionId:null,scrollOn:true,dropped:0,finalizing:false,_recStoredSid:null,
+  // ── 课堂 v2：场次元数据 + 分段状态 ──
+  meta:null,            // {date,type,name} 创建表单收集
+  segSeq:0,             // 已完成的 5 分钟段数（=当前段号-1）
+  _segT0:0,             // 当前 5 分钟窗口起点
+  _segChunks:[],_segBytes:0,_segBroken:false,_segFlush:Promise.resolve(),
+  batchTr:ls('classBatchTr',1),  // 按段批量翻译（默认开）；逐句实时=0
+  _pendingItems:[],     // 批量模式下暂存本段待翻句子
+  view:'live'           // live=录制页 list=场次列表 detail=场次详情
+};
 let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[],classSegT0=0;
 // classFailedChunks 的元素是 {b:Blob,ts:该段在录音里的真实时刻}，补识时用它把句子插回原位（不是补到末尾）
 
@@ -2200,7 +2231,62 @@ const CLASS_MEM_MAX=8*1024*1024;
 // 一直在讲话、始终没有 1200ms 静音时，实时段会无限增长 —— 客户端 120s 超时和服务端 8MB
 // 都会先炸，整段内容就白录了。给一个硬上限，到点切一刀。
 const CLASS_SEG_MAX_MS=60000;
+// 课堂 v2：5 分钟录音分段（只切录音文件，不切识别流）+ 4 小时上限
+const CLASS_SEG_WINDOW_MS=300000,CLASS_MAX_SEGS=48;
 let classMemBytes=0,classPartSeq=0,classPartsFlushed=0,classPartsBroken=false,classPartFlush=Promise.resolve();
+// 课堂 v2：5 分钟窗口分桶。原始块先照旧进 classStashChunk（整课备份），
+// 同时追加进当前段桶；段满 300s 由 segTick 落库出卡。识别流完全不受影响。
+let _segBlobsBroken=false;
+function classSegAppend(b){
+  if(!CLASS.running||!CLASS._segT0)return;
+  CLASS._segChunks.push(b);CLASS._segBytes+=(b.size||0);
+}
+function classSegRotate(){
+  // 把当前段桶落库为「录音N」，开新桶
+  const seq=CLASS.segSeq+1;
+  const blob=new Blob(CLASS._segChunks,{type:classMime});
+  CLASS._segChunks=[];CLASS._segBytes=0;
+  if(blob.size>1024){
+    const sid=CLASS._recSid,t0=CLASS._segT0,t1=Date.now();
+    const seg={id:sid+'_s'+String(seq).padStart(3,'0'),sessionId:sid,seq:seq,t0:t0,t1:t1,blob:blob,text:'',translation:''};
+    classPartFlush=classPartFlush.then(()=>recParts.putSeg(seg)).catch(()=>{});
+    classSegCardUpsert(seq,t0,t1,blob.size);
+    CLASS.segSeq=seq;
+    toast('💾 录音'+seq+' 已保存（5 分钟）');
+  }
+  // 段末批量翻译：整段原文一次调用（1 次额度），译文回填字幕+段卡
+  if(CLASS.batchTr&&CLASS._pendingItems.length){
+    const pend=CLASS._pendingItems.splice(0);
+    const segSeqLocal=seq;
+    const fullText=pend.map(x=>x.text).join('\n');
+    const prevTail=CLASS.items.filter(x=>x.translation).slice(-2).map(x=>x.original+' → '+x.translation).join('\n');
+    classTranslate(fullText).then(r=>{
+      // 译文按行拆回各句（行数不齐时整段塞进段卡）
+      const lines=(r.translation||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+      pend.forEach((x,i)=>{
+        const it=CLASS.items.find(y=>y._id===x.id);
+        if(it){it.original=r.original&&lines.length===pend.length?(lines[i]&&it.original||it.original):it.original;
+          it.translation=lines.length===pend.length?(lines[i]||''):r.translation;
+          if(it._id&&CLASS.sessionId)idbStore.put('transcripts',{id:it._id,sessionId:CLASS.sessionId,timestamp:it._ts,original:it.original,translation:it.translation,note:it.note||'',confidence:it.confidence,star:it.star?1:0}).catch(()=>{});}
+      });
+      classRender();
+      const el=document.getElementById('classSegs');
+      if(el){const card=el.querySelector('[data-seg="'+segSeqLocal+'"] .seg-tr');
+        if(card)card.innerHTML='<b>译文：</b>'+escape(lines.length===pend.length?lines.join(' / '):r.translation).slice(0,600);}
+    }).catch(()=>{});
+  }
+  CLASS._segT0=Date.now();
+}
+// 段计时器：录制中每秒检查一次（放在 classSilenceTick 的 200ms 轮询之外，独立低频）
+function classSegTick(){
+  if(!CLASS.running||!CLASS._segT0)return;
+  if(Date.now()-CLASS._segT0>=CLASS_SEG_WINDOW_MS){classSegRotate()}
+  if(CLASS.segSeq>=CLASS_MAX_SEGS){
+    toast('⏰ 已到 4 小时上限，自动收尾');
+    classStop();return;
+  }
+  setTimeout(classSegTick,1000);
+}
 function classStashChunk(b){
   classSessionChunks.push(b);classMemBytes+=(b.size||0);
   if(classPartsBroken||classMemBytes<CLASS_MEM_MAX)return;
@@ -2532,6 +2618,12 @@ function classStartBtnSync(){
 
 function classStart(){
   const status=document.getElementById('classStatus');
+  // 课堂 v2：未带场次元数据时先展开创建表单（再点一次开始才真正开录）
+  if(!CLASS.meta){
+    const f=document.getElementById('classNewForm');
+    if(f){const show=f.style.display!=='block';f.style.display=show?'block':'none';classNewFormInit();
+      if(show){status.textContent='📋 填写课程信息后开始';return}}
+  }
   // 上一堂课还在收尾（拼接全程录音 + 补识重试）时不允许开始，否则两边会互相踩：
   // 新课的残留分片清理会把本课还没读走的落盘分片删掉，补识句也会插进新课的字幕板
   if(CLASS.finalizing){if(status)status.textContent='⏳ 上一堂课还在保存录音，请稍等…';return}
@@ -2546,7 +2638,11 @@ function classStart(){
     CLASS.sessionId=genId();
     CLASS._recSid=CLASS.sessionId;
     CLASS._sessionStart=Date.now();
-    idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:null,courseName:''}).catch(()=>{});
+    const _meta=CLASS.meta||{};
+    idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:null,courseName:_meta.name||'',cdate:_meta.date||new Date().toISOString().slice(0,10),ctype:_meta.type||'',segCount:0}).catch(()=>{});
+    CLASS.segSeq=0;CLASS._segT0=Date.now();CLASS._segChunks=[];CLASS._segBytes=0;
+    classSegsBarShow();classSegCardClear();
+    setTimeout(classSegTick,1000);
     classAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
     const srcNode=classAudioCtx.createMediaStreamSource(stream);
     classAnalyser=classAudioCtx.createAnalyser();
@@ -2862,6 +2958,12 @@ async function classSendText(t,confidence,meta){
   if(!tt||tt===CLASS._lastSent)return;
   if(!asrLooksValid(tt,meta)){CLASS._lastSent=tt;asrDropNotify();return;}
   CLASS._lastSent=tt;
+  // 课堂 v2：批量模式下原句先上屏（原文立即可见），段末整段翻译后回填
+  if(CLASS.batchTr&&CLASS.running){
+    classAddItem(tt,'','',confidence,(meta&&meta.tsMs)||undefined);
+    CLASS._pendingItems.push({id:CLASS.items[CLASS.items.length-1]._id,text:tt,ts:(meta&&meta.tsMs)||Date.now()});
+    return Promise.resolve();
+  }
   document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';
   // 返回 Promise，让回放重翻能串行等待（保证字幕板顺序与时间轴一致）
   return classTranslate(tt).then(r=>{
@@ -2900,9 +3002,14 @@ function classStop(){
   keepAwakeOff();   // 松开屏幕常亮
   // 结束会话：写入结束时间
   if(CLASS.sessionId){
-    idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:Date.now(),courseName:''}).catch(()=>{});
+    // 尾段不足 5 分钟也落库（有余量才算一段）
+    if(CLASS._segChunks&&CLASS._segChunks.length){classSegRotate()}
+    idbStore.get('sessions',CLASS.sessionId).then(sess=>{
+      if(sess){sess.endTime=Date.now();sess.segCount=CLASS.segSeq;sess.cdate=(CLASS.meta||{}).date||sess.cdate;sess.ctype=(CLASS.meta||{}).type||sess.ctype;sess.courseName=(CLASS.meta||{}).name||sess.courseName;
+        idbStore.put('sessions',sess).catch(()=>{})}
+    }).catch(()=>{});
     CLASS.sessionId=null;
-    CLASS._sessionStart=null;
+    CLASS._sessionStart=null;CLASS._segT0=0;
   }
   if(classRecorder){try{classRecorder.stop()}catch(e){}classRecorder=null}
   if(classStream){classStream.getTracks().forEach(t=>t.stop());classStream=null}
@@ -2916,6 +3023,124 @@ function classStop(){
   classStartBtnSync();
   document.getElementById('classStopBtn').disabled=true;
   document.getElementById('classStatus').textContent='⏳ 正在保存录音…';
+}
+
+// ═══ 课堂 v2：段卡（录音N）═══
+const CLASS_TYPES=['语法','听力','口语','阅读','写作','文学'];
+function classTypeGet(){return ls('classType','')}
+function classTypeSet(t){ss('classType',t)}
+function classSegsBarShow(){const el=document.getElementById('classSegs');if(el)el.style.display='block'}
+function classSegCardClear(){const el=document.getElementById('classSegs');if(el)el.innerHTML=''}
+function classSegCardUpsert(seq,t0,t1,size){
+  const el=document.getElementById('classSegs');if(!el)return;
+  let card=el.querySelector('[data-seg="'+seq+'"]');
+  if(!card){card=document.createElement('div');card.dataset.seg=seq;card.className='seg-card';
+    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px';
+    el.appendChild(card)}
+  const fmt=ts=>{const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+  const mb=(size/1048576).toFixed(1);
+  card.innerHTML='<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:13px;color:var(--blue)">录音'+seq+'</span>'
+    +'<span style="font-size:10.5px;color:var(--text3)">'+fmt(t0)+'–'+fmt(t1)+' · '+mb+'MB</span>'
+    +'<span style="flex:1"></span>'
+    +'<button class="mini-chip" data-segcopy-ru="'+seq+'">复制原文</button>'
+    +'<button class="mini-chip" data-segcopy-cn="'+seq+'">复制译文</button>'
+    +'<button class="mini-chip" data-segplay="'+seq+'">▶</button>'
+    +'<button class="mini-chip" data-segexp="'+seq+'">⬇️</button></div>'
+    +'<div class="seg-tr" style="font-size:11.5px;color:var(--blue);margin-top:4px;line-height:1.5">'+(card.querySelector('.seg-tr')?card.querySelector('.seg-tr').innerHTML:'<span style="color:var(--text3)">翻译将在本段结束后出现…</span>')+'</div>';
+}
+function classSegItemsFor(seq){
+  // 本段句子：按时间戳落窗 [segT0, segT1)
+  const sess=CLASS._segMeta&&CLASS._segMeta[seq];
+  if(!sess)return[];
+  return CLASS.items.filter(it=>it._ts>=sess.t0&&it._ts<sess.t1);
+}
+function classSegTextFor(seq,field){
+  const its=classSegItemsFor(seq);
+  return its.map((it,i)=>field==='ru'?it.original:(it.translation||'')).filter(Boolean).join('\n\n');
+}
+// 段事件委托
+// 创建表单：开始录制
+document.getElementById('classNewGo').addEventListener('click',()=>{
+  const d=document.getElementById('classNewDate').value||new Date().toISOString().slice(0,10);
+  const sel=document.querySelector('#classNewTypes .class-type-btn[data-sel]');
+  const nm=document.getElementById('classNewName').value.trim();
+  CLASS.meta={date:d,type:sel?sel.dataset.t:'',name:nm};
+  document.getElementById('classNewForm').style.display='none';
+  classStart();
+});
+document.getElementById('classNewCancel').addEventListener('click',()=>{document.getElementById('classNewForm').style.display='none'});
+
+// 场次详情视图（从历史列表点标题进入）
+async function classOpenSessionDetail(sid){
+  const sess=await idbStore.get('sessions',sid).catch(()=>null);
+  const items=(await idbStore.byIndex('transcripts','sessionId',sid).catch(()=>[])).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+  const segs=(await recParts.segBySession(sid).catch(()=>[])).sort((a,b)=>a.seq-b.seq);
+  const el=document.getElementById('classBoard');
+  if(!sess){el.innerHTML='<div class="empty-state">场次不存在</div>';return}
+  const head='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><button class="mini-chip" id="classBackLive">← 返回</button><b style="font-size:13px">'+(sess.cdate||'')+(sess.ctype?' · '+escape(sess.ctype):'')+(sess.courseName?' · '+escape(sess.courseName):'')+'</b></div>';
+  const segHtml=segs.map(g=>{
+    const n=items.filter(it=>it.timestamp>=g.t0&&it.timestamp<g.t1).length;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px"><b style="color:var(--blue);font-size:13px">录音'+g.seq+'</b><span style="font-size:10.5px;color:var(--text3)">'+n+' 句 · '+(g.blob.size/1048576).toFixed(1)+'MB</span><span style="flex:1"></span><button class="mini-chip" data-dsegplay="'+g.id+'">▶</button><button class="mini-chip" data-dsegexp="'+g.id+'">⬇️</button></div>';
+  }).join('');
+  const body=items.map(it=>'<div style="padding:7px 4px;border-bottom:1px solid var(--border2)"><span style="font-size:10px;color:var(--text3)">'+(it.time||'')+'</span><div style="font-size:14px;font-weight:500">'+escape(it.original)+'</div><div style="font-size:12px;color:var(--blue)">'+escape(it.translation||'')+'</div></div>').join('');
+  el.innerHTML=head+'<div style="font-size:11px;color:var(--text3);margin-bottom:6px">'+segs.length+' 段 · '+items.length+' 句</div>'+segHtml+'<div style="margin-top:8px"></div>'+body;
+  document.getElementById('classBackLive').addEventListener('click',()=>classRender());
+  el.querySelectorAll('[data-dsegplay]').forEach(b=>b.addEventListener('click',async()=>{
+    const seg=await recParts.getSeg(b.dataset.dsegplay);if(!seg)return;
+    try{if(window._segAudio)window._segAudio.pause()}catch(err){}
+    window._segAudio=new Audio(URL.createObjectURL(seg.blob));window._segAudio.play();
+  }));
+  el.querySelectorAll('[data-dsegexp]').forEach(b=>b.addEventListener('click',async()=>{
+    const seg=await recParts.getSeg(b.dataset.dsegexp);if(!seg)return;
+    const ext=(classMime||'').indexOf('mp4')>=0?'m4a':'webm';
+    const name='录音_'+new Date(seg.t0||Date.now()).toISOString().slice(0,10)+'.'+ext;
+    const file=new File([seg.blob],name,{type:seg.blob.type||classMime});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(err){if(err&&err.name==='AbortError')return}}
+    const url=URL.createObjectURL(seg.blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000);
+  }));
+}
+
+document.getElementById('classSegs').addEventListener('click',async e=>{
+  const t=e.target.closest('button');if(!t)return;
+  const seq=parseInt(t.dataset.segcopyRu||t.dataset.segcopyCn||t.dataset.segplay||t.dataset.segexp);
+  if(isNaN(seq))return;
+  if(t.dataset.segcopyRu!==undefined){
+    const txt=classSegTextFor(seq,'ru');
+    if(!txt){toast('本段还没有原文');return}
+    navigator.clipboard.writeText(txt).then(()=>toast('已复制 录音'+seq+' 原文')).catch(()=>toast('复制失败'));
+  }else if(t.dataset.segcopyCn!==undefined){
+    const txt=classSegTextFor(seq,'cn');
+    if(!txt){toast('译文还没出来（段末批量翻译）');return}
+    navigator.clipboard.writeText(txt).then(()=>toast('已复制 录音'+seq+' 译文')).catch(()=>toast('复制失败'));
+  }else if(t.dataset.segplay!==undefined){
+    const seg=await recParts.getSeg((CLASS._recSid||'')+'_s'+String(seq).padStart(3,'0'));
+    if(!seg){toast('本段音频不在本机');return}
+    try{if(window._segAudio)window._segAudio.pause()}catch(err){}
+    window._segAudio=new Audio(URL.createObjectURL(seg.blob));window._segAudio.play();
+  }else if(t.dataset.segexp!==undefined){
+    const seg=await recParts.getSeg((CLASS._recSid||'')+'_s'+String(seq).padStart(3,'0'));
+    if(!seg){toast('本段音频不在本机');return}
+    const ext=(classMime||'').indexOf('mp4')>=0?'m4a':'webm';
+    const name='录音'+seq+'_'+new Date(seg.t0||Date.now()).toISOString().slice(0,10)+'.'+ext;
+    const file=new File([seg.blob],name,{type:seg.blob.type||classMime});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(err){if(err&&err.name==='AbortError')return}}
+    const url=URL.createObjectURL(seg.blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000);
+  }
+});
+// 创建表单逻辑
+function classNewFormInit(){
+  const wrap=document.getElementById('classNewTypes');if(!wrap)return;
+  wrap.innerHTML=CLASS_TYPES.map(t=>'<button class="mini-chip class-type-btn" data-t="'+t+'">'+t+'</button>').join('');
+  const cur=classTypeGet();
+  wrap.querySelectorAll('.class-type-btn').forEach(b=>{
+    if(b.dataset.t===cur){b.style.background='var(--blue)';b.style.color='#fff';b.dataset.sel='1'}
+    b.addEventListener('click',()=>{
+      wrap.querySelectorAll('.class-type-btn').forEach(x=>{x.style.background='';x.style.color='';delete x.dataset.sel});
+      b.style.background='var(--blue)';b.style.color='#fff';b.dataset.sel='1';
+      classTypeSet(b.dataset.t);
+    });
+  });
+  const d=document.getElementById('classNewDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);
 }
 
 // 导出课堂录音。
@@ -2962,7 +3187,8 @@ async function classClear(){
     for(const it of CLASS.items){if(it._id)await idbStore.del('transcripts',it._id).catch(()=>{})}
     const left=await idbStore.byIndex('transcripts','sessionId',sid).catch(()=>[]);
     if(!(left&&left.length))await idbStore.del('sessions',sid).catch(()=>{});
-    await recParts.delRec(sid).catch(()=>{});   // 录音跟着这节课一起删
+    await recParts.delRec(sid).catch(()=>{});
+    await recParts.delSegs(sid).catch(()=>{});   // 录音跟着这节课一起删
     if(CLASS._recStoredSid===sid){CLASS._recBlob=null;CLASS._recStoredSid=null;const b=document.getElementById('classSaveRecBtn');if(b)b.style.display='none'}
     CLASS._clearedSid=sid;
     toast('已清空（含本节课历史记录）');
@@ -3025,7 +3251,7 @@ async function classHistRender(){
   filled.forEach(s=>{
     const items=byS[s.id]||[];
     const dur=s.endTime?Math.round((s.endTime-s.startTime)/1000)+' 秒':'进行中';
-    html+=`<div class="les-card" style="margin-top:6px"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div><div class="les-num">📅 ${fmtTime(s.startTime)}</div><div class="les-title">${items.length} 句 · ${dur}</div></div><span style="display:flex;gap:6px;align-items:center"><button class="mini-chip" data-sid="${s.id}" data-act="copy">📋 复制</button><button class="mini-chip" data-sid="${s.id}" data-act="md">⬇️ 导出</button><button class="mini-chip danger" data-sid="${s.id}" data-act="del">🗑 删除</button><span class="les-arrow" style="margin-left:4px">&#9660;</span></span></div><div class="les-card-body">`+
+    html+=`<div class="les-card" style="margin-top:6px"><div class="les-card-hdr" onclick="this.closest('.les-card').classList.toggle('open')"><div data-clsess="${s.id}" style="cursor:pointer"><div class="les-num">📅 ${s.cdate||fmtTime(s.startTime)}${s.ctype?' · '+s.ctype:''}${s.courseName?' · '+s.courseName:''}</div><div class="les-title">${items.length} 句 · ${dur}${s.segCount?' · '+s.segCount+' 段':''}</div></div><span style="display:flex;gap:6px;align-items:center"><button class="mini-chip" data-sid="${s.id}" data-act="copy">📋 复制</button><button class="mini-chip" data-sid="${s.id}" data-act="md">⬇️ 导出</button><button class="mini-chip danger" data-sid="${s.id}" data-act="del">🗑 删除</button><span class="les-arrow" style="margin-left:4px">&#9660;</span></span></div><div class="les-card-body">`+
     items.map((it,i)=>`<div style="padding:8px 4px;border-bottom:1px solid var(--border2);display:flex;gap:6px;align-items:flex-start"><span style="font-size:10px;color:var(--text3);white-space:nowrap;padding-top:3px">${it.time||fmtTimeShort(it.timestamp)}</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:500">${escape(it.original)}${it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-size:11px">⚠️</span>':''}</div><div style="font-size:12px;color:var(--blue)">${escape(it.translation)}</div>${it.note?`<div style="font-size:11px;color:var(--yellow)">⚠️ ${escape(it.note)}</div>`:''}</div><button class="mini-chip" data-sid="${s.id}" data-i="${i}" data-act="play">🔊</button></div>`).join('')+
     '</div></div>';
   });
@@ -3033,6 +3259,8 @@ async function classHistRender(){
 }
 // 事件委托：课堂历史里的 返回/播放/复制/导出/删除 一次绑定
 document.getElementById('classBoard').addEventListener('click',async e=>{
+  const sessT=e.target.closest('[data-clsess]');
+  if(sessT){classOpenSessionDetail(sessT.dataset.clsess);return}
   const t=e.target.closest('#classBackLive,.mini-chip');
   if(!t)return;
   if(t.id==='classBackLive'){setClassHist(false);return}
@@ -3048,7 +3276,8 @@ document.getElementById('classBoard').addEventListener('click',async e=>{
     if(!confirm('删除这节课的全部记录？'))return;
     await idbStore.del('sessions',sid).catch(()=>{});
     await Promise.all(items.map(it=>idbStore.del('transcripts',it.id).catch(()=>{})));
-    await recParts.delRec(sid).catch(()=>{});   // 录音跟着这节课一起删
+    await recParts.delRec(sid).catch(()=>{});
+    await recParts.delSegs(sid).catch(()=>{});   // 录音跟着这节课一起删
     if(CLASS._recStoredSid===sid){CLASS._recBlob=null;CLASS._recStoredSid=null;const b=document.getElementById('classSaveRecBtn');if(b)b.style.display='none'}
     classHistRender();
   }
