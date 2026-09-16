@@ -737,7 +737,7 @@ const server = http.createServer((req, res) => {
   // ── 静态文件（白名单制：只放行页面资源；密钥/配置/.git 等一律 404）──
   // 审计 P0-1 (2026-09-16)：此前任意存在的文件都可下载，keys.json/cloud.json/codes.json/.dev.vars 曾暴露
   const STATIC_WHITELIST = ['/', '/index.html', '/style.css', '/sw.js', '/manifest.json',
-    '/privacy.html', '/clear-cache.html', '/voice-test.html', '/widget.html', '/models.html'];
+    '/privacy.html', '/clear-cache.html', '/voice-test.html', '/widget.html', '/models.html', '/class-recorder.html'];
   if (!STATIC_WHITELIST.includes(url)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Not found');

@@ -115,64 +115,33 @@ if(t==='ink'||t==='amber'){
       <div id="quizArea" style="display:none;flex:1;overflow-y:auto;min-height:0"></div>
     </div>
 
-    <!-- ══ CLASS MODE (课堂语音翻译) ══ -->
+    <!-- ═══ CLASS MODE v3：内容主页（保存的课堂 + 新建入口）═══ -->
     <div class="screen" id="sClass">
-      <div style="padding:10px 0;flex-shrink:0">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-weight:600;font-size:15px;color:var(--blue)">🎤 课堂模式</span>
-          <span id="classStatus" style="font-size:11px;color:var(--text3)">未开始</span>
-          <span style="flex:1"></span>
-          <button id="classTermsBtn" class="mini-chip">📖 术语</button>
-          <button id="classScrollBtn" class="mini-chip">⏸ 滚动</button>
-          <button id="classHistBtn" class="mini-chip">📚 历史</button>
-          <button id="classCalBtn" class="mini-chip">🎚 校准</button>
-          <span style="font-size:11px;color:var(--text3)" id="classCount">0 句</span>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <button id="classStartBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--blue);color:#fff">🎙️ 开始录音</button>
-          <button id="classStopBtn" style="flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--input);color:var(--text2);border:1.5px solid var(--border)" disabled>⏹ 停止</button>
-          <button id="classSaveRecBtn" style="display:none;flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:12px;font-weight:700;background:var(--green);color:#fff;border:none">💾 保存录音</button>
-        </div>
-        <!-- 课堂 v2：创建新翻译表单（点 classNewBtn 展开） -->
-        <div id="classNewForm" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px">
-          <div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:8px">➕ 创建新翻译</div>
-          <div style="display:flex;gap:6px;margin-bottom:6px">
-            <input id="classNewDate" type="date" style="flex:1;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
-            <input id="classNewName" placeholder="课程名（可选）" style="flex:1.4;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
+      <div style="padding:6px 0 10px;flex-shrink:0">
+        <button id="classNewBtn" style="width:100%;padding:16px 0;border-radius:var(--radius);font-size:15px;font-weight:700;background:var(--blue);color:#fff;border:none;cursor:pointer;box-shadow:var(--shadow-sm)">➕ 新建翻译</button>
+      </div>
+      <div id="classHomeGrid" style="flex:1;overflow-y:auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start;padding-bottom:12px"></div>
+      <!-- 长按调色盘弹层 -->
+      <div id="colorPicker" style="display:none;position:fixed;inset:0;background:rgba(15,25,45,.45);z-index:60;align-items:center;justify-content:center">
+        <div style="background:var(--surface);border:1px solid var(--glass-border);border-radius:var(--radius);padding:16px;width:min(88%,340px);backdrop-filter:blur(var(--blur));box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">🎨 卡片颜色</div>
+          <canvas id="hueWheel" width="200" height="200" style="display:block;margin:0 auto;cursor:crosshair;touch-action:none"></canvas>
+          <div style="margin-top:10px">
+            <div style="font-size:10.5px;color:var(--text3);margin-bottom:2px">色相 H <span id="vH">—</span></div>
+            <input id="slH" type="range" min="0" max="360" value="210" style="width:100%">
+            <div style="font-size:10.5px;color:var(--text3);margin:6px 0 2px">饱和度 S <span id="vS">—</span></div>
+            <input id="slS" type="range" min="0" max="100" value="45" style="width:100%">
+            <div style="font-size:10.5px;color:var(--text3);margin:6px 0 2px">明度 L <span id="vL">—</span></div>
+            <input id="slL" type="range" min="30" max="90" value="78" style="width:100%">
           </div>
-          <div id="classNewTypes" class="class-type-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-          <div style="display:flex;gap:6px">
-            <button id="classNewGo" style="flex:1;padding:9px 0;border-radius:8px;font-size:12.5px;font-weight:700;background:var(--blue);color:#fff;border:none;cursor:pointer">开始录制</button>
-            <button id="classNewCancel" style="padding:9px 14px;border-radius:8px;font-size:12px;background:var(--input);color:var(--text2);border:1.5px solid var(--border);cursor:pointer">取消</button>
+          <div id="cpPrev" style="height:34px;border-radius:10px;margin-top:10px;border:1px solid var(--border)"></div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button id="cpOk" style="flex:1;padding:10px 0;border-radius:10px;border:none;background:var(--blue);color:#fff;font-weight:700;font-size:13px;cursor:pointer">确定</button>
+            <button id="cpCancel" style="padding:10px 16px;border-radius:10px;background:var(--input);color:var(--text2);border:1.5px solid var(--border);font-size:13px;cursor:pointer">取消</button>
           </div>
-          <div style="font-size:10px;color:var(--text3);margin-top:6px">每 5 分钟自动存一条「录音N」，一堂课最长 4 小时（48 段）</div>
-        </div>
-        <!-- 课堂 v2：段卡列表（录音N） -->
-        <div id="classSegs" style="display:none;margin-bottom:8px"></div>
-        <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:6px" id="classHint">
-          说俄语 → 自动转文字 → 翻译显示。识别引擎：<b id="classEngine">检测中…</b>
-        </div>
-        <div id="classTermsPanel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px">
-          <div style="display:flex;gap:6px;margin-bottom:6px">
-            <input id="classTermRu" placeholder="русский 术语" style="flex:1;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
-            <input id="classTermCn" placeholder="中文翻译" style="flex:1;padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)">
-            <button id="classTermAdd" style="padding:7px 12px;border-radius:8px;font-size:12px;background:var(--blue);color:#fff;border:none;cursor:pointer">添加</button>
-          </div>
-          <div id="classTermsList" style="font-size:12px;max-height:120px;overflow-y:auto"></div>
-          <div style="font-size:10px;color:var(--text3);margin-top:4px">术语会注入课堂翻译，保证整节课译法统一</div>
         </div>
       </div>
-      <div id="classBoard" style="flex:1;overflow-y:auto;min-height:0;padding-bottom:10px">
-        <div class="empty-state" id="classEmpty">点击"开始录音"，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-shrink:0;padding-bottom:8px">
-        <button id="classSaveBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">💾 复制本课记录</button>
-        <button id="classReplayBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--blue);border:1.5px solid var(--blue)">📼 回放重翻</button>
-        <button id="classClearBtn" style="flex:1;padding:9px 0;border-radius:var(--radius-sm);font-size:12px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border)">🧹 清空</button>
-      </div>
-      <input type="file" id="classReplayFile" accept="audio/*,.m4a,.mp4,.webm,.wav" style="display:none">
     </div>
-
     <!-- ══ MORE ══ -->
     <div class="screen" id="sMore">
       <div class="sub-tabs" style="margin-bottom:10px">
@@ -216,7 +185,7 @@ if(t==='ink'||t==='amber'){
 // ═══════════════════════════════════════════════════════════════
 // ⚠️ 版本号唯一来源：发版只改这一行（标题 h1、设置页「关于」都从这里取）。
 // 缓存版本号不用手改：跑 sync.bat 会自动递增 sw.js 的 russian-app-vN。
-const APP_VERSION='6.5.0';
+const APP_VERSION='6.7.0';
 const LANGS={ru:'俄语',en:'英语','zh-CN':'中文'};
 const LANG_TO_API={ru:'ru',en:'en','zh-CN':'zh-CN'};
 const CFG={models:[{id:'mymemory',name:'MyMemory',desc:'神经网络翻译引擎，免费不限次',api:'https://api.mymemory.translated.net/get'},{id:'libre',name:'LibreTranslate',desc:'开源翻译引擎，俄语翻译优秀',api:'https://translate.terraprint.co/translate'}],speeds:[0.25,0.5,0.75,1,1.25,1.5,1.75,2],fsRange:[13,24]};
@@ -2349,7 +2318,7 @@ function classAddItem(original,translation,note,confidence,tsMs){
   }
   // 高频路径只追加新节点。只有插入到中间、或裁掉过旧条目（索引整体位移）时才整块重建。
   if(inserted||trimmed)classRender();else classAppendItem(item);
-  if(CLASS.scrollOn!==false){const board=document.getElementById('classBoard');board.scrollTop=board.scrollHeight;}
+  if(CLASS.scrollOn!==false){const board=document.getElementById('classBoard');if(board)board.scrollTop=board.scrollHeight;}
 }
 
 // 追加一条新字幕：只插入这一个节点，不碰已有节点。
@@ -2357,7 +2326,7 @@ function classAddItem(original,translation,note,confidence,tsMs){
 // 结果每出一句新话，屏幕上所有历史句子一起闪一下——一节课累计几百次全量重建，闪屏＋耗电。
 // （正好撞在《开发经验清单》第 10 条：高频重渲染要只重渲染变化的列表）
 function classAppendItem(it){
-  const el=document.getElementById('classBoard');
+  const el=document.getElementById('classBoard');if(!el)return; // v3
   const empty=document.getElementById('classEmpty');
   const wrap=document.createElement('div');
   wrap.innerHTML=classItemHTML(it,CLASS.items.length-1);
@@ -2370,7 +2339,7 @@ function classAppendItem(it){
 }
 
 function classRender(){
-  const el=document.getElementById('classBoard');
+  const el=document.getElementById('classBoard');if(!el)return; // v3：主页无字幕板，录制在独立页
   document.getElementById('classCount').textContent=CLASS.items.length+' 句';
   if(!CLASS.items.length){el.innerHTML='<div class="empty-state" id="classEmpty">点击"开始录音"，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div>';return}
   el.innerHTML=CLASS.items.map((it,i)=>classItemHTML(it,i)).join('');
@@ -2617,6 +2586,8 @@ function classStartBtnSync(){
 }
 
 function classStart(){
+  // v3：录制已迁往 class-recorder.html，主页此函数仅作跳转兜底
+  location.href='class-recorder.html';return;
   const status=document.getElementById('classStatus');
   // 课堂 v2：未带场次元数据时先展开创建表单（再点一次开始才真正开录）
   if(!CLASS.meta){
@@ -3071,11 +3042,149 @@ document.getElementById('classNewGo').addEventListener('click',()=>{
 document.getElementById('classNewCancel').addEventListener('click',()=>{document.getElementById('classNewForm').style.display='none'});
 
 // 场次详情视图（从历史列表点标题进入）
+// ═══ 课堂 v3：主页（正方形卡网格 + 长按调色）═══
+const CLASS_TYPE_COLORS={'语法':'#cfe0f5','听力':'#d4efdd','口语':'#fdeacc','阅读':'#e6dcf2','写作':'#fbd9dd','文学':'#d8ece8'};
+function classColorOf(sess){if(sess&&sess.color)return sess.color;return CLASS_TYPE_COLORS[sess&&sess.ctype]||"#cfe0f5"}
+let _homeSess=null,_lpTimer=null,_lpFired=false;
+async function classHomeRender(){
+  const el=document.getElementById('classHomeGrid');if(!el)return;
+  const sessions=(await idbStore.getAll('sessions').catch(function(){return[]})).sort(function(a,b){return (b.startTime||0)-(a.startTime||0)});
+  const transcripts=await idbStore.getAll('transcripts').catch(function(){return[]});
+  const byS={};transcripts.forEach(function(t){byS[t.sessionId]=(byS[t.sessionId]||0)+1});
+  const filled=sessions.filter(function(s2){return (byS[s2.id]||0)>0||(s2.segCount||0)>0});
+  if(!filled.length){el.innerHTML='<div class="empty-state" style="grid-column:1/-1">还没有课堂记录<br>点上方「➕ 新建翻译」开始第一节课</div>';return}
+  el.innerHTML=filled.map(function(s2,i){
+    const c=classColorOf(s2);
+    const dur=s2.endTime?Math.round((s2.endTime-s2.startTime)/60000)+' 分钟':'进行中';
+    return '<div class=class-tile data-tile="'+s2.id+'" style="aspect-ratio:1/1;border-radius:var(--radius);background:'+c+';border:1px solid var(--glass-border);box-shadow:var(--shadow-sm);padding:10px;display:flex;flex-direction:column;cursor:pointer;user-select:none;-webkit-user-select:none">'
+      +'<div style="font-size:15px;font-weight:700;color:var(--text)">'+(s2.cdate||fmtTime(s2.startTime).slice(5,10))+'</div>'
+      +'<div style="margin-top:4px"><span style="font-size:10.5px;padding:2px 8px;border-radius:var(--radius-pill);background:rgba(255,255,255,.55);color:var(--text2)">'+(s2.ctype||'未分类')+'</span>'+(s2.courseName?'<div style="font-size:11px;color:var(--text2);margin-top:4px">'+escape(s2.courseName)+'</div>':'')+'</div>'
+      +'<div style="flex:1"></div>'
+      +'<div style="font-size:10.5px;color:var(--text2)">'+(s2.segCount||0)+' 段 · '+(byS[s2.id]||0)+' 句 · '+dur+'</div>'
+      +'<div style="display:flex;gap:4px;margin-top:6px"><button class="mini-chip" data-tcopy="'+s2.id+'" style="flex:1;padding:4px 0;font-size:10px">复制</button><button class="mini-chip" data-tmd="'+s2.id+'" style="flex:1;padding:4px 0;font-size:10px">导出</button><button class="mini-chip" data-tdel="'+s2.id+'" style="padding:4px 8px;font-size:10px">🗑</button></div>'
+    '</div>'
+  }).join('');
+  bindTiles();
+}
+function bindTiles(){
+  const el=document.getElementById('classHomeGrid');
+  el.querySelectorAll('[data-tile]').forEach(function(tile){
+    const sid=tile.dataset.tile;
+    // 点击=进详情
+    tile.addEventListener('click',function(){
+      if(_lpFired){_lpFired=false;return}
+      classOpenSessionDetail(sid);
+    });
+    // 长按 350ms=调色
+    tile.addEventListener('contextmenu',function(e){e.preventDefault();colorOpen(sid)});
+    let timer=null;
+    tile.addEventListener('touchstart',function(){_lpFired=false;timer=setTimeout(function(){_lpFired=true;colorOpen(sid)},350)},{passive:true});
+    ['touchend','touchmove','touchcancel'].forEach(function(ev){tile.addEventListener(ev,function(){clearTimeout(timer)},{passive:true})});
+  });
+  el.querySelectorAll('[data-tcopy]').forEach(function(b){b.addEventListener('click',async function(e){e.stopPropagation();
+    const sid=b.dataset.tcopy;const items=(await idbStore.byIndex('transcripts','sessionId',sid).catch(function(){return[]})||[]).sort(function(x,y){return (x.timestamp||0)-(y.timestamp||0)});
+    if(!items.length){toast('该场次没有文本');return}
+    const txt=items.map(function(it,i){return (i+1)+'. '+(it.original||'')+'\n    '+(it.translation||'')}).join('\n\n');
+    navigator.clipboard.writeText(txt).then(function(){toast('已复制全部原文+译文')}).catch(function(){toast('复制失败')});
+  })});
+  el.querySelectorAll('[data-tmd]').forEach(function(b){b.addEventListener('click',async function(e){e.stopPropagation();
+    const sid=b.dataset.tmd;const sess=await idbStore.get('sessions',sid);const items=(await idbStore.byIndex('transcripts','sessionId',sid).catch(function(){return[]})||[]).sort(function(x,y){return (x.timestamp||0)-(y.timestamp||0)});
+    if(!items.length){toast('该场次没有文本');return}
+    const md='# 课堂记录\n\n- 日期：'+(sess&&sess.cdate||'')+'\n- 类型：'+(sess&&sess.ctype||'')+'\n\n'+items.map(function(it,i){return (i+1)+'. '+(it.original||'')+'\n   '+(it.translation||'')}).join('\n');
+    downloadMd('课堂记录_'+(sess&&sess.cdate||Date.now())+'.md',md);toast('已导出 Markdown');
+  })});
+  el.querySelectorAll('[data-tdel]').forEach(function(b){b.addEventListener('click',async function(e){e.stopPropagation();
+    const sid=b.dataset.tdel;
+    if(!confirm('删除这一场的全部记录与录音？不可恢复'))return;
+    const items=await idbStore.byIndex('transcripts','sessionId',sid).catch(function(){return[]})||[];
+    await idbStore.del('sessions',sid).catch(function(){});
+    await Promise.all(items.map(function(it){return idbStore.del('transcripts',it.id).catch(function(){})}));
+    await recParts.delRec(sid).catch(function(){});
+    await recParts.delSegs(sid).catch(function(){});
+    classHomeRender();
+  })});
+}
+// ── 调色盘（圆盘 + 三滑轨）──
+let _cpSid=null,_cpH=210,_cpS=45,_cpL=78;
+function hslCss(h,s,l){return 'hsl('+h+','+s+'%,'+l+'%)'}
+function drawHueWheel(){
+  const cv=document.getElementById('hueWheel');const ctx=cv.getContext('2d');
+  const r=cv.width/2,rr=r-8;
+  for(let a=0;a<360;a+=1){
+    const a0=(a-1.2)*Math.PI/180,a1=(a+1.2)*Math.PI/180;
+    ctx.beginPath();ctx.moveTo(r+Math.cos(a0)*rr*0.62,r+Math.sin(a0)*rr*0.62);
+    ctx.lineTo(r+Math.cos(a0)*rr,r+Math.sin(a0)*rr);
+    ctx.arc(r,r,rr,a0,a1);
+    ctx.closePath();
+    ctx.fillStyle='hsl('+a+',70%,60%)';ctx.fill();
+  }
+  const mid=(r+rr*0.62)/2+8;
+  ctx.beginPath();ctx.arc(r,r,mid,0,Math.PI*2);ctx.fillStyle=hslCss(_cpH,_cpS,_cpL);ctx.fill();
+  const ang=_cpH*Math.PI/180;
+  ctx.strokeStyle='#1e2b45';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(r+Math.cos(ang)*(mid-4),r+Math.sin(ang)*(mid-4));ctx.lineTo(r+Math.cos(ang)*(rr-1),r+Math.sin(ang)*(rr-1));ctx.stroke();
+}
+function cpUpdate(){
+  document.getElementById('cpPrev').style.background=hslCss(_cpH,_cpS,_cpL);
+  document.getElementById('vH').textContent=_cpH;document.getElementById('vS').textContent=_cpS+'%';document.getElementById('vL').textContent=_cpL+'%';
+  document.getElementById('slH').value=_cpH;document.getElementById('slS').value=_cpS;document.getElementById('slL').value=_cpL;
+  drawHueWheel();
+}
+function colorOpen(sid){
+  _cpSid=sid;
+  idbStore.get('sessions',sid).then(function(sess){
+    let c=classColorOf(sess);
+    const m=c.match(/hsl\((\d+),(\d+)%,(\d+)%\)/);
+    if(m){_cpH=+m[1];_cpS=+m[2];_cpL=+m[3]}
+    else{const hex=c.replace('#','');
+      const r=parseInt(hex.substr(0,2),16)/255,g=parseInt(hex.substr(2,2),16)/255,b=parseInt(hex.substr(4,2),16)/255;
+      const mx=Math.max(r,g,b),mn=Math.min(r,g,b);_cpL=Math.round((mx+mn)/2*100);
+      let h=0,ss2=0;const d2=mx-mn;
+      if(d2){ss2=Math.round(d2/(1-Math.abs(2*_cpL/100-1))*100);
+        if(mx===r)h=((g-b)/d2)%6;else if(mx===g)h=(b-r)/d2+2;else h=(r-g)/d2+4;
+        h=Math.round(h*60);if(h<0)h+=360}
+      _cpH=h;_cpS=Math.min(100,ss2)}
+    const pk=document.getElementById('colorPicker');pk.style.display='flex';cpUpdate();
+  });
+}
+document.getElementById('hueWheel').addEventListener('pointerdown',function(e){
+  const cv=e.target;const rect=cv.getBoundingClientRect();
+  const cx=rect.width/2,cy=rect.height/2;
+  const move=function(ev){
+    const x=ev.clientX-rect.left-cx,y=ev.clientY-rect.top-cy;
+    let ang=Math.atan2(y,x)*180/Math.PI;if(ang<0)ang+=360;
+    _cpH=Math.round(ang);cpUpdate();
+  };
+  move(e);
+  const up=function(){window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up)};
+  window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
+});
+['slH','slS','slL'].forEach(function(id){document.getElementById(id).addEventListener('input',function(){
+  _cpH=+document.getElementById('slH').value;_cpS=+document.getElementById('slS').value;_cpL=+document.getElementById('slL').value;cpUpdate();
+})});
+document.getElementById('cpOk').addEventListener('click',function(){
+  idbStore.get('sessions',_cpSid).then(function(sess){
+    if(sess){sess.color=hslCss(_cpH,_cpS,_cpL);return idbStore.put('sessions',sess)}
+  }).then(function(){
+    document.getElementById('colorPicker').style.display='none';
+    classHomeRender();toast('颜色已保存');
+  });
+});
+document.getElementById('cpCancel').addEventListener('click',function(){document.getElementById('colorPicker').style.display='none'});
+document.getElementById('colorPicker').addEventListener('click',function(e){if(e.target===this)this.style.display='none'});
+// ── 主页入口：新建翻译 → 跳录制页 ──
+document.getElementById('classNewBtn').addEventListener('click',function(){location.href='class-recorder.html'});
+// 屏幕切入时刷新网格
+document.querySelectorAll('.nav-btn').forEach(function(b){b.addEventListener('click',function(){if(b.dataset.screen==='sClass')classHomeRender()})});
+// v3 主页不再需要 v2 的历史/字幕板切换；classHomeRender 取代 sClass 初始渲染
+if(document.readyState!=='loading')classHomeRender();else document.addEventListener('DOMContentLoaded',function(){classHomeRender()});
+
 async function classOpenSessionDetail(sid){
   const sess=await idbStore.get('sessions',sid).catch(()=>null);
   const items=(await idbStore.byIndex('transcripts','sessionId',sid).catch(()=>[])).sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
   const segs=(await recParts.segBySession(sid).catch(()=>[])).sort((a,b)=>a.seq-b.seq);
-  const el=document.getElementById('classBoard');
+  const el=document.getElementById('classHomeGrid');if(!el)return;
+  el.style.display='block';el.style.gridTemplateColumns='1fr';
   if(!sess){el.innerHTML='<div class="empty-state">场次不存在</div>';return}
   const head='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><button class="mini-chip" id="classBackLive">← 返回</button><b style="font-size:13px">'+(sess.cdate||'')+(sess.ctype?' · '+escape(sess.ctype):'')+(sess.courseName?' · '+escape(sess.courseName):'')+'</b></div>';
   const segHtml=segs.map(g=>{
@@ -3234,11 +3343,8 @@ async function classHistData(){
   Object.values(byS).forEach(arr=>arr.sort((a,b)=>(a.timestamp||0)-(b.timestamp||0)));
   return {sessions,byS};
 }
-function setClassHist(on){
-  classHistMode=on;
-  document.getElementById('classHistBtn').textContent=on?'← 字幕板':'📚 历史';
-  if(on)classHistRender();else classRender();
-}
+// v3：历史视图由主页网格与详情页取代
+function setClassHist(on){classHomeRender()}
 async function classHistRender(){
   const el=document.getElementById('classBoard');
   const {sessions,byS}=await classHistData();
@@ -3279,19 +3385,11 @@ document.getElementById('classBoard').addEventListener('click',async e=>{
     await recParts.delRec(sid).catch(()=>{});
     await recParts.delSegs(sid).catch(()=>{});   // 录音跟着这节课一起删
     if(CLASS._recStoredSid===sid){CLASS._recBlob=null;CLASS._recStoredSid=null;const b=document.getElementById('classSaveRecBtn');if(b)b.style.display='none'}
-    classHistRender();
+    classHomeRender();
   }
 });
 
-document.getElementById('classHistBtn').addEventListener('click',()=>setClassHist(!classHistMode));
-
-document.getElementById('classStartBtn').addEventListener('click',classStart);
-document.getElementById('classStopBtn').addEventListener('click',classStop);
-document.getElementById('classCalBtn').addEventListener('click',classCalibrate);
-classCalUi();
-document.getElementById('classSaveBtn').addEventListener('click',classSave);
-document.getElementById('classClearBtn').addEventListener('click',classClear);
-document.getElementById('classScrollBtn').addEventListener('click',()=>{CLASS.scrollOn=!CLASS.scrollOn;document.getElementById('classScrollBtn').textContent=CLASS.scrollOn?'⏸ 滚动':'▶ 已暂停';toast(CLASS.scrollOn?'自动滚动已恢复':'自动滚动已暂停')});
+// v3：录制相关按钮已整体迁往 class-recorder.html；主页只保留网格/详情/调色
 // 按分隔符拼术语并卡上限。原先 join(...).slice(0,800) 可能正好切在一个术语中间，
 // 送进提示词就成了半截词，而用户完全不知道被截了——改为整条装不下就停。
 function classTermsJoin(list,sep,maxLen){
@@ -3312,7 +3410,7 @@ function classTermsRender(){
   box.innerHTML=t.length?t.map((x,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dashed var(--border)"><span><b style="color:var(--blue)">${escape(x.ru)}</b> = ${escape(x.cn)}</span><span class="class-term-del" data-i="${i}" style="color:var(--red);cursor:pointer">✕</span></div>`).join(''):'<span style="color:var(--text3)">还没有术语，添加后翻译即刻生效</span>';
   box.querySelectorAll('.class-term-del').forEach(b=>b.addEventListener('click',()=>{const a=classTermsGet();a.splice(parseInt(b.dataset.i),1);ss('classTerms',a);classTermsRender()}));
 }
-document.getElementById('classTermsBtn').addEventListener('click',()=>{const p=document.getElementById('classTermsPanel');p.style.display=p.style.display==='block'?'none':'block';classTermsRender()});
+// v3：术语面板移至 class-recorder.html
 document.getElementById('classTermAdd').addEventListener('click',()=>{
   const ru=document.getElementById('classTermRu').value.trim(),cn=document.getElementById('classTermCn').value.trim();
   if(!ru||!cn){toast('两边都要填');return}

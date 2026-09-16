@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>课堂 v3 主功能改版方案</title>
+<style>
+  :root{--bg:#fafbfb;--ink:#1a1d21;--ink2:#4a5158;--ink3:#6e7681;--hair:#d9dde2;--hair2:#e8ebef;--navy:#1e3a5f;--mono:"Consolas",monospace;--sans:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.65}
+  .canvas{max-width:1040px;margin:0 auto;padding:52px 36px 72px}
+  .kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  h1{font-size:36px;line-height:1.12;letter-spacing:-.02em;font-weight:600;margin:12px 0 10px}
+  .sub{font-size:16px;color:var(--ink2);max-width:720px}
+  .meta{margin:16px 0 0;display:flex;flex-wrap:wrap;gap:6px 26px;font-family:var(--mono);font-size:12px;color:var(--ink3)}
+  section{margin-top:42px}
+  .sec{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+  .no{font-family:var(--mono);font-size:12px;color:var(--navy)}
+  h2{font-size:21px;font-weight:600}
+  .rule{flex:1;height:1px;background:var(--hair)}
+  p{max-width:780px;color:var(--ink2);margin-top:8px}
+  p b,li b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0 6px}
+  th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--ink);font-weight:600}
+  td{padding:9px 10px 9px 0;border-bottom:1px solid var(--hair2);vertical-align:top;color:var(--ink2)}
+  td.k{color:var(--ink);font-weight:500;white-space:nowrap}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;background:var(--hair);border:1px solid var(--hair);margin:16px 0}
+  .cell{background:var(--bg);padding:14px 16px}
+  .cell .t{font-weight:600;font-size:13.5px;color:var(--ink)}
+  .cell .d{font-size:12.5px;color:var(--ink2);margin-top:4px}
+  ul{margin:10px 0 4px 18px;max-width:760px}
+  li{color:var(--ink2);margin-top:5px}
+  .warn{border:1px solid var(--ink);padding:18px 20px;margin:16px 0}
+  .warn h3{font-size:15px;font-weight:600;margin-bottom:6px}
+  .colo{margin-top:50px;padding-top:18px;border-top:2px solid var(--ink);font-size:12px;color:var(--ink3)}
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="kicker">课堂 v3 · 主功能改版方案 · 先方案后实施</div>
+  <h1>课堂 = 保存库 + 独立录制页</h1>
+  <p class="sub">课堂标签页变成「我的课堂内容」主页：只留一个长条「➕ 新建翻译」入口，下方网格铺满已保存的正方形场次卡（日期 + 课程类型 + 长按调色）。录制（录音/停止/段卡/字幕/保存）整体搬进独立页面，保存按钮常驻。</p>
+  <div class="meta"><span>基于 <b>课堂 v2 已落地代码（32336c0）</b></span><span>改版范围 <b>index.html 课堂屏 + 新增 class-recorder.html</b></span></div>
+
+  <section>
+    <div class="sec"><span class="no">01</span><h2>两个页面怎么分工</h2><span class="rule"></span></div>
+    <table>
+      <tr><th>页面</th><th>放什么</th><th>不放什么</th></tr>
+      <tr><td class="k">课堂主页<br>（原 sClass 屏）</td><td>① 顶部一个长条按钮「➕ 新建翻译」（点击跳录制页）② 下方两列正方形场次卡网格：日期、课程类型徽章、课程名、段数/句数，<b>长按弹调色盘改卡色</b> ③ 点卡进详情（复用已做的 classOpenSessionDetail）</td><td>开始/停止/保存录音按钮、字幕板、术语/校准/滚动——全部移走或搬到录制页</td></tr>
+      <tr><td class="k">录制页<br>（新增 class-recorder.html）</td><td>完整录制工作台：开始/停止、字幕板、段卡（录音N + 复制原文/译文/试听/导出）、术语面板、静音校准、滚动开关、回放重翻；<b>「💾 保存并结束」按钮固定常驻</b>（录制中=保存并结束，未录制=返回主页）</td><td>——</td></tr>
+    </table>
+    <p>录制页用<b>独立 HTML</b> 而不是主应用内的隐藏屏：录制中锁屏/切后台回来状态不丢，代码隔离干净（主 index.html 只减不改），localStorage/appTheme/账号体系天然同源共享。</p>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">02</span><h2>课堂主页：正方形卡网格</h2><span class="rule"></span></div>
+    <ul>
+      <li><b>布局</b>：CSS Grid 两列，<code>aspect-ratio:1</code> 正方形卡，卡片内容三行——顶部日期（大字）、中部课程类型徽章（语法/听力…，取自卡色系统一渲染）、底部「N 段 · M 句」统计。新建的排最前。</li>
+      <li><b>卡色</b>：每张卡一个自定义底色（存 sessions.color，默认按课程类型自动分配——语法=蓝、听力=绿、口语=橙…），同类型课在列表里一眼可辨。</li>
+      <li><b>长按调色</b>：长按 350ms 触发（手机）+ 右键（桌面）；弹出居中调色面板：上方的<b>圆形色盘</b>（HSL 环，手指拖动取色相）+ 下方<b>三条滑轨</b>（色相 H / 饱和度 S / 明度 L，0–255 可滑动微调）+ 实时预览块 + 确认/取消。选色写入该卡的 color 字段，主页卡背景立即换色。</li>
+      <li><b>保留操作</b>：卡右上角 ⋯ 菜单：复制全文 / 导出 Markdown / 删除（删卡连段落音频一起删）。</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">03</span><h2>录制页：流程与常驻保存</h2><span class="rule"></span></div>
+    <div class="grid">
+      <div class="cell"><div class="t">进入</div><div class="d">主页点「➕ 新建翻译」→ 录制页顶部就是表单（日期/类型/课程名）→「开始录制」开麦。从主页某张卡的"继续上课"进入则跳过表单直接续录（同一场次追加段）。</div></div>
+      <div class="cell"><div class="t">录制中</div><div class="d">字幕板 + 段卡照 v2 逻辑走：60 秒静音切分识别、300 秒出「录音N」、48 段上限自动收尾。</div></div>
+      <div class="cell"><div class="t">💾 保存（常驻）</div><div class="d">固定在页面底部，任何状态可见可点：<b>录制中</b>=保存并结束（走完整收尾：尾段落库、批量翻译回填、录音落库）；<b>已完成</b>=返回主页；<b>无内容</b>=置灰。不再有"保存按钮随 5 分钟段消失"的问题。</div></div>
+      <div class="cell"><div class="t">保存后</div><div class="d">自动跳回课堂主页，新卡出现在网格第一位，带刚选的卡色。</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec"><span class="no">04</span><h2>技术改动清单</h2><span class="rule"></span></div>
+    <table>
+      <tr><th>#</th><th>文件</th><th>改动</th></tr>
+      <tr><td class="k">V1</td><td>index.html · sClass 屏</td><td>重写为"主页"：删按钮行/字幕板/底部三钮/术语校准等 DOM，换成长条新建按钮 + 卡网格容器 + 调色盘弹层；classRender/classHist 系列改为网格渲染 classHomeRender()；术语/校准/回放入口移到录制页（主页不放）</td></tr>
+      <tr><td class="k">V2</td><td>index.html · JS</td><td>classSendText/classSegRotate/classStart/classStop/classTranslate 等录制逻辑<b>原样搬到</b> class-recorder.html（同源 localStorage，账号线程不动）；index.html 里只留：主页渲染、卡点击进详情、长按调色、跳转</td></tr>
+      <tr><td class="k">V3</td><td>class-recorder.html（新文件）</td><td>录制工作台：搬入 v2 全部录制 DOM+JS + 常驻保存按钮 + 表单；沿用主应用玻璃设计系统与主题键</td></tr>
+      <tr><td class="k">V4</td><td>proxy.js / worker.js</td><td>无需改——批量翻译、分段端点已在；唯白名单加 class-recorder.html 一行</td></tr>
+      <tr><td class="k">V5</td><td>IndexedDB</td><td>sessions 加 color 字段（透明升级：读到 undefined 用类型默认色）</td></tr>
+      <tr><td class="k">V6</td><td>sync.bat / 白名单 / 版本</td><td>class-recorder.html 进三份同步清单与白名单；APP_VERSION → 6.7.0</td></tr>
+    </table>
+    <div class="warn">
+      <h3>兼容与风险</h3>
+      <p>① 录制中误触返回：录制页加 beforeunload 拦截 + 录制中底部按钮变「保存并结束」，避免误滑丢课。② 旧数据（无 color 字段）：按 ctype 映射默认色，不迁移。③ APK 端跳转：同源相对路径 file 链接在 Capacitor WebView 内直接可用，无需额外配置。④ 体验额度（15 段）与接入码逻辑不动。</p>
+    </div>
+    <p><b>工作量</b>：主页改版 + 调色盘 ≈ 1 天；录制页搬迁 + 常驻保存 ≈ 1 天；联动测试 ≈ 半天。合计约 2.5 天，一个发版走完。</p>
+  </section>
+
+  <div class="colo">基于课堂 v2（32336c0）实况代码制定 · 2026-09-16 · 确认后实施</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>课堂录制 · 俄语学习</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg-a:#d9e7f8;--bg-b:#f0f7ff;--orb-1:#c2d8f4;--orb-2:#b9dcf2;--orb-3:#d6e8fb;
+  --glass:rgba(255,255,255,.50);--glass-strong:rgba(255,255,255,.66);--glass-soft:rgba(255,255,255,.42);
+  --glass-border:rgba(255,255,255,.60);--blur:16px;
+  --shadow:0 10px 30px rgba(50,80,140,.14);--shadow-sm:0 4px 14px rgba(50,80,140,.10);
+  --surface:var(--glass-strong);--card:var(--glass-strong);--input:rgba(255,255,255,.55);
+  --border:rgba(255,255,255,.70);--border2:rgba(91,143,214,.14);
+  --blue:#3a6cb8;--blue2:#5b8fd6;--blue-bg:rgba(91,143,214,.10);--blue-bg2:rgba(91,143,214,.18);
+  --text:#1e2b45;--text2:#3a4a66;--text3:#7c8ca8;
+  --green:#22c55e;--yellow:#f59e0b;--red:#ef4444;
+  --radius:16px;--radius-sm:12px;--radius-pill:22px;
+}
+:root[data-theme="ink"]{--bg-a:#FFFFFF;--bg-b:#F7F7F8;--orb-1:#F2F3F5;--orb-2:#F4F4F6;--orb-3:#FAFAFB;--glass:#FFFFFF;--glass-strong:#FFFFFF;--glass-soft:#FFFFFF;--glass-border:#E6E7EA;--shadow:0 2px 10px rgba(17,17,20,.06);--shadow-sm:0 1px 4px rgba(17,17,20,.05);--surface:#FFFFFF;--card:#FFFFFF;--input:#F7F7F8;--border:#E6E7EA;--border2:rgba(17,17,20,.08);--blue:#111114;--blue2:#3F3F46;--blue-bg:rgba(17,17,20,.05);--blue-bg2:rgba(17,17,20,.09);--text:#111114;--text2:#4B5563;--text3:#9CA3AF;--green:#16A34A;--yellow:#D97706;--red:#DC2626}
+:root[data-theme="amber"]{--bg-a:#FBF3E4;--bg-b:#F6EAD3;--orb-1:#F3DFAF;--orb-2:#F5E7C4;--orb-3:#F9EFD9;--glass:rgba(255,249,238,.72);--glass-strong:rgba(255,249,238,.90);--glass-soft:rgba(255,249,238,.62);--glass-border:rgba(214,178,120,.45);--shadow:0 10px 30px rgba(150,110,60,.14);--shadow-sm:0 4px 14px rgba(150,110,60,.10);--surface:#FFF9EF;--card:#FFF9EF;--input:#FFFDF5;--border:rgba(214,178,120,.50);--border2:rgba(150,110,60,.14);--blue:#C2690A;--blue2:#E08A2E;--blue-bg:rgba(194,105,10,.10);--blue-bg2:rgba(194,105,10,.18);--text:#3B2A12;--text2:#5C4626;--text3:#A98F6C;--green:#16A34A;--yellow:#D97706;--red:#DC2626}
+html,body{height:100%}
+body{font-family:-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',system-ui,sans-serif;color:var(--text);background:linear-gradient(160deg,var(--bg-a),var(--bg-b));overflow-x:hidden}
+.bg{position:fixed;inset:0;background:linear-gradient(160deg,var(--bg-a),var(--bg-b));z-index:-3}
+.orb{position:fixed;border-radius:50%;filter:blur(60px);opacity:.8;z-index:-2}
+.orb.a{width:340px;height:340px;background:var(--orb-1);top:-80px;left:-60px}
+.orb.b{width:280px;height:280px;background:var(--orb-2);top:30%;right:-90px}
+.orb.c{width:260px;height:260px;background:var(--orb-3);bottom:-70px;left:22%}
+.app{max-width:520px;margin:0 auto;padding:16px 14px 96px;display:flex;flex-direction:column;min-height:100vh}
+.header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.header h1{font-size:18px;font-weight:700;flex:1}
+.header .meta{font-size:11px;color:var(--text3)}
+.header .back{padding:8px 14px;border-radius:var(--radius-pill);background:var(--glass);border:1px solid var(--glass-border);color:var(--text2);font-size:13px;text-decoration:none}
+.card{background:var(--card);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow-sm);backdrop-filter:blur(var(--blur));padding:12px;margin-bottom:10px}
+.mini-chip{padding:6px 11px;border-radius:var(--radius-pill);font-size:11.5px;background:var(--input);color:var(--text2);border:1px solid var(--border);cursor:pointer;white-space:nowrap}
+.row{display:flex;gap:8px;margin-bottom:10px}
+.row .big{flex:1;padding:13px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;background:var(--blue);color:#fff;border:none;cursor:pointer}
+.row .big.gray{background:var(--input);color:var(--text2);border:1.5px solid var(--border)}
+.row .big:disabled{opacity:.5;cursor:not-allowed}
+#classHint{font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:6px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px}
+#classTermsPanel input{padding:7px 10px;font-size:12px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text)}
+#classBoard{flex:1;overflow-y:auto;min-height:0;padding-bottom:8px}
+.class-item{background:var(--surface);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px}
+.empty-state{text-align:center;color:var(--text3);font-size:13px;padding:36px 10px}
+.seg-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px}
+#saveBar{position:fixed;left:0;right:0;bottom:0;padding:10px 14px 14px;background:linear-gradient(transparent,var(--bg-b) 40%);display:flex;gap:8px;z-index:9}
+#saveBar button{flex:1;padding:14px 0;border-radius:var(--radius-sm);font-size:14px;font-weight:700;border:none;cursor:pointer}
+#btnSaveLive{background:var(--green);color:#fff}
+#btnSaveLive.gray{background:var(--input);color:var(--text2);border:1.5px solid var(--border)}
+#btnSaveLive:disabled{opacity:.45;cursor:not-allowed}
+.toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:rgba(30,43,69,.92);color:#fff;padding:10px 18px;border-radius:var(--radius-pill);font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:99;max-width:86%;text-align:center}
+.toast.show{opacity:1}
+input.f{padding:8px 10px;font-size:12.5px;background:var(--input);border:1.5px solid var(--border);border-radius:8px;color:var(--text);min-width:0}
+.tbtn.sel{background:var(--blue)!important;color:#fff!important}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+<div class="app">
+  <header class="header">
+    <h1 id="pageTitle">课堂录制</h1>
+    <span class="meta" id="metaLine"></span>
+    <a class="back" href="index.html">← 课堂</a>
+  </header>
+
+  <!-- 表单（新建时显示） -->
+  <div class="card" id="formCard">
+    <div style="font-size:12.5px;font-weight:600;color:var(--blue);margin-bottom:8px">➕ 新建翻译</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input class="f" id="fDate" type="date" style="flex:1">
+      <input class="f" id="fName" placeholder="课程名（可选）" style="flex:1.4">
+    </div>
+    <div id="fTypes" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+    <button class="mini-chip tbtn" id="fGo" style="width:100%;padding:10px 0;font-size:13px;font-weight:700;background:var(--blue);color:#fff">🎙️ 开始录制</button>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px">每 5 分钟自动存一条「录音N」，一堂课最长 4 小时（48 段）</div>
+  </div>
+
+  <!-- 录制工具行（表单隐藏后显示） -->
+  <div id="tools" style="display:none">
+    <div class="row">
+      <button class="big" id="classStartBtn">🎙️ 开始录音</button>
+      <button class="big gray" id="classStopBtn" disabled>⏹ 停止</button>
+      <button class="big" id="classSaveRecBtn" style="display:none;background:var(--green)">💾 保存录音</button>
+    </div>
+    <div id="classHint">识别引擎：<b id="classEngine">检测中…</b></div>
+    <div class="panel" id="classTermsPanel" style="display:none">
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input class="f" id="classTermRu" placeholder="русский 术语" style="flex:1">
+        <input class="f" id="classTermCn" placeholder="中文翻译" style="flex:1">
+        <button class="mini-chip" id="classTermAdd" style="background:var(--blue);color:#fff">添加</button>
+      </div>
+      <div id="classTermsList" style="font-size:12px;max-height:120px;overflow-y:auto"></div>
+    </div>
+    <div class="row" style="margin-bottom:8px">
+      <button class="mini-chip" id="classTermsBtn">📖 术语</button>
+      <button class="mini-chip" id="classCalBtn">🎚 校准</button>
+      <button class="mini-chip" id="classScrollBtn">⏸ 滚动</button>
+      <span style="flex:1"></span>
+      <span style="font-size:11px;color:var(--text3)" id="classCount">0 句</span>
+    </div>
+    <div id="classSegs"></div>
+    <div id="classBoard"><div class="empty-state" id="classEmpty">点上方「开始录音」，老师说一句就显示一句<br>原文（大）＋ 译文（小），自动滚动</div></div>
+    <div class="row" style="padding-bottom:4px">
+      <button class="mini-chip" id="classSaveBtn" style="flex:1;padding:9px 0">💾 复制本课记录</button>
+      <button class="mini-chip" id="classReplayBtn" style="flex:1;padding:9px 0">📼 回放重翻</button>
+      <button class="mini-chip" id="classClearBtn" style="flex:1;padding:9px 0">🧹 清空</button>
+    </div>
+    <input type="file" id="classReplayFile" accept="audio/*,.m4a,.mp4,.webm,.wav" style="display:none">
+  </div>
+
+  <!-- 常驻保存条 -->
+  <div id="saveBar">
+    <button id="btnSaveLive" class="gray">🏠 返回课堂主页</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══ 课堂录制工作台（v3）：从主应用迁移的完整录制逻辑，独立同源运行 ═══ */
+// 主题联动
+(function(){try{var t=localStorage.getItem('appTheme');if(t==='ink'||t==='amber')document.documentElement.setAttribute('data-theme',t)}catch(e){}})();
+
+// ── 基础工具 ──
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show')},2800)}
+function ls(k,d){try{var v=JSON.parse(localStorage.getItem('ru_'+k));return v===null||v===undefined?d:v}catch(e){return d}}
+function ss(k,v){try{localStorage.setItem('ru_'+k,JSON.stringify(v))}catch(e){}}
+function escape(s){return String(s).replace(/[<>&"']/g,function(c){return{'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]})}
+function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+function fmtTime(ts){var d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function fmtTimeShort(ts){var d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+
+// ── API（与主应用同源同逻辑）──
+var SETTINGS=ls('settings',{model:'mymemory',speed:.75,fontSize:16,autoTr:true,mode:'fast',dsKey:'',apiBase:''});
+var API_BASE=(SETTINGS.apiBase&&String(SETTINGS.apiBase).trim())||(location.protocol.indexOf('http')===0?location.origin:'https://aimisi.top');
+var _devid=ls('devid','');
+function devId(){
+  if(_devid&&/^[A-Za-z0-9-]{8,64}$/.test(_devid))return _devid;
+  var m=document.cookie.match(/(?:^|;\s*)ra_devid=([A-Za-z0-9-]{8,64})/);
+  if(m)_devid=m[1];
+  if(!_devid||!/^[A-Za-z0-9-]{8,64}$/.test(_devid)){_devid=(crypto.randomUUID?crypto.randomUUID():('dev-'+Date.now().toString(36)+Math.random().toString(36).slice(2,10)));ss('devid',_devid);try{document.cookie='ra_devid='+_devid+';max-age=31536000;path=/;SameSite=Lax'}catch(e){}}
+  return _devid;
+}
+function authHdr(){var s=ls('session','');return s?{Authorization:'Bearer '+s}:{}}
+function apiFetch(path,opt){opt=opt||{};
+  var b=opt.body;
+  if(b&&typeof b==='object'&&b.key!==undefined){b=Object.assign({},b,{deviceId:devId()})}
+  var headers=Object.assign({'Content-Type':'application/json'},authHdr(),opt.headers||{});
+  return fetch(API_BASE+path,{method:opt.method||'POST',headers:headers,body:b!==undefined?JSON.stringify(b):undefined,signal:AbortSignal.timeout(opt.timeout||60000)})
+    .then(function(r){return r.json().catch(function(){return{}})})
+    .then(function(d){if(d.error&&typeof d.error!=='string')d.error=d.error.message||JSON.stringify(d.error);
+      if(d.error)throw new Error(d.error+(d.snippet?' | 模型返回: '+d.snippet:''));return d});
+}
+
+// ── IndexedDB：主库（sessions/transcripts）──
+var idbStore=(function(){
+  var DB='russian_app',VER=2,_db=null;
+  function open(){if(_db)return Promise.resolve(_db);
+    return new Promise(function(res,rej){var rq=indexedDB.open(DB,VER);
+      rq.onupgradeneeded=function(e){var db=e.target.result;
+        if(!db.objectStoreNames.contains('sessions'))db.createObjectStore('sessions',{keyPath:'id'});
+        if(!db.objectStoreNames.contains('transcripts')){var st=db.createObjectStore('transcripts',{keyPath:'id'});st.createIndex('sessionId','sessionId',{unique:false})}};
+      rq.onsuccess=function(){_db=rq.result;res(_db)};rq.onerror=function(){rej(rq.error)}})}
+  function run(store,mode,fn){return open().then(function(db){return new Promise(function(res,rej){
+    var t=db.transaction(store,mode),os=t.objectStore(store),result;
+    t.oncomplete=function(){res(result)};t.onerror=function(){rej(t.error)};t.onabort=function(){rej(t.error)};
+    var r;try{r=fn(os)}catch(e){rej(e);return}
+    r.onsuccess=function(){result=r.result};r.onerror=function(){rej(r.error)}})})}
+  return{put:function(s,v){return run(s,'readwrite',function(o){return o.put(v)})},
+    get:function(s,k){return run(s,'readonly',function(o){return o.get(k)})},
+    getAll:function(s){return run(s,'readonly',function(o){return o.getAll()})},
+    del:function(s,k){return run(s,'readwrite',function(o){return o.delete(k)})},
+    byIndex:function(s,i,k){return run(s,'readonly',function(o){return o.index(i).getAll(k)})}};
+})();
+
+// ── IndexedDB：录音库（parts/recordings/segs v3）──
+var recParts=(function(){
+  var DB='russian_app_rec',ST='parts',RST='recordings',SG='segs',VER=3,_db=null;
+  function open(){if(_db)return Promise.resolve(_db);
+    return new Promise(function(res,rej){var rq=indexedDB.open(DB,VER);
+      rq.onupgradeneeded=function(){var db=rq.result;
+        if(!db.objectStoreNames.contains(ST)){var s=db.createObjectStore(ST,{keyPath:'id'});s.createIndex('sessionId','sessionId',{unique:false})}
+        if(!db.objectStoreNames.contains(RST))db.createObjectStore(RST,{keyPath:'id'});
+        if(!db.objectStoreNames.contains(SG)){var sg=db.createObjectStore(SG,{keyPath:'id'});sg.createIndex('sessionId','sessionId',{unique:false})}};
+      rq.onsuccess=function(){_db=rq.result;res(_db)};rq.onerror=function(){rej(rq.error)};
+      rq.onblocked=function(){rej(new Error('录音库被其他标签页占用'))}})}
+  function run(store,mode,fn){return open().then(function(db){return new Promise(function(res,rej){
+    var t=db.transaction(store,mode),os=t.objectStore(store),out;
+    t.oncomplete=function(){res(out)};t.onerror=function(){rej(t.error)};t.onabort=function(){rej(t.error)};
+    var r;try{r=fn(os)}catch(e){rej(e);return}
+    r.onsuccess=function(){out=r.result};r.onerror=function(){rej(r.error)}})})}
+  return{put:function(v){return run(ST,'readwrite',function(o){return o.put(v)})},
+    bySession:function(sid){return run(ST,'readonly',function(o){return o.index('sessionId').getAll(sid)})},
+    keys:function(){return run(ST,'readonly',function(o){return o.getAllKeys()})},
+    del:function(id){return run(ST,'readwrite',function(o){return o.delete(id)})},
+    putRec:function(v){return run(RST,'readwrite',function(o){return o.put(v)})},
+    getRec:function(id){return run(RST,'readonly',function(o){return o.get(id)})},
+    listRecs:function(){return run(RST,'readonly',function(o){return o.getAll()})},
+    delRec:function(id){return run(RST,'readwrite',function(o){return o.delete(id)})},
+    putSeg:function(v){return run(SG,'readwrite',function(o){return o.put(v)})},
+    getSeg:function(id){return run(SG,'readonly',function(o){return o.get(id)})},
+    segBySession:function(sid){return run(SG,'readonly',function(o){return o.index('sessionId').getAll(sid)})},
+    delSegs:function(sid){return run(SG,'readwrite',function(o){var rr=o.index('sessionId').getAll(sid);rr.onsuccess=function(){(rr.result||[]).forEach(function(x){o.delete(x.id)})}})}};
+})();
+
+// ── 状态 ──
+const CLASS={running:false,items:[],sessionId:null,scrollOn:true,dropped:0,finalizing:false,_recStoredSid:null,
+  meta:null,segSeq:0,_segT0:0,_segChunks:[],_segBytes:0,batchTr:ls('classBatchTr',1),_pendingItems:[],_lastSent:'',_trialLeft:1,_recBlob:null,_recSid:null,_sessionStart:null};
+const CLASS_SEG_MAX_MS=60000,CLASS_SEG_WINDOW_MS=300000,CLASS_MAX_SEGS=48;
+const CLASS_GATE_DEFAULT=0.015,CLASS_SIL_DEFAULT=1200;
+let classStream=null,classAudioCtx=null,classAnalyser=null,classRecorder=null,classMime='audio/webm',classChunks=[],classSilenceMs=0,classSessionChunks=[],classFailedChunks=[],classSegT0=0;
+let _gateCache=null,_silCache=null;
+const CLASS_MEM_MAX=8*1024*1024;
+let classMemBytes=0,classPartSeq=0,classPartsFlushed=0,classPartsBroken=false,classPartFlush=Promise.resolve();
+const CLASS_TYPES=['语法','听力','口语','阅读','写作','文学'];
+function classGate(){if(_gateCache==null){var v=parseFloat(ls('classGate',0));_gateCache=(isFinite(v)&&v>0)?Math.min(0.08,Math.max(0.005,v)):CLASS_GATE_DEFAULT}return _gateCache}
+function classSilMs(){if(_silCache==null){var v=parseInt(ls('classSil',0),10);_silCache=(isFinite(v)&&v>=400&&v<=3000)?v:CLASS_SIL_DEFAULT}return _silCache}
+function classTermsGet(){return ls('classTerms',[])}
+function classTermsJoin(list,sep,maxLen){var out='';for(var _i=0;_i<(list||[]).length;_i++){var p=String(list[_i]==null?'':list[_i]).trim();if(!p)continue;if(!out){if(p.length>maxLen)return p.slice(0,maxLen);out=p;continue}if(out.length+sep.length+p.length>maxLen)break;out+=sep+p}return out}
+
+// ── 屏幕常亮 ──
+var _wakeLock=null;
+async function keepAwakeOn(){try{if(navigator.wakeLock){_wakeLock=await navigator.wakeLock.request('screen');return true}}catch(e){}return false}
+function keepAwakeOff(){try{if(_wakeLock){_wakeLock.release();_wakeLock=null}}catch(e){}}
+
+// ── 字幕渲染 ──
+function classAddItem(original,translation,note,confidence,tsMs){
+  var ts=(tsMs!=null&&isFinite(tsMs)&&tsMs>0)?tsMs:Date.now();
+  var item={_id:genId(),_ts:ts,time:fmtTimeShort(ts),original:original,translation:translation,note:note||'',confidence:(confidence===null||confidence===undefined)?null:confidence,star:false};
+  var last=CLASS.items[CLASS.items.length-1];
+  if(last&&item._ts<last._ts){var k=CLASS.items.length;while(k>0&&CLASS.items[k-1]._ts>item._ts)k--;CLASS.items.splice(k,0,item)}else CLASS.items.push(item);
+  if(CLASS.items.length>200)CLASS.items.shift();
+  if(CLASS.sessionId)idbStore.put('transcripts',{id:item._id,sessionId:CLASS.sessionId,timestamp:item._ts,original:original,translation:translation,note:note||'',confidence:item.confidence,star:0}).catch(function(){});
+  classAppendItem(item);
+  if(CLASS.scrollOn!==false){var b=document.getElementById('classBoard');b.scrollTop=b.scrollHeight}
+}
+function classItemHTML(it,i){return '<div class="class-item" data-idx="'+i+'">'
+  +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:10px;color:var(--text3)">'+it.time+'</span>'
+  +'<span><span class="class-play" data-i="'+i+'" data-lang="ru" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">🔊原文</span> '
+  +'<span class="class-play" data-i="'+i+'" data-lang="zh" style="font-size:12px;color:var(--text2);padding:2px 8px;border-radius:12px;background:var(--input);cursor:pointer">🔊译文</span></span></div>'
+  +'<div style="font-size:17px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:3px">'+escape(it.original)+(it.confidence!==null&&it.confidence<-0.8?' <span style="color:var(--yellow);font-weight:400;font-size:13px">⚠️ 识别不准</span>':'')+'</div>'
+  +'<div style="font-size:14px;color:var(--blue);line-height:1.5">'+escape(it.translation||'')+'</div>'
+  +(it.note?'<div style="font-size:11px;color:var(--yellow);margin-top:3px">⚠️ '+escape(it.note)+'</div>':'')
+  +'</div>'}
+function classAppendItem(it){
+  var el=document.getElementById('classBoard');
+  var wrap=document.createElement('div');wrap.innerHTML=classItemHTML(it,CLASS.items.length-1);
+  var empty=document.getElementById('classEmpty');if(empty)el.innerHTML='';
+  el.appendChild(wrap.firstElementChild);
+  document.getElementById('classCount').textContent=CLASS.items.length+' 句';
+}
+function classRender(){
+  var el=document.getElementById('classBoard');
+  document.getElementById('classCount').textContent=CLASS.items.length+' 句';
+  if(!CLASS.items.length){el.innerHTML='<div class="empty-state" id="classEmpty">点上方「开始录音」，老师说一句就显示一句</div>';return}
+  el.innerHTML=CLASS.items.map(function(it,i){return classItemHTML(it,i)}).join('');
+  el.querySelectorAll('.class-play').forEach(function(b){b.addEventListener('click',function(){
+    var it=CLASS.items[parseInt(b.dataset.i)];if(!it)return;
+    var u=new SpeechSynthesisUtterance(b.dataset.lang==='ru'?it.original:(it.translation||''));
+    u.lang=b.dataset.lang==='ru'?'ru-RU':'zh-CN';u.rate=.9;speechSynthesis.speak(u)})});
+}
+
+// ── 翻译（批量 + 实时两态）──
+async function classTranslate(text){
+  try{
+    var d=await apiFetch('/api/class-translate',{body:{key:SETTINGS.dsKey||'',text:text,terms:classTermsJoin(classTermsGet().map(function(t){return t.ru+'='+t.cn}),'; ',800)},timeout:120000});
+    return{original:d.original||text,translation:d.translation||'',note:d.note||''};
+  }catch(e){return{original:text,translation:'（翻译失败: '+(e.message||e)+'）',note:''}}
+}
+function asrLooksValid(tt,meta){
+  if(/[\u0400-\u04FF]/.test(tt))return true;
+  if(/[\u4e00-\u9fff]/.test(tt))return true;
+  if(/[a-zA-Z]{2,}/.test(tt)&&!(/^(you|thank|ok|so|and)\b/i.test(tt)&&tt.split(/\s+/).length<=3))return true;
+  return false;
+}
+async function classSendText(t,confidence,meta){
+  var tt=(t||'').trim();
+  if(!tt||tt===CLASS._lastSent)return;
+  if(!asrLooksValid(tt,meta)){CLASS._lastSent=tt;return}
+  CLASS._lastSent=tt;
+  if(CLASS.batchTr&&CLASS.running){
+    classAddItem(tt,'','',confidence,(meta&&meta.tsMs)||undefined);
+    CLASS._pendingItems.push({id:CLASS.items[CLASS.items.length-1]._id,text:tt,ts:(meta&&meta.tsMs)||Date.now()});
+    return Promise.resolve();
+  }
+  document.getElementById('classHint').innerHTML='<span style="color:var(--text2)">翻译中…</span>';
+  return classTranslate(tt).then(function(r){classAddItem(r.original,r.translation,r.note,confidence,(meta&&meta.tsMs)||undefined);classHintReset()});
+}
+function classHintReset(){document.getElementById('classHint').textContent='识别引擎：'+(document.getElementById('classEngine').textContent||'')}
+
+// ── 5 分钟分段 ──
+function classSegAppend(b){if(!CLASS.running||!CLASS._segT0)return;CLASS._segChunks.push(b);CLASS._segBytes+=(b.size||0)}
+function classSegCardUpsert(seq,t0,t1,size){
+  var el=document.getElementById('classSegs');if(!el)return;
+  var card=el.querySelector('[data-seg="'+seq+'"]');
+  if(!card){card=document.createElement('div');card.dataset.seg=seq;card.className='seg-card';el.appendChild(card);
+    card.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:13px;color:var(--blue)">录音'+seq+'</b><span class="segmeta" style="font-size:10.5px;color:var(--text3)"></span><span style="flex:1"></span><button class="mini-chip" data-sc-ru="'+seq+'">复制原文</button><button class="mini-chip" data-sc-cn="'+seq+'">复制译文</button><button class="mini-chip" data-sc-play="'+seq+'">▶</button><button class="mini-chip" data-sc-exp="'+seq+'">⬇️</button></div><div class="seg-tr" style="font-size:11.5px;color:var(--blue);margin-top:4px;line-height:1.5"><span style="color:var(--text3)">翻译将在本段结束后出现…</span></div>'}
+  var fmt=function(ts){var d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+  card.querySelector('.segmeta').textContent=fmt(t0)+'–'+fmt(t1)+' · '+(size/1048576).toFixed(1)+'MB';
+}
+function classSegItemsFor(seq){var m=CLASS._segMeta&&CLASS._segMeta[seq];if(!m)return[];return CLASS.items.filter(function(it){return it._ts>=m.t0&&it._ts<m.t1})}
+function classSegRotate(){
+  var seq=CLASS.segSeq+1;
+  var blob=new Blob(CLASS._segChunks,{type:classMime});
+  CLASS._segChunks=[];CLASS._segBytes=0;
+  if(blob.size>1024){
+    var sid=CLASS._recSid,t0=CLASS._segT0,t1=Date.now();
+    var seg={id:sid+'_s'+String(seq).padStart(3,'0'),sessionId:sid,seq:seq,t0:t0,t1:t1,blob:blob};
+    classPartFlush=classPartFlush.then(function(){return recParts.putSeg(seg)}).catch(function(){});
+    classSegCardUpsert(seq,t0,t1,blob.size);
+    CLASS.segSeq=seq;
+    CLASS._segMeta=CLASS._segMeta||{};CLASS._segMeta[seq]={t0:t0,t1:t1};
+    toast('💾 录音'+seq+' 已保存（5 分钟）');
+  }
+  // 段末批量翻译
+  if(CLASS.batchTr&&CLASS._pendingItems.length){
+    var pend=CLASS._pendingItems.splice(0);
+    var segSeqLocal=seq;
+    var fullText=pend.map(function(x){return x.text}).join('\n');
+    var prevTail=CLASS.items.filter(function(x){return x.translation}).slice(-2).map(function(x){return x.original}).join('\n');
+    apiFetch('/api/class-translate',{body:{key:SETTINGS.dsKey||'',batch:true,text:fullText,context:prevTail,terms:classTermsJoin(classTermsGet().map(function(t){return t.ru+'='+t.cn}),'; ',800)},timeout:120000}).then(function(r){
+      var lines=((r||{}).translation||'').split(/\n+/).map(function(x){return x.trim()}).filter(Boolean);
+      pend.forEach(function(x,i){
+        var it=null;for(var _j=0;_j<CLASS.items.length;_j++)if(CLASS.items[_j]._id===x.id){it=CLASS.items[_j];break}
+        if(it){if(lines.length===pend.length)it.translation=lines[i]||'';else it.translation=(r&&r.translation)||'';
+          if(it._id&&CLASS.sessionId)idbStore.put('transcripts',{id:it._id,sessionId:CLASS.sessionId,timestamp:it._ts,original:it.original,translation:it.translation,note:it.note||'',confidence:it.confidence,star:0}).catch(function(){})}
+      });
+      classRender();
+      var el=document.getElementById('classSegs');
+      if(el){var card=el.querySelector('[data-seg="'+segSeqLocal+'"] .seg-tr');
+        if(card)card.innerHTML='<b>译文：</b>'+escape(lines.length===pend.length?lines.join(' / '):((r&&r.translation)||'')).slice(0,600)}
+    }).catch(function(){});
+  }
+  CLASS._segT0=Date.now();
+}
+function classSegTick(){
+  if(!CLASS.running||!CLASS._segT0)return;
+  if(Date.now()-CLASS._segT0>=CLASS_SEG_WINDOW_MS)classSegRotate();
+  if(CLASS.segSeq>=CLASS_MAX_SEGS){toast('⏰ 已到 4 小时上限，自动收尾');classStop();return}
+  setTimeout(classSegTick,1000);
+}
+
+// ── 录音落盘（整课备份）──
+function classStashChunk(b){
+  classSessionChunks.push(b);classMemBytes+=(b.size||0);
+  if(classPartsBroken||classMemBytes<CLASS_MEM_MAX)return;
+  var batch=classSessionChunks;classSessionChunks=[];classMemBytes=0;
+  var sid=CLASS._recSid,seq=classPartSeq++;
+  classPartFlush=classPartFlush.then(function(){
+    if(classPartsBroken)throw new Error('skip');
+    return recParts.put({id:sid+'_'+String(seq).padStart(6,'0'),sessionId:sid,seq:seq,blob:new Blob(batch,{type:classMime})}).then(function(){classPartsFlushed++})})
+    .catch(function(){classPartsBroken=true;classSessionChunks=batch.concat(classSessionChunks);classMemBytes+=batch.reduce(function(n,x){return n+(x.size||0)},0)});
+}
+async function classCollectRecording(){
+  var sid=CLASS._recSid,parts=[];
+  if(classPartSeq>0){try{parts=await classPartFlush.then(function(){return recParts.bySession(sid)})}catch(e){parts=[]}
+    parts=(parts||[]).slice().sort(function(a,b){return a.seq-b.seq})}
+  var list=parts.map(function(p){return p.blob}).concat(classSessionChunks);
+  for(var _i=0;_i<parts.length;_i++){try{await recParts.del(parts[_i].id)}catch(e){}}
+  var blob=new Blob(list,{type:classMime});
+  classSessionChunks=[];classMemBytes=0;classPartSeq=0;classPartsFlushed=0;classPartsBroken=false;
+  return blob;
+}
+
+// ── 识别 ──
+const CLASS_ASR_BACKLOG_MAX=6,CLASS_FAILED_MAX=30;
+var classAsrChain=Promise.resolve(),classAsrBacklog=0;
+function classQueueRecognize(blob,ts){
+  if(classAsrBacklog>=CLASS_ASR_BACKLOG_MAX){if(classFailedChunks.length<CLASS_FAILED_MAX)classFailedChunks.push({b:blob,ts:ts});return}
+  classAsrBacklog++;
+  classAsrChain=classAsrChain.then(function(){return classRecognize(blob,ts)}).catch(function(){}).then(function(){classAsrBacklog=Math.max(0,classAsrBacklog-1)});
+}
+async function classRecognize(blob,tsMs){
+  var ts=(tsMs!=null)?tsMs:Date.now();
+  try{
+    var r=await fetch(API_BASE+'/api/voice',{method:'POST',body:blob,headers:authHdr(),signal:AbortSignal.timeout(120000)});
+    var d=await r.json().catch(function(){return{}});
+    if(d.error)throw new Error(d.error);
+    classSendText(d.text||'',d.confidence,Object.assign({},d,{tsMs:ts}));
+  }catch(e){
+    if(classFailedChunks.length<CLASS_FAILED_MAX)classFailedChunks.push({b:blob,ts:ts});
+  }
+}
+
+// ── 开始 / 停止 ──
+function classStartBtnSync(){var b=document.getElementById('classStartBtn');if(b)b.disabled=!!CLASS.running||!!CLASS.finalizing}
+function classStart(){
+  var status=document.getElementById('classStatus');
+  if(CLASS.finalizing){toast('⏳ 上一堂课还在保存，请稍等…');return}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('❌ 浏览器不支持麦克风');return}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    classStream=stream;
+    if(!CLASS.sessionId){CLASS.sessionId=genId();CLASS._recSid=CLASS.sessionId;CLASS._sessionStart=Date.now();CLASS.segSeq=0;CLASS._segT0=Date.now();CLASS._segMeta={};
+      var m=CLASS.meta||{};
+      idbStore.put('sessions',{id:CLASS.sessionId,startTime:CLASS._sessionStart,endTime:null,courseName:m.name||'',cdate:m.date||new Date().toISOString().slice(0,10),ctype:m.type||'',segCount:0}).catch(function(){});
+      classSegsClear();}
+    classAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    var srcNode=classAudioCtx.createMediaStreamSource(stream);
+    classAnalyser=classAudioCtx.createAnalyser();classAnalyser.fftSize=1024;
+    srcNode.connect(classAnalyser);
+    classMime=MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')?'audio/mp4;codecs=mp4a.40.2':(MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm');
+    classRecorder=new MediaRecorder(stream,{mimeType:classMime});
+    classChunks=[];classSessionChunks=[];classFailedChunks=[];CLASS._recBlob=null;CLASS._lastSent='';CLASS.dropped=0;
+    classMemBytes=0;classPartSeq=0;classPartsFlushed=0;classPartsBroken=false;classPartFlush=Promise.resolve();
+    classRecorder.ondataavailable=function(e){if(e.data&&e.data.size){classChunks.push(e.data);classStashChunk(e.data);classSegAppend(e.data)}};
+    classRecorder.onstop=function(){
+      if(classChunks.length){var blob=new Blob(classChunks,{type:classMime});classChunks=[];classQueueRecognize(blob,classSegT0)}
+      if(CLASS.running){classSegT0=Date.now();try{classRecorder.start(200)}catch(e){}}
+      else{classFinalizeRecording()}
+    };
+    classSegT0=Date.now();
+    classRecorder.start(200);
+    CLASS.running=true;classSilenceMs=0;
+    classStartBtnSync();saveBarSync();
+    document.getElementById('classStopBtn').disabled=false;
+    document.getElementById('classHint').textContent='🎙️ 聆听中… 每 5 分钟自动存一条录音';
+    classSilenceTick();setTimeout(classSegTick,1000);
+    keepAwakeOn();
+  }).catch(function(){
+    document.getElementById('classHint').innerHTML='❌ 麦克风被拒绝：浏览器地址栏 🔒 → 网站设置 → 允许麦克风';
+  });
+}
+function classHintDefault(){return '识别引擎：'+document.getElementById('classEngine').textContent}
+function classSilenceTick(){
+  if(!CLASS.running)return;
+  var buf=new Uint8Array(classAnalyser.fftSize);
+  classAnalyser.getByteTimeDomainData(buf);
+  var sum=0;for(var i=0;i<buf.length;i++){var v=(buf[i]-128)/128;sum+=v*v}
+  var rms=Math.sqrt(sum/buf.length);
+  if(rms<classGate()){
+    classSilenceMs+=200;
+    if(classSilenceMs>=classSilMs()&&classRecorder&&classRecorder.state==='recording'){classSilenceMs=0;try{classRecorder.stop()}catch(e){}}
+  }else classSilenceMs=0;
+  if(classSegT0&&Date.now()-classSegT0>=CLASS_SEG_MAX_MS&&classRecorder&&classRecorder.state==='recording'){classSilenceMs=0;try{classRecorder.stop()}catch(e){}}
+  setTimeout(classSilenceTick,200);
+}
+function classStop(){
+  CLASS.running=false;CLASS._lastSent='';classSilenceMs=0;
+  keepAwakeOff();
+  if(CLASS._segChunks&&CLASS._segChunks.length)classSegRotate();
+  if(CLASS.sessionId){
+    var sid=CLASS.sessionId,segN=CLASS.segSeq;
+    idbStore.get('sessions',sid).then(function(sess){if(sess){sess.endTime=Date.now();sess.segCount=segN;idbStore.put('sessions',sess).catch(function(){})}}).catch(function(){});
+  }
+  if(classRecorder){try{classRecorder.stop()}catch(e){}classRecorder=null}
+  if(classStream){classStream.getTracks().forEach(function(t){t.stop()});classStream=null}
+  if(classAudioCtx){try{classAudioCtx.close()}catch(e){}classAudioCtx=null}
+  classAnalyser=null;
+  CLASS.finalizing=true;classStartBtnSync();saveBarSync();
+  document.getElementById('classStopBtn').disabled=true;
+  document.getElementById('classHint').textContent='⏳ 正在保存录音与译文…';
+  clearTimeout(CLASS._finTimer);
+  CLASS._finTimer=setTimeout(function(){if(CLASS.finalizing){CLASS.finalizing=false;classStartBtnSync();saveBarSync()}},600000);
+}
+async function classFinalizeRecording(){
+  try{
+    var hasAudio=classSessionChunks.length>0||classPartSeq>0;
+    if(hasAudio){
+      var blob=await classCollectRecording();
+      if(blob&&blob.size){
+        CLASS._recBlob=blob;
+        var sid=CLASS._recSid||'rec_'+Date.now();
+        CLASS._recStoredSid=sid;
+        recParts.putRec({id:sid,time:Date.now(),size:blob.size,blob:blob}).catch(function(){});
+        var btn=document.getElementById('classSaveRecBtn');
+        if(btn){btn.style.display='inline-block';btn.textContent='💾 保存录音（'+Math.max(1,Math.round(blob.size/600000))+'分钟）'}
+      }
+    }
+    try{await classAsrChain}catch(e){}
+    if(classFailedChunks.length){
+      document.getElementById('classHint').textContent='🔁 正在精修重试 '+classFailedChunks.length+' 段…';
+      var failed=classFailedChunks.splice(0);
+      for(var i=0;i<failed.length;i++){
+        var fc=failed[i];
+        try{
+          var qs='?hq=1&beam=10&ts='+fc.ts;
+          var r=await fetch(API_BASE+'/api/voice-hq'+qs,{method:'POST',body:fc.b,headers:authHdr(),signal:AbortSignal.timeout(180000)});
+          var d=await r.json().catch(function(){return{}});
+          if(d.text&&d.text.trim())await classSendText(d.text,d.confidence,{tsMs:fc.ts});
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+  CLASS.finalizing=false;classStartBtnSync();saveBarSync();
+  document.getElementById('classHint').textContent='✅ 已保存。可点右下「返回课堂主页」查看，或继续录音（同一场次追加段落）';
+  CLASS.sessionId=null;
+}
+
+// ── 段卡事件 ──
+document.getElementById('classSegs').addEventListener('click',async function(e){
+  var t=e.target.closest('button');if(!t)return;
+  var seq=parseInt(t.dataset.scRu||t.dataset.scCn||t.dataset.scPlay||t.dataset.scExp);
+  if(isNaN(seq))return;
+  if(t.dataset.scRu!==undefined){
+    var its=classSegItemsFor(seq).filter(function(x){return x.original});
+    if(!its.length){toast('本段还没有原文');return}
+    navigator.clipboard.writeText(its.map(function(x){return x.original}).join('\n\n')).then(function(){toast('已复制录音'+seq+'原文')}).catch(function(){toast('复制失败')});
+  }else if(t.dataset.scCn!==undefined){
+    var its2=classSegItemsFor(seq).filter(function(x){return x.translation});
+    if(!its2.length){toast('译文还没出来（段末批量翻译）');return}
+    navigator.clipboard.writeText(its2.map(function(x){return x.translation}).join('\n\n')).then(function(){toast('已复制录音'+seq+'译文')}).catch(function(){toast('复制失败')});
+  }else if(t.dataset.scPlay!==undefined){
+    var seg=await recParts.getSeg((CLASS._recSid||'')+'_s'+String(seq).padStart(3,'0'));
+    if(!seg){toast('本段音频不在本机');return}
+    try{if(window._segAudio)window._segAudio.pause()}catch(err){}
+    window._segAudio=new Audio(URL.createObjectURL(seg.blob));window._segAudio.play();
+  }else if(t.dataset.scExp!==undefined){
+    var seg2=await recParts.getSeg((CLASS._recSid||'')+'_s'+String(seq).padStart(3,'0'));
+    if(!seg2){toast('本段音频不在本机');return}
+    var ext=(classMime||'').indexOf('mp4')>=0?'m4a':'webm';
+    var name='录音'+seq+'_'+new Date(seg2.t0||Date.now()).toISOString().slice(0,10)+'.'+ext;
+    var file=new File([seg2.blob],name,{type:seg2.blob.type||classMime});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(err){if(err&&err.name==='AbortError')return}}
+    var url=URL.createObjectURL(seg2.blob);var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){a.remove();URL.revokeObjectURL(url)},1000);
+  }
+});
+function classSegsClear(){var el=document.getElementById('classSegs');if(el)el.innerHTML=''}
+
+// ── 术语 / 校准 / 滚动 / 复制 / 清空 ──
+function classTermsRender(){
+  var box=document.getElementById('classTermsList');if(!box)return;
+  var t=classTermsGet();
+  box.innerHTML=t.length?t.map(function(x,i){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px dashed var(--border)"><span><b style="color:var(--blue)">'+escape(x.ru)+'</b> = '+escape(x.cn)+'</span><span class="class-term-del" data-i="'+i+'" style="color:var(--red);cursor:pointer">✕</span></div>'}).join(''):'<span style="color:var(--text3)">还没有术语，添加后翻译即刻生效</span>';
+  box.querySelectorAll('.class-term-del').forEach(function(b){b.addEventListener('click',function(){var a=classTermsGet();a.splice(parseInt(b.dataset.i),1);ss('classTerms',a);classTermsRender()})});
+}
+document.getElementById('classTermsBtn').addEventListener('click',function(){var p=document.getElementById('classTermsPanel');p.style.display=p.style.display==='block'?'none':'block';classTermsRender()});
+document.getElementById('classTermAdd').addEventListener('click',function(){
+  var ru=document.getElementById('classTermRu').value.trim(),cn=document.getElementById('classTermCn').value.trim();
+  if(!ru||!cn){toast('两项都填');return}
+  var a=classTermsGet();a.push({ru:ru,cn:cn});ss('classTerms',a);classTermsRender();
+  document.getElementById('classTermRu').value='';document.getElementById('classTermCn').value='';toast('术语已添加');
+});
+document.getElementById('classCalBtn').addEventListener('click',async function(){
+  if(!classStream){toast('先开始录音再校准');return}
+  toast('正在采样教室底噪 3 秒…请保持安静');
+  var buf=new Uint8Array(classAnalyser.fftSize),peaks=[],n=0;
+  var timer=setInterval(function(){
+    classAnalyser.getByteTimeDomainData(buf);var sum=0;
+    for(var i=0;i<buf.length;i++){var v=(buf[i]-128)/128;sum+=v*v}
+    peaks.push(Math.sqrt(sum/buf.length));
+    if(++n>=15){clearInterval(timer);
+      peaks.sort(function(a,b){return a-b});
+      var med=peaks[Math.floor(peaks.length/2)]||CLASS_GATE_DEFAULT;
+      var gate=Math.min(0.08,Math.max(0.005,med*2.2));
+      ss('classGate',gate);_gateCache=gate;
+      toast('✅ 门限已校准为 '+gate.toFixed(4))}
+  },200);
+});
+document.getElementById('classScrollBtn').addEventListener('click',function(){CLASS.scrollOn=!CLASS.scrollOn;this.textContent=CLASS.scrollOn?'⏸ 滚动':'▶ 已暂停';toast(CLASS.scrollOn?'自动滚动已恢复':'自动滚动已暂停')});
+document.getElementById('classSaveBtn').addEventListener('click',function(){
+  if(!CLASS.items.length){toast('还没有记录');return}
+  var txt=CLASS.items.map(function(it,i){return (i+1)+'. ['+it.time+'] '+it.original+'\n    '+(it.translation||'')}).join('\n\n');
+  navigator.clipboard.writeText(txt).then(function(){toast('已复制到剪贴板')}).catch(function(){toast('复制失败')});
+});
+document.getElementById('classClearBtn').addEventListener('click',async function(){
+  if(!CLASS.items.length)return;
+  if(!confirm('清空当前字幕板？（历史记录仍在）'))return;
+  CLASS.items=[];classRender();
+});
+document.getElementById('classSaveRecBtn').addEventListener('click',async function(){
+  if(!CLASS._recBlob){toast('没有可保存的录音');return}
+  var ext=classMime.indexOf('mp4')>=0?'m4a':'webm';
+  var name='课堂录音_'+new Date().toISOString().slice(0,10)+'.'+ext;
+  var file=new File([CLASS._recBlob],name,{type:CLASS._recBlob.type||classMime});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return}catch(e){if(e&&e.name==='AbortError')return}}
+  var url=URL.createObjectURL(CLASS._recBlob);var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){a.remove();URL.revokeObjectURL(url)},1000);
+});
+// 回放重翻（文件版）
+document.getElementById('classReplayBtn').addEventListener('click',function(){document.getElementById('classReplayFile').click()});
+document.getElementById('classReplayFile').addEventListener('change',async function(e){
+  var f=e.target.files[0];if(!f)return;
+  toast('回放精修中…约需 1-2 分钟');
+  try{
+    var r=await fetch(API_BASE+'/api/voice-hq',{method:'POST',body:f,headers:authHdr(),signal:AbortSignal.timeout(300000)});
+    var d=await r.json().catch(function(){return{}});
+    if(d.text)await classSendText(d.text,d.confidence,{tsMs:Date.now()});
+    else toast(d.error||'回放失败');
+  }catch(err){toast('回放失败：'+(err.message||err))}
+  e.target.value='';
+});
+
+// ── 表单 / 继续上课 ──
+function qsParam(k){var m=new RegExp('[?&]'+k+'=([^&]*)').exec(location.search);return m?decodeURIComponent(m[1]):''}
+function formInit(){
+  var wrap=document.getElementById('fTypes');
+  wrap.innerHTML=CLASS_TYPES.map(function(t){return '<button class="mini-chip tbtn" data-t="'+t+'">'+t+'</button>'}).join('');
+  var cur=ls('classType','');
+  wrap.querySelectorAll('.tbtn').forEach(function(b){
+    if(b.dataset.t===cur){b.classList.add('sel')}
+    b.addEventListener('click',function(){wrap.querySelectorAll('.tbtn').forEach(function(x){x.classList.remove('sel')});b.classList.add('sel');ss('classType',b.dataset.t)});
+  });
+  var d=document.getElementById('fDate');if(!d.value)d.value=new Date().toISOString().slice(0,10);
+}
+document.getElementById('fGo').addEventListener('click',function(){
+  var sel=document.querySelector('#fTypes .tbtn.sel');
+  CLASS.meta={date:document.getElementById('fDate').value||new Date().toISOString().slice(0,10),type:sel?sel.dataset.t:'',name:document.getElementById('fName').value.trim()};
+  document.getElementById('formCard').style.display='none';
+  document.getElementById('tools').style.display='block';
+  document.getElementById('metaLine').textContent=CLASS.meta.date+(CLASS.meta.type?' · '+CLASS.meta.type:'')+(CLASS.meta.name?' · '+CLASS.meta.name:'');
+  document.getElementById('pageTitle').textContent='录制中 · '+ (CLASS.meta.type||'课堂');
+  toast('信息已保存，点「开始录音」');
+});
+// 常驻保存条
+function saveBarSync(){
+  var b=document.getElementById('btnSaveLive');
+  if(CLASS.running){b.textContent='💾 保存并结束';b.disabled=false;b.classList.remove('gray')}
+  else if(CLASS.finalizing){b.textContent='⏳ 正在保存…';b.disabled=true;b.classList.remove('gray')}
+  else if(CLASS.items.length||CLASS._recBlob){b.textContent='🏠 保存完成 · 返回主页';b.disabled=false;b.classList.add('gray')}
+  else{b.textContent='🏠 返回课堂主页';b.disabled=false;b.classList.add('gray')}
+}
+document.getElementById('btnSaveLive').addEventListener('click',function(){
+  if(CLASS.running){classStop();return}
+  if(CLASS.finalizing){toast('正在保存，请稍等');return}
+  location.href='index.html';
+});
+// 录制中防误触离开
+window.addEventListener('beforeunload',function(e){if(CLASS.running||CLASS.finalizing){e.preventDefault();e.returnValue=''}});
+// 引擎探测
+fetch(API_BASE+'/api/voice-health',{signal:AbortSignal.timeout(5000)}).then(function(r){return r.json()}).then(function(d){
+  document.getElementById('classEngine').textContent=(d&&d.ok&&d.stt)?('本机 '+(d.device||'')):'☁️ 云 Whisper';
+}).catch(function(){document.getElementById('classEngine').textContent='☁️ 云 Whisper'});
+
+// ── 启动 ──
+(function(){
+  var sid=qsParam('sid');
+  if(sid){
+    // 继续上课：载入元数据，跳过表单
+    idbStore.get('sessions',sid).then(function(sess){
+      if(sess){CLASS.meta={date:sess.cdate||new Date().toISOString().slice(0,10),type:sess.ctype||'',name:sess.courseName||''};
+        document.getElementById('metaLine').textContent=CLASS.meta.date+(CLASS.meta.type?' · '+CLASS.meta.type:'')+(CLASS.meta.name?' · '+CLASS.meta.name:'');
+        document.getElementById('pageTitle').textContent='继续上课 · '+(CLASS.meta.type||'课堂');
+        recParts.segBySession(sid).then(function(segs){CLASS.segSeq=segs.length;}).catch(function(){});
+        CLASS._recSid=sid;CLASS.sessionId=sid;   // 续录同一场次
+        document.getElementById('formCard').style.display='none';
+        document.getElementById('tools').style.display='block';
+        toast('已载入场次，可继续录音（段落接着编号）');
+      }else{formInit()}
+    }).catch(function(){formInit()});
+  }else{formInit()}
+})();
+</script>
+</body>
+</html>
