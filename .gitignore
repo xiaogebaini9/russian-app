@@ -17,3 +17,6 @@ cloud/.wrangler/
 android/keystore/
 # 本地归档（audit P2-3 移出的历史 backup/archive）
 ../russian-app-archive/
+
+# keystore 备份密码说明（绝不入库）
+audit/keystore-backup-info.txt
