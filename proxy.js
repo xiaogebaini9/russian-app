@@ -186,7 +186,7 @@ async function requestJsonAnalysis(key, messages, maxTokens, timeoutMs) {
 const MIME = {
   '.html':'text/html;charset=utf-8',
   '.js':'application/javascript',
-  '.json':'application/json',
+  '.json':'application/json; charset=utf-8',
   '.css':'text/css',
   '.png':'image/png',
   '.jpg':'image/jpeg',
@@ -211,7 +211,11 @@ const server = http.createServer((req, res) => {
     return;
   }
   const _writeHead = res.writeHead.bind(res);
-  res.writeHead = (code, headers) => _writeHead(code, Object.assign({}, headers, corsHeaders));
+  res.writeHead = (code, headers) => {
+    // JSON 响应统一补 charset（audit I-3：否则中文在部分客户端乱码）
+    if (headers && headers['Content-Type'] === 'application/json') headers = Object.assign({}, headers, { 'Content-Type': 'application/json; charset=utf-8' });
+    return _writeHead(code, Object.assign({}, headers, corsHeaders));
+  };
 
   // ── 余额查询（仅 DeepSeek 官方地址支持，中转一般没有此接口）──
   if (req.method === 'GET' && url === '/api/balance') {
@@ -673,7 +677,9 @@ const server = http.createServer((req, res) => {
       // 1. DeepSeek API 可达性
       try {
         const r = await fetch(`${DEEPSEEK}/v1/models`, { signal: AbortSignal.timeout(8000) });
-        result.checks.push({ name: 'DeepSeek API', ok: true, detail: '可达 (HTTP ' + r.status + ')' });
+        // 无鉴权探测：2xx=可达且可用；401/403=网络可达但未鉴权（不算可用）；其他状态=异常
+        const authOk = r.status >= 200 && r.status < 300;
+        result.checks.push({ name: 'DeepSeek API', ok: authOk, detail: authOk ? '可达 (HTTP ' + r.status + ')' : '网络可达但未鉴权 (HTTP ' + r.status + ')，不代表 Key 可用' });
       } catch (e) {
         result.checks.push({ name: 'DeepSeek API', ok: false, detail: e.message });
       }

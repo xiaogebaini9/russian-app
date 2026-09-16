@@ -1,5 +1,5 @@
 // Service Worker for offline caching
-const CACHE = 'russian-app-v65';
+const CACHE = 'russian-app-v66';
 const URLS = ['index.html', 'style.css', 'manifest.json', 'privacy.html'];
 
 self.addEventListener('install', e => {
@@ -34,8 +34,15 @@ self.addEventListener('fetch', e => {
       }).catch(() => caches.match(e.request).then(r => r || new Response('离线模式', { status: 200 })))
     );
   } else {
+    // 静态资源 cache-first；离线且不在缓存时：HTML 回兜底文本，其余回 503 JSON
+    // （audit I-2：此前一律 200 "离线模式"，JS/CSS/JSON 会以语法错误形式失败）
     e.respondWith(
-      caches.match(e.request).then(r => r || fetch(e.request).catch(() => new Response('离线模式', { status: 200 })))
+      caches.match(e.request).then(r => r || fetch(e.request).catch(() => {
+        if (e.request.destination === 'document' || /\.html?(\?|$)/.test(e.request.url)) {
+          return new Response('离线模式', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+        }
+        return new Response(JSON.stringify({ error: '离线：该资源不可用' }), { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+      }))
     );
   }
 });

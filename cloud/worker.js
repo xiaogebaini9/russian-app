@@ -364,7 +364,7 @@ function isAdmin(request, env) {
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json; charset=utf-8' }
   });
 }
 
@@ -810,6 +810,47 @@ async function route(request, env, ctx, path) {
   }
 
   // ── 意见反馈：存 KV，配了 pushplusToken 则微信推送管理员 ──
+  // ── 免费翻译最终兜底（audit I-4）：Workers AI m2m100，服务端执行，全球可达；每 IP 每日限 200 次防滥用 ──
+  if (method === 'POST' && path === '/api/translate-free') {
+    const body = await readJson(request);
+    const text = String((body && body.text) || '').slice(0, 2000);
+    if (!text.trim()) return json({ error: '文本为空' }, 400);
+    if (!env.AI) return json({ error: '翻译兜底未启用' }, 500);
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    const qk = 'tf:' + today() + ':' + ip;
+    let n = 0; try { n = parseInt(await env.KV.get(qk)) || 0; } catch (e) {}
+    if (n >= 200) return json({ error: '免费兜底额度已用完，请明天再试或填接入码' }, 429);
+    try {
+      const LANG_NAME = { ru: '俄语', en: '英语', zh: '中文' };
+      const model = String(body.model || '').slice(0, 60);
+      const isLLM = /instruct|chat/.test(model);
+      let t = '';
+      if (isLLM) {
+        // LLM 通道：messages 输入，指令式翻译（探测验证 @cf/meta/llama-3.3-70b-instruct-fp8-fast 可用）
+        const srcName = LANG_NAME[String(body.src || 'ru')] || '源语言';
+        const tgtName = LANG_NAME[String(body.tgt || 'zh')] || '中文';
+        const out = await env.AI.run(model || '@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+          messages: [
+            { role: 'system', content: '你是翻译引擎。只输出译文，不要任何解释、引号或前缀。' },
+            { role: 'user', content: '把下面的' + srcName + '翻译成' + tgtName + '：\n' + text }
+          ],
+          max_tokens: 1024
+        });
+        t = (out && out.response) || '';
+      } else {
+        // 翻译模型通道：text + source_lang/target_lang
+        const out = await env.AI.run(model || '@cf/meta/m2m100-1.2B', { text, source_lang: String(body.src || 'ru').slice(0, 8), target_lang: String(body.tgt || 'zh').slice(0, 8) });
+        t = (out && out.translated_text) || '';
+      }
+      t = String(t || '').trim();
+      if (!t) return json({ error: '兜底翻译为空' }, 502);
+      try { await env.KV.put(qk, String(n + 1), { expirationTtl: 172800 }); } catch (e) {}
+      return json({ translatedText: t, det: 'WorkerAI' });
+    } catch (e) {
+      return json({ error: '兜底翻译失败：' + (e.message || e) }, 502);
+    }
+  }
+
   if (method === 'POST' && path === '/api/feedback') {
     const body = await readJson(request);
     const text = String((body && body.text) || '').trim().slice(0, 2000);
@@ -834,7 +875,8 @@ async function route(request, env, ctx, path) {
   if (method === 'GET' && path === '/api/diagnose') {    const result = { server: 'ok', time: Date.now(), checks: [] };
     try {
       const r = await fetch(`${DS_BASE}/v1/models`, { signal: AbortSignal.timeout(8000) });
-      result.checks.push({ name: 'DeepSeek API', ok: true, detail: '可达 (HTTP ' + r.status + ')' });
+      const authOk = r.status >= 200 && r.status < 300;
+      result.checks.push({ name: 'DeepSeek API', ok: authOk, detail: authOk ? '可达 (HTTP ' + r.status + ')' : '网络可达但未鉴权 (HTTP ' + r.status + ')，不代表 Key 可用' });
     } catch (e) {
       result.checks.push({ name: 'DeepSeek API', ok: false, detail: e.message });
     }

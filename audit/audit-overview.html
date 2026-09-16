@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>russian-app 审计总览 · 2026-09-16</title>
+<style>
+  :root{
+    --bg:#fafbfb; --ink:#1a1d21; --ink2:#4a5158; --ink3:#6e7681;
+    --hair:#d9dde2; --hair2:#e8ebef;
+    --navy:#1e3a5f; --navy-ink:#16324f;
+    --mono:"Consolas","SF Mono","Courier New",monospace;
+    --sans:"Segoe UI","Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{background:var(--bg)}
+  body{font-family:var(--sans);color:var(--ink);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .canvas{max-width:1080px;margin:0 auto;padding:56px 40px 80px}
+  .kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+  .kicker b{color:var(--navy);font-weight:600}
+  .mono{font-family:var(--mono)}
+  a{color:var(--navy-ink);text-decoration:none;border-bottom:1px solid var(--hair)}
+  a:hover{border-bottom-color:var(--navy)}
+  /* 封面 */
+  .cover{padding-bottom:34px;border-bottom:2px solid var(--ink)}
+  .cover h1{font-size:44px;line-height:1.08;letter-spacing:-0.02em;font-weight:600;margin:14px 0 12px;max-width:720px}
+  .cover .sub{font-size:16px;color:var(--ink2);max-width:640px}
+  .meta-row{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px 28px;font-family:var(--mono);font-size:12px;color:var(--ink3)}
+  .meta-row span b{color:var(--ink2);font-weight:400}
+  /* TOC */
+  .toc{padding:22px 0;border-bottom:1px solid var(--hair)}
+  .toc ol{list-style:none;display:flex;flex-wrap:wrap;gap:4px 30px;font-size:13px;color:var(--ink2)}
+  .toc li{counter-increment:t}
+  .toc li::before{content:counter(t,decimal-leading-zero);font-family:var(--mono);font-size:11px;color:var(--navy);margin-right:8px}
+  /* 章节 */
+  section{padding:40px 0 8px}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:18px}
+  .sec-no{font-family:var(--mono);font-size:12px;color:var(--navy);letter-spacing:.08em}
+  .sec-head h2{font-size:23px;font-weight:600;letter-spacing:-0.01em}
+  .sec-rule{flex:1;height:1px;background:var(--hair);align-self:center}
+  p.lede{font-size:16.5px;line-height:1.65;max-width:760px;color:var(--ink)}
+  p.body{max-width:760px;color:var(--ink2);margin:10px 0 0}
+  /* stat strip —— 印刷式数字条，非卡片 */
+  .stats{display:flex;flex-wrap:wrap;margin:26px 0 6px;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+  .stat{flex:1 1 150px;min-width:140px;padding:16px 18px 14px;border-left:1px solid var(--hair)}
+  .stat:first-child{border-left:none}
+  .stat .n{font-size:34px;font-weight:600;letter-spacing:-0.02em;line-height:1.1;color:var(--navy-ink)}
+  .stat .n em{font-style:normal;font-size:15px;color:var(--ink3);font-weight:400}
+  .stat .l{font-size:12px;color:var(--ink3);margin-top:4px}
+  /* 表格 */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0 6px}
+  th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);font-weight:600;text-align:left;padding:8px 12px 8px 0;border-bottom:1px solid var(--ink)}
+  td{padding:9px 12px 9px 0;border-bottom:1px solid var(--hair2);vertical-align:top;color:var(--ink2)}
+  td.k{color:var(--ink);font-weight:500}
+  td .mono{font-size:12px}
+  tr:last-child td{border-bottom:1px solid var(--hair)}
+  /* 等级标签 */
+  .tag{display:inline-block;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:2px 7px;border:1px solid var(--ink);color:var(--ink);white-space:nowrap}
+  .tag.p0{background:var(--navy);border-color:var(--navy);color:#fafbfb}
+  .tag.p1{border-color:var(--navy);color:var(--navy-ink)}
+  .tag.p2{border-color:var(--hair);color:var(--ink3)}
+  .tag.ok{border-color:var(--hair);color:var(--ink3)}
+  /* P0 聚焦块 */
+  .focus{border:1px solid var(--ink);padding:24px 26px 18px;margin:20px 0 10px}
+  .focus .fh{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .focus h3{font-size:18px;font-weight:600}
+  .focus .mono-note{font-family:var(--mono);font-size:12px;color:var(--ink3)}
+  .focus p{max-width:none}
+  /* 图 */
+  figure{margin:22px 0 10px}
+  figcaption{font-size:12px;color:var(--ink3);margin-top:8px;max-width:640px}
+  figcaption b{color:var(--ink2);font-weight:600}
+  /* 里程碑 */
+  .ms{border-left:1px solid var(--hair);margin:18px 0 8px;padding-left:0}
+  .ms-row{display:flex;gap:22px;padding:14px 0 14px 24px;border-bottom:1px solid var(--hair2);position:relative}
+  .ms-row::before{content:"";position:absolute;left:-3px;top:22px;width:5px;height:5px;background:var(--navy)}
+  .ms-when{flex:0 0 92px;font-family:var(--mono);font-size:12px;color:var(--navy);padding-top:2px}
+  .ms-body{flex:1}
+  .ms-body b{font-weight:600;color:var(--ink)}
+  .ms-body .d{color:var(--ink3);font-size:13px;margin-top:2px}
+  /* 清单 */
+  ul.chk{list-style:none;margin:12px 0 4px;max-width:760px}
+  ul.chk li{padding:7px 0 7px 26px;border-bottom:1px solid var(--hair2);color:var(--ink2);position:relative;font-size:14px}
+  ul.chk li::before{content:"";position:absolute;left:2px;top:14px;width:11px;height:11px;border:1.5px solid var(--navy)}
+  ul.chk li b{color:var(--ink)}
+  /* colophon */
+  .colo{margin-top:56px;padding-top:20px;border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:10px 40px;font-size:12px;color:var(--ink3)}
+  .colo div{min-width:200px}
+  .colo b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px;font-weight:600}
+  @media (max-width:720px){
+    .canvas{padding:36px 20px 60px}
+    .cover h1{font-size:32px}
+    .stat{min-width:45%}
+  }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- 封面 -->
+  <header class="cover">
+    <div class="kicker">项目体检 · 只读审计 · <b>P0 一项需当天处理</b></div>
+    <h1>russian-app 审计总览</h1>
+    <p class="sub">俄语学习 App（Capacitor 混合应用 · Web / 本地代理 / Cloudflare Worker 三形态）。结论：可构建、可运行、线上正常、git 无密钥泄露；唯一 P0 是本地代理静态服务无白名单，密钥文件可被局域网直接下载。</p>
+    <div class="meta-row">
+      <span>对象 <b>C:\Users\Administrator\russian-app</b></span>
+      <span>版本 <b>v6.5.0</b></span>
+      <span>commit <b>956e309（与 origin/main 同步）</b></span>
+      <span>日期 <b>2026-09-16</b></span>
+      <span>方式 <b>只读 · 未改业务代码</b></span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <ol>
+      <li><a href="#s1">结论与关键数字</a></li>
+      <li><a href="#s2">P0 发现</a></li>
+      <li><a href="#s3">风险分布</a></li>
+      <li><a href="#s4">构建与运行验证</a></li>
+      <li><a href="#s5">模块全貌</a></li>
+      <li><a href="#s6">修复路线</a></li>
+      <li><a href="#s7">报告包索引</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1 结论 -->
+  <section id="s1">
+    <div class="sec-head"><span class="sec-no">01</span><h2>结论与关键数字</h2><span class="sec-rule"></span></div>
+    <p class="lede">工程纪律好于同类个人项目：版本号单处来源、三份静态拷贝脚本化同步、XSS 转义覆盖引号、防刷成体系、内部文档与真实状态一致。全部发现共 10 项，其中 1 项 P0 需要当天处置，其余按周/月排期。</p>
+    <div class="stats">
+      <div class="stat"><div class="n">10</div><div class="l">分级问题（P0×1 / P1×4 / P2×5）</div></div>
+      <div class="stat"><div class="n">4</div><div class="l">依赖漏洞，均在构建工具链，运行时为 0</div></div>
+      <div class="stat"><div class="n">98</div><div class="l">npm 包，许可证全部宽松许可</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">密钥进入 git 历史（git log --all 验证）</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">套交付形态共用一份 Web 代码</div></div>
+      <div class="stat"><div class="n">5</div><div class="l">敏感路径实测可下载（P0 证据）</div></div>
+    </div>
+    <p class="body">判定依据全部可复现：每条结论对应文件路径、命令或 HTTP 实测输出，见第 04 节验证记录与报告包各分册。</p>
+  </section>
+
+  <!-- 2 P0 -->
+  <section id="s2">
+    <div class="sec-head"><span class="sec-no">02</span><h2>P0 发现：代理静态服务无白名单</h2><span class="sec-rule"></span></div>
+    <div class="focus">
+      <div class="fh"><span class="tag p0">P0</span><h3>keys.json / cloud.json / codes.json / .dev.vars 均可被局域网直接下载</h3><span class="mono-note">proxy.js L692-711 · L728 监听 0.0.0.0:8765</span></div>
+      <p class="body" style="margin-top:12px">静态文件段只防了目录穿越（<span class="mono">path.normalize</span> 实测有效，<span class="mono">curl --path-as-is</span> 全部 404），没有做允许清单——项目根目录里的一切文件都可读，而密钥恰好就在根目录。README 推荐的「手机同 Wi-Fi 访问」正是这个暴露面；审计时主机正连公共 Wi-Fi（Ruijie-s209C_5G，Public 配置文件）。</p>
+      <table>
+        <thead><tr><th>实测路径</th><th>HTTP</th><th>大小</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td class="k mono">/keys.json</td><td>200</td><td>50 B</td><td>DeepSeek API Key（sk-874…1556）</td></tr>
+          <tr><td class="k mono">/cloud.json</td><td>200</td><td>101 B</td><td>云端 adminToken（48 位）——可全权接管云端</td></tr>
+          <tr><td class="k mono">/codes.json</td><td>200</td><td>665 B</td><td>9 个接入码与用量</td></tr>
+          <tr><td class="k mono">/cloud/.dev.vars</td><td>200</td><td>60 B</td><td>本地 ADMIN_TOKEN</td></tr>
+          <tr><td class="k mono">/.git/config</td><td>200</td><td>381 B</td><td>仓库元数据（含远程地址）</td></tr>
+        </tbody>
+      </table>
+      <p class="body">修复约 10 行（白名单 8 个静态文件），并轮换两把密钥；步骤与验证命令见 roadmap.md P0-1 / P0-2。云端 Worker 无此问题（/proxy.js、/codes.json 实测 404）。</p>
+    </div>
+  </section>
+
+  <!-- 3 风险分布 -->
+  <section id="s3">
+    <div class="sec-head"><span class="sec-no">03</span><h2>风险与漏洞分布</h2><span class="sec-rule"></span></div>
+    <p class="body">10 项分级问题覆盖安全（2）、可用性（3）、加固（3）、卫生（2）；每一项在 code-issues.md 带文件位置、在 risk-register.md 带触发条件与回滚步骤。</p>
+    <figure>
+      <svg viewBox="0 0 720 128" width="100%" role="img" aria-label="问题分级条形图：P0 一项，P1 四项，P2 五项">
+        <g font-family="Consolas,monospace" font-size="12">
+          <text x="0" y="18" fill="#6e7681">P0</text>
+          <rect x="34" y="8" width="24" height="14" fill="#1e3a5f"/>
+          <text x="64" y="19" fill="#1a1d21">1 · 密钥经静态服务泄露</text>
+          <text x="0" y="54" fill="#6e7681">P1</text>
+          <rect x="34" y="44" width="96" height="14" fill="#9aa3ad"/>
+          <text x="136" y="55" fill="#1a1d21">4 · 引擎双挂 / SW 兜底 / diagnose / 签名单点</text>
+          <text x="0" y="90" fill="#6e7681">P2</text>
+          <rect x="34" y="80" width="120" height="14" fill="#c9ced4"/>
+          <text x="160" y="91" fill="#1a1d21">5 · 哈希加固 / allowBackup / 仓库卫生等</text>
+          <line x1="0" y1="110" x2="720" y2="110" stroke="#d9dde2" stroke-width="1"/>
+          <text x="0" y="124" fill="#6e7681">n=10 · 来源 code-issues.md I-1…I-10 · 2026-09-16</text>
+        </g>
+      </svg>
+      <figcaption><b>图 1</b> · 分级问题计数。P0 为安全项（海军蓝），P1/P2 为灰阶。依赖漏洞另有 4 项（1 High / 3 Moderate），全部位于 @capacitor/cli 构建链，不进 APK 运行时。</figcaption>
+    </figure>
+    <figure>
+      <svg viewBox="0 0 720 56" width="100%" role="img" aria-label="依赖漏洞严重度点阵：1 高危，3 中危">
+        <g font-family="Consolas,monospace" font-size="12">
+          <text x="0" y="20" fill="#6e7681">依赖漏洞</text>
+          <circle cx="80" cy="16" r="6" fill="#1e3a5f"/>
+          <text x="92" y="20" fill="#1a1d21">High ×1 @xmldom/xmldom（13 条通告）</text>
+          <circle cx="80" cy="38" r="6" fill="none" stroke="#9aa3ad" stroke-width="1.5"/>
+          <circle cx="102" cy="38" r="6" fill="none" stroke="#9aa3ad" stroke-width="1.5"/>
+          <circle cx="124" cy="38" r="6" fill="none" stroke="#9aa3ad" stroke-width="1.5"/>
+          <text x="140" y="42" fill="#1a1d21">Moderate ×3 uuid / xcode / @capacitor/cli</text>
+        </g>
+      </svg>
+      <figcaption><b>图 2</b> · npm audit 与 npm ls 依赖链两种方式交叉核对一致。修复：<span class="mono">npm audit fix</span>（无 breaking change），预计本周内完成。</figcaption>
+    </figure>
+  </section>
+
+  <!-- 4 验证 -->
+  <section id="s4">
+    <div class="sec-head"><span class="sec-no">04</span><h2>构建与运行验证（实测记录）</h2><span class="sec-rule"></span></div>
+    <table>
+      <thead><tr><th>步骤</th><th>命令 / 请求</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td class="k">语法检查</td><td class="mono">node --check proxy.js / gen-codes.js / worker.js</td><td>全部通过（worker 按 ESM 校验）</td></tr>
+        <tr><td class="k">内联脚本</td><td>提取 index.html 两个 script 块</td><td>342 + 272,891 字符，语法通过</td></tr>
+        <tr><td class="k">资源同步</td><td class="mono">npx cap sync android</td><td>成功 0.149s；执行后 git 工作区保持干净（三份拷贝本就一致）</td></tr>
+        <tr><td class="k">本地冒烟</td><td class="mono">GET http://localhost:8765/api/config</td><td>200 <span class="mono">{"isOfficial":true}</span></td></tr>
+        <tr><td class="k">接入码校验</td><td class="mono">GET /api/testkey（有效码）</td><td>200 <span class="mono">{"ok":true,"code":true,"remaining":100}</span></td></tr>
+        <tr><td class="k">语音健康</td><td class="mono">GET /api/voice-health</td><td>200，本地 Whisper 未启动如实上报 stt:false</td></tr>
+        <tr><td class="k">云端自检</td><td class="mono">GET https://aimisi.top/api/diagnose</td><td>200；DeepSeek 可达；MyMemory 当日限额 + LibreTranslate 502（即 P1 引擎双挂）</td></tr>
+        <tr><td class="k">部署一致性</td><td>远端 index.html / sw.js / style.css</td><td>APP_VERSION 6.5.0、sw v65 与本地一致；字节差异为 Cloudflare Web Analytics 注入，非版本漂移</td></tr>
+        <tr><td class="k">运行截图</td><td>Edge headless 420×900 两张</td><td>local-proxy-home.png / remote-aimisi-home.png（像素采样 164 色，非空白）</td></tr>
+        <tr><td class="k">环境</td><td>Node v22.22.0 · JDK 17.0.20 · Android SDK</td><td>前两者满足；SDK 未装 → 本地出 APK 不可行，CI 链路完整可替代</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 5 模块 -->
+  <section id="s5">
+    <div class="sec-head"><span class="sec-no">05</span><h2>模块全貌</h2><span class="sec-rule"></span></div>
+    <table>
+      <thead><tr><th>模块</th><th>位置 · 规模</th><th>职责与状态</th></tr></thead>
+      <tbody>
+        <tr><td class="k">前端主应用</td><td class="mono">index.html · 3051 行 / 346KB</td><td>全部界面与逻辑单文件；style.css / sw.js（缓存 russian-app-v65，HTML network-first）</td></tr>
+        <tr><td class="k">本地代理</td><td class="mono">proxy.js · 668 行 · :8765</td><td>静态托管 + 13 个 /api/* + 接入码校验 + 转发本机 Whisper(:9000)——P0 所在</td></tr>
+        <tr><td class="k">云端 Worker</td><td class="mono">cloud/worker.js · 988 行</td><td>aimisi.top 生产：KV 码库、D1 账号/会话/设备防刷、Workers AI 云语音、PBKDF2 登录</td></tr>
+        <tr><td class="k">语音识别（可选）</td><td class="mono">whisper/stt_server.py · 129 行</td><td>faster-whisper large-v3-turbo（1,543MB）CUDA float16；模型与 venv 就绪，服务未运行</td></tr>
+        <tr><td class="k">Android 壳</td><td class="mono">android/ · Capacitor 8.5.0</td><td>com.russian.learn · minSdk 24 / targetSdk 36 / AGP 8.13.0；keystore 本地保管（已忽略）</td></tr>
+        <tr><td class="k">运维 CLI</td><td class="mono">gen-codes.js · 611 行</td><td>码全生命周期 + 换 Key + 用户/设备/反馈管理（本地与云端同套命令）</td></tr>
+        <tr><td class="k">发版与 CI</td><td class="mono">sync.bat · build-apk.bat · build.yml</td><td>SW 版本自增 + 三份拷贝同步；push main 自动出 APK + Release，支持签名 Secrets</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 6 路线 -->
+  <section id="s6">
+    <div class="sec-head"><span class="sec-no">06</span><h2>修复路线（详版见 roadmap.md）</h2><span class="sec-rule"></span></div>
+    <div class="ms">
+      <div class="ms-row">
+        <div class="ms-when">今天 · 1.5h</div>
+        <div class="ms-body"><b>P0 止损：静态白名单 + 轮换两把密钥 + 公共 Wi-Fi 约束</b>
+          <div class="d">验证：curl 五个敏感路径全 404、页面五屏正常；旧 Key / 旧 token 失效。</div></div>
+      </div>
+      <div class="ms-row">
+        <div class="ms-when">本周 · 4-6h</div>
+        <div class="ms-body"><b>P1：npm audit fix · 快速翻译第三引擎兜底 · SW 离线分流与 diagnose 修复 · keystore 异地备份</b>
+          <div class="d">验证：npm audit 归零、模拟双挂有兜底、DevTools 离线无语法错误、备份可解密且哈希一致。</div></div>
+      </div>
+      <div class="ms-row">
+        <div class="ms-when">月底 · 1-2 天</div>
+        <div class="ms-body"><b>P2：allowBackup 收紧 · 哈希加固与常量时间比较 · 仓库清理 · 最小监控（余额告警 + 每日自检）</b>
+          <div class="d">验证：新 APK 备份不含 WebView 数据；老用户登录无感重哈希；人为触低阈值收到推送。</div></div>
+      </div>
+    </div>
+    <ul class="chk">
+      <li><b>今天就可以做的三件事：</b>停掉公共 Wi-Fi 上的 proxy（审计用进程已由我停止）→ 改 proxy.js 静态白名单 → <span class="mono">node gen-codes.js key sk-新Key</span></li>
+      <li><b>不要做的：</b>在未轮换密钥前把 proxy 暴露到不可信网络；误把 .gitignore.new 当现行规则（其内容会误标删除 proxy.js 与 widget.html）</li>
+      <li><b>接手新环境：</b>按 handover.md 第 8 节冒烟清单跑一遍（四条 curl + 云端一条）</li>
+    </ul>
+  </section>
+
+  <!-- 7 索引 -->
+  <section id="s7">
+    <div class="sec-head"><span class="sec-no">07</span><h2>报告包索引</h2><span class="sec-rule"></span></div>
+    <table>
+      <thead><tr><th>分册</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><a href="audit-report.md">audit-report.md</a></td><td>主报告：全貌、验证记录、密钥检查、异常路径摘要、结论</td></tr>
+        <tr><td class="k"><a href="dependency-audit.md">dependency-audit.md</a></td><td>98 包清单、4 漏洞（含引入链与建议版本）、许可证分布、交叉验证方式</td></tr>
+        <tr><td class="k"><a href="code-issues.md">code-issues.md</a></td><td>I-1…I-10 分级问题（文件位置 + 复现方法）+ 异常路径 11 条评级 + 死代码盘点</td></tr>
+        <tr><td class="k"><a href="risk-register.md">risk-register.md</a></td><td>R1…R10：影响范围 / 触发条件 / 缓解与回滚步骤</td></tr>
+        <tr><td class="k"><a href="roadmap.md">roadmap.md</a></td><td>P0/P1/P2 十六项动作：工作量 + 验证方法 + 里程碑</td></tr>
+        <tr><td class="k"><a href="handover.md">handover.md</a></td><td>交接文档：环境要求、启动命令、环境变量、云端运维、发版流程、冒烟清单</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer class="colo">
+    <div><b>方法</b>只读审计 · 未改动业务代码 · 结论均可凭路径/命令/HTTP 输出复现</div>
+    <div><b>交叉验证</b>漏洞结论 = npm audit × npm ls 双源；部署状态 = 版本号 × 字节比对 × SW 版本三源</div>
+    <div><b>制图</b>Native HTML · 科学期刊风（Fathom）· 单一海军蓝 accent · 数据均来自 2026-09-16 实测</div>
+  </footer>
+
+</div>
+</body>
+</html>

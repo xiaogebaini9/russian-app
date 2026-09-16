@@ -340,10 +340,14 @@ async function translateFree(txt,mid){
   const src=LANG_TO_API[S.langSrc],tgt=LANG_TO_API[S.langTgt];
   const tryLibre=async()=>{const lz={ru:'ru',en:'en','zh-CN':'zh'};const r=await fetch(CFG.models[1].api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({q:txt,source:lz[src],target:lz[tgt],format:'text'}),signal:AbortSignal.timeout(8000)});const d=await r.json();if(d.translatedText)return{text:d.translatedText,det:'LibreTranslate'};throw new Error(d.error||'失败')};
   const tryMyMemory=async()=>{const r=await fetch(`${CFG.models[0].api}?q=${encodeURIComponent(txt)}&langpair=${src}|${tgt}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();if(d.responseStatus===200&&d.responseData)return{text:d.responseData.translatedText,det:'MyMemory'};throw new Error(d.responseDetails||'失败')};
+  // 第三引擎（audit I-4）：MyMemory 按 IP 限额 + terraprint LibreTranslate 曾同日双挂，加 Google gtx 兜底；全挂时引导深度模式
+  const tryGoogle=async()=>{const r=await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${src}&tl=${tgt}&dt=t&q=${encodeURIComponent(txt)}`,{signal:AbortSignal.timeout(8000)});const d=await r.json();if(d&&d[0]&&d[0][0])return{text:d[0].map(x=>x[0]||'').join(''),det:'Google'};throw new Error('失败')};
+    const tryWorkerAI=async()=>{const lz2={ru:'ru',en:'en','zh-CN':'zh'};const d=await apiFetch('/api/translate-free',{body:{text:txt,src:lz2[src],tgt:lz2[tgt],model:'@cf/meta/llama-3.3-70b-instruct-fp8-fast'},timeout:25000});if(d.translatedText)return{text:d.translatedText,det:'WorkerAI'};throw new Error(d.error||'失败')};
+  const QUICK_HINT='快速引擎今日限额或故障，请切到「深度」模式翻译';
   if(mid==='mymemory'){
-    try{return await tryMyMemory()}catch(e){try{return await tryLibre()}catch(e2){throw new Error(e.message||'失败')}}
+    try{return await tryMyMemory()}catch(e){try{return await tryLibre()}catch(e2){try{return await tryGoogle()}catch(e3){try{return await tryWorkerAI()}catch(e4){throw new Error(QUICK_HINT)}}}}
   }else{
-    try{return await tryLibre()}catch(e){try{return await tryMyMemory()}catch(e2){throw new Error(e.message||'失败')}}
+    try{return await tryLibre()}catch(e){try{return await tryMyMemory()}catch(e2){try{return await tryGoogle()}catch(e3){try{return await tryWorkerAI()}catch(e4){throw new Error(QUICK_HINT)}}}}
   }
 }
 async function translateDeepSeek(txt){if(!txt.trim())return null;const d=await apiFetch('/api/translate',{body:{key:S.settings.dsKey,src:S.langSrc,tgt:S.langTgt,text:txt},timeout:20000});return{text:d.text,det:'DeepSeek'}}
