@@ -52,11 +52,12 @@ jobs:
         env:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASS }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_B64" ] && [ -n "$ANDROID_KEYSTORE_PASS" ]; then
             mkdir -p android/keystore
             echo "$ANDROID_KEYSTORE_B64" | base64 -d > android/keystore/release.keystore
-            printf 'storeFile=keystore/release.keystore\nstorePassword=%s\nkeyAlias=russian-app\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASS" "$ANDROID_KEYSTORE_PASS" > android/keystore.properties
+            printf 'storeFile=keystore/release.keystore\nstorePassword=%s\nkeyAlias=russian-app\nkeyPassword=%s\n' "$ANDROID_KEYSTORE_PASS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
             echo "SIGNED_RELEASE=true" >> $GITHUB_ENV
             echo "签名密钥已就绪，将构建正式签名版"
           else

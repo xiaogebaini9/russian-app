@@ -626,6 +626,7 @@ async function route(request, env, ctx, path) {
 
   if (method === 'GET' && path === '/api/balance') {
     const key = request.headers.get('x-api-key') || '';
+    if (!key.trim()) return json({ error: '未填写 API Key 或接入码' }, 400);
     const d = await fetch(`${DS_BASE}/user/balance`, {
       headers: { 'Authorization': `Bearer ${key}` },
       signal: AbortSignal.timeout(10000)

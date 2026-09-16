@@ -225,6 +225,7 @@ const server = http.createServer((req, res) => {
       return;
     }
     const key = req.headers['x-api-key'] || '';
+    if (!String(key).trim()) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: '未填写 API Key 或接入码' })); return; }
     fetch(`${DEEPSEEK}/user/balance`, {
       headers: { 'Authorization': `Bearer ${key}` },
       signal: AbortSignal.timeout(10000)
